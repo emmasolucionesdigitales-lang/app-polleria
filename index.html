@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="theme-color" content="#1B3A2D"/>
+  <title>Gestión Pollería 🐔</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --verde-oscuro:  #1B3A2D;
+      --verde-medio:   #2D6A4F;
+      --verde-claro:   #40916C;
+      --verde-vivo:    #52B788;
+      --verde-suave:   #B7E4C7;
+      --crema:         #F8FAF5;
+      --beige:         #EDF2EB;
+      --beige2:        #D8E6D3;
+      --rojo:          #C0392B;
+      --naranja:       #E67E22;
+      --azul:          #2980B9;
+      --dorado:        #F0B429;
+      --texto:         #1A2E1F;
+      --texto2:        #4A7A5A;
+      --sombra:        0 3px 14px rgba(27,58,45,0.10);
+      --superficie:    #FFFFFF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--crema); color: var(--texto); min-height: 100vh; }
+    input, select, textarea, button { font-family: 'DM Sans', sans-serif; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--beige2); border-radius: 4px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyDl2QhPwVToc4t6UQEGlCydRLzdE4oAx8A",
+  authDomain:        "app-polleria-f349b.firebaseapp.com",
+  projectId:         "app-polleria-f349b",
+  storageBucket:     "app-polleria-f349b.firebasestorage.app",
+  messagingSenderId: "831311117717",
+  appId:             "1:831311117717:web:f1101e7fd49ddcbdb64a9c"
+};
+
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db   = firebase.firestore();
+const auth = firebase.auth();
+
+// ══════ HELPERS ══════
+const hoy = () => new Date().toISOString().split('T')[0];
+const formatFecha = (f) => { if (!f) return '—'; const [y,m,d] = f.split('-'); return `${d}/${m}/${y}`; };
+const formatPeso  = (n) => '$' + Number(n||0).toLocaleString('es-AR', {minimumFractionDigits:0});
+const ahora = () => new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+
+// ══════ ESTILOS ══════
+const S = {
+  input: {
+    display:'block', width:'100%', marginTop:4, padding:'11px 13px',
+    borderRadius:10, border:'2px solid var(--beige)', background:'var(--superficie)',
+    color:'var(--texto)', fontSize:15, outline:'none', marginBottom:2,
+  },
+  label: {
+    fontSize:12, color:'var(--texto2)', fontWeight:600,
+    display:'block', marginBottom:2, marginTop:12,
+    textTransform:'uppercase', letterSpacing:'0.5px',
+  },
+  btnV: { background:'var(--verde-claro)', color:'white', border:'none', borderRadius:10, padding:'10px 18px', fontWeight:600, fontSize:14, cursor:'pointer' },
+  btnS: { background:'var(--beige)', color:'var(--verde-oscuro)', border:'none', borderRadius:10, padding:'10px 18px', fontWeight:600, fontSize:14, cursor:'pointer' },
+};
+
+function Campo({ label, value, onChange, placeholder, tipo='text', rows }) {
+  return (
+    <>
+      <label style={S.label}>{label}</label>
+      {rows
+        ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...S.input, resize:'vertical'}}/>
+        : <input type={tipo} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={S.input}/>
+      }
+    </>
+  );
+}
+
+// ══════ HEADER ══════
+function Header({ titulo, onBack, onAdd, onLogout, subtitulo }) {
+  return (
+    <header style={{
+      background:'var(--verde-oscuro)', color:'#F8FAF5',
+      padding:'14px 16px 12px', display:'flex', alignItems:'center',
+      justifyContent:'space-between', position:'sticky', top:0, zIndex:50,
+      boxShadow:'0 2px 12px rgba(27,58,45,0.3)',
+    }}>
+      <div style={{display:'flex', alignItems:'center', gap:10}}>
+        {onBack && <button onClick={onBack} style={{background:'none',border:'none',color:'#F8FAF5',fontSize:22,cursor:'pointer',lineHeight:1}}>←</button>}
+        <div>
+          <h2 style={{fontFamily:'Syne', fontSize:19, lineHeight:1.1}}>{titulo}</h2>
+          {subtitulo && <p style={{fontSize:11, opacity:0.6, marginTop:1}}>{subtitulo}</p>}
+        </div>
+      </div>
+      <div style={{display:'flex', gap:8, alignItems:'center'}}>
+        {onAdd && <button onClick={onAdd} style={{...S.btnV, padding:'8px 14px', fontSize:22, lineHeight:1, borderRadius:10}}>+</button>}
+        {onLogout && <button onClick={onLogout} style={{background:'none', border:'1px solid rgba(248,250,245,0.25)', color:'#F8FAF5', borderRadius:8, padding:'6px 10px', fontSize:12, cursor:'pointer'}}>Salir</button>}
+      </div>
+    </header>
+  );
+}
+
+// ══════ NAV ══════
+const TABS = [
+  { id:'pedidos',    icon:'📋', label:'Pedidos'   },
+  { id:'precios',    icon:'💰', label:'Precios'   },
+  { id:'stock',      icon:'📦', label:'Stock'     },
+  { id:'clientes',   icon:'👥', label:'Clientes'  },
+  { id:'caja',       icon:'🧾', label:'Caja'      },
+];
+
+function NavBar({ activo, onChange }) {
+  return (
+    <nav style={{
+      position:'fixed', bottom:0, left:0, right:0,
+      background:'var(--verde-oscuro)', display:'flex', justifyContent:'space-around',
+      padding:'8px 0 12px', zIndex:100, boxShadow:'0 -2px 16px rgba(27,58,45,0.25)',
+    }}>
+      {TABS.map(t => (
+        <button key={t.id} onClick={()=>onChange(t.id)} style={{
+          background:'none', border:'none', cursor:'pointer',
+          display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+          padding:'4px 10px', borderRadius:10,
+          opacity: activo===t.id ? 1 : 0.45,
+          transform: activo===t.id ? 'scale(1.12)' : 'scale(1)',
+          transition:'all 0.18s',
+        }}>
+          <span style={{fontSize:20}}>{t.icon}</span>
+          <span style={{fontSize:10, color:'#F8FAF5', fontWeight: activo===t.id ? 700 : 400}}>{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+// ══════ LOGIN ══════
+function Login() {
+  const [email,setEmail] = useState('');
+  const [pass,setPass]   = useState('');
+  const [error,setError] = useState('');
+  const [carg,setCarg]   = useState(false);
+
+  const ingresar = async () => {
+    if (!email||!pass) return setError('Completá los dos campos');
+    setCarg(true); setError('');
+    try { await auth.signInWithEmailAndPassword(email,pass); }
+    catch { setError('Email o contraseña incorrectos'); setCarg(false); }
+  };
+
+  return (
+    <div style={{minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'32px 24px', background:'var(--crema)'}}>
+      <div style={{position:'fixed', top:-80, right:-80, width:250, height:250, borderRadius:'50%', background:'rgba(64,145,108,0.08)', pointerEvents:'none'}}/>
+      <div style={{position:'fixed', bottom:-60, left:-60, width:200, height:200, borderRadius:'50%', background:'rgba(82,183,136,0.10)', pointerEvents:'none'}}/>
+      <div style={{fontSize:64, marginBottom:8}}>🐔</div>
+      <h1 style={{fontFamily:'Syne', fontSize:32, color:'var(--verde-oscuro)', marginBottom:4}}>Gestión Pollería</h1>
+      <p style={{color:'var(--texto2)', marginBottom:36, fontSize:14}}>Tu negocio bajo control</p>
+      <div style={{width:'100%', maxWidth:340, background:'var(--superficie)', borderRadius:16, padding:24, boxShadow:'0 4px 24px rgba(27,58,45,0.12)'}}>
+        {error && <div style={{background:'#FDEDEC', color:'var(--rojo)', padding:'10px 14px', borderRadius:10, marginBottom:14, fontSize:13, fontWeight:600}}>⚠️ {error}</div>}
+        <Campo label="Email" value={email} onChange={setEmail} placeholder="tu@email.com" tipo="email"/>
+        <Campo label="Contraseña" value={pass} onChange={setPass} placeholder="••••••••" tipo="password"/>
+        <button onClick={ingresar} disabled={carg} style={{...S.btnV, width:'100%', marginTop:18, padding:14, fontSize:16, opacity:carg?0.7:1}}>
+          {carg ? 'Ingresando...' : '🐔 Ingresar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// PANTALLA: PRECIOS
+// ══════════════════════════════════════════════════════
+function PantallaPrecios({ uid }) {
+  const [productos, setProductos] = useState([]);
+  const [form, setForm]           = useState(null);
+  const [buscar, setBuscar]       = useState('');
+
+  const CATS = ['🐔 Pollo', '🥩 Carne', '🥦 Verduras', '🍋 Frutas', '🥚 Huevos y lácteos', '🧀 Fiambres', '🛒 Almacén', 'Otro'];
+
+  const col = db.collection(`polleria/${uid}/productos`);
+  useEffect(() => col.orderBy('nombre','asc').onSnapshot(snap =>
+    setProductos(snap.docs.map(d=>({id:d.id,...d.data()})))
+  ), []);
+
+  const guardar = async (datos) => {
+    const {id,...resto} = datos;
+    if (id) await col.doc(id).update(resto);
+    else    await col.add(resto);
+    setForm(null);
+  };
+
+  const eliminar = async (id) => {
+    if (!confirm('¿Eliminar este producto?')) return;
+    await col.doc(id).delete();
+  };
+
+  if (form !== null) return <FormProducto inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)} categorias={CATS}/>;
+
+  const filtrados = productos.filter(p =>
+    p.nombre.toLowerCase().includes(buscar.toLowerCase()) ||
+    (p.categoria||'').toLowerCase().includes(buscar.toLowerCase())
+  );
+  const porCat = {};
+  filtrados.forEach(p => { const c=p.categoria||'Otro'; if(!porCat[c]) porCat[c]=[]; porCat[c].push(p); });
+
+  return (
+    <div>
+      <Header titulo="💰 Lista de Precios" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()}/>
+      <div style={{padding:'10px 16px 110px'}}>
+        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar producto..." style={{...S.input, marginTop:0, marginBottom:8}}/>
+
+        {productos.length===0 && (
+          <div style={{textAlign:'center', padding:56}}>
+            <div style={{fontSize:52}}>🐔</div>
+            <p style={{color:'var(--texto2)', marginTop:10, marginBottom:20}}>No hay productos todavía</p>
+            <button onClick={()=>setForm({})} style={S.btnV}>+ Agregar producto</button>
+          </div>
+        )}
+
+        {Object.entries(porCat).map(([cat, prods]) => (
+          <div key={cat} style={{marginBottom:18}}>
+            <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', padding:'7px 14px', borderRadius:10, marginBottom:8, fontWeight:700, fontSize:13, display:'flex', justifyContent:'space-between'}}>
+              <span>{cat}</span>
+              <span style={{opacity:0.6}}>{prods.length}</span>
+            </div>
+            {prods.map(p => (
+              <div key={p.id} style={{background:'var(--superficie)', borderRadius:12, padding:'12px 14px', marginBottom:8, border:'1px solid var(--beige)', boxShadow:'var(--sombra)'}}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700, fontSize:15, color:'var(--verde-oscuro)'}}>{p.nombre}</div>
+                    {p.descripcion && <div style={{fontSize:12, color:'var(--texto2)', marginTop:2}}>{p.descripcion}</div>}
+                    <div style={{fontSize:12, color:'var(--texto2)', marginTop:2}}>por {p.unidad||'kg'}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    {p.precioCosto>0 && <div style={{fontSize:12, color:'var(--texto2)', textDecoration:'line-through'}}>{formatPeso(p.precioCosto)}</div>}
+                    <div style={{fontWeight:800, fontSize:20, color:'var(--verde-claro)'}}>{formatPeso(p.precioVenta||0)}</div>
+                  </div>
+                </div>
+                <div style={{display:'flex', gap:8, marginTop:8}}>
+                  <button onClick={()=>setForm(p)} style={{...S.btnS, fontSize:12, padding:'5px 12px'}}>✏️ Editar</button>
+                  <button onClick={()=>eliminar(p.id)} style={{...S.btnS, fontSize:12, padding:'5px 12px', color:'var(--rojo)', marginLeft:'auto'}}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FormProducto({ inicial, onGuardar, onCancelar, categorias }) {
+  const UNIDADES = ['kg', 'g', 'unidad', 'docena', 'litro', 'atado', 'bandeja'];
+  const [d, setD] = useState({nombre:'', categoria:'🐔 Pollo', descripcion:'', precioCosto:'', precioVenta:'', unidad:'kg', ...inicial});
+  const set = (k,v) => setD(p=>({...p,[k]:v}));
+  const margen = d.precioCosto>0 ? Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100) : 0;
+
+  const guardar = () => {
+    if (!d.nombre.trim()) return alert('El nombre es obligatorio');
+    onGuardar({...d, precioCosto:Number(d.precioCosto)||0, precioVenta:Number(d.precioVenta)||0});
+  };
+
+  return (
+    <div>
+      <Header titulo={d.id ? '✏️ Editar Producto' : '+ Nuevo Producto'} onBack={onCancelar}/>
+      <div style={{padding:'16px 16px 110px'}}>
+        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
+
+        <label style={S.label}>Categoría</label>
+        <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:4}}>
+          {categorias.map(c=>(
+            <button key={c} onClick={()=>set('categoria',c)} style={{padding:'6px 12px', borderRadius:20, border:'none', cursor:'pointer', background:d.categoria===c?'var(--verde-claro)':'var(--beige)', color:d.categoria===c?'white':'var(--verde-oscuro)', fontWeight:600, fontSize:12}}>
+              {c}
+            </button>
+          ))}
+        </div>
+
+        <label style={S.label}>Unidad de venta</label>
+        <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:4}}>
+          {UNIDADES.map(u=>(
+            <button key={u} onClick={()=>set('unidad',u)} style={{padding:'6px 12px', borderRadius:20, border:'none', cursor:'pointer', background:d.unidad===u?'var(--verde-claro)':'var(--beige)', color:d.unidad===u?'white':'var(--verde-oscuro)', fontWeight:600, fontSize:13}}>
+              {u}
+            </button>
+          ))}
+        </div>
+
+        <Campo label="Descripción (opcional)" value={d.descripcion} onChange={v=>set('descripcion',v)} placeholder="Ej: fresco, de granja" rows={2}/>
+        <Campo label="💸 Precio de costo ($)" value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
+        <Campo label="💰 Precio de venta ($)" value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
+
+        {Number(d.precioCosto)>0 && Number(d.precioVenta)>0 && (
+          <div style={{background:margen>=0?'#E9F7EF':'#FDEDEC', border:`1px solid ${margen>=0?'#27AE60':'#C0392B'}`, borderRadius:10, padding:'10px 14px', marginTop:4, display:'flex', justifyContent:'space-between'}}>
+            <span style={{fontSize:13, color:'var(--texto2)'}}>Ganancia:</span>
+            <span style={{fontWeight:700, color:margen>=0?'var(--verde-claro)':'var(--rojo)', fontSize:15}}>{margen}% — {formatPeso(Number(d.precioVenta)-Number(d.precioCosto))}</span>
+          </div>
+        )}
+
+        <div style={{display:'flex', gap:8, marginTop:18}}>
+          <button onClick={guardar} style={{...S.btnV, flex:1, padding:14, fontSize:15}}>{d.id ? '✓ Guardar' : '+ Agregar'}</button>
+          <button onClick={onCancelar} style={{...S.btnS, padding:14}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// PANTALLA: STOCK
+// ══════════════════════════════════════════════════════
+function PantallaStock({ uid }) {
+  const [items, setItems]   = useState([]);
+  const [form, setForm]     = useState(null);
+  const [buscar, setBuscar] = useState('');
+
+  const col = db.collection(`polleria/${uid}/stock`);
+  useEffect(() => col.orderBy('nombre','asc').onSnapshot(snap =>
+    setItems(snap.docs.map(d=>({id:d.id,...d.data()})))
+  ), []);
+
+  const guardar = async (datos) => {
+    const {id,...resto} = datos;
+    if (id) await col.doc(id).update(resto);
+    else    await col.add(resto);
+    setForm(null);
+  };
+
+  const eliminar = async (id) => { if (!confirm('¿Eliminar?')) return; await col.doc(id).delete(); };
+  const ajustar  = async (id, delta) => {
+    const item = items.find(i=>i.id===id);
+    if (!item) return;
+    await col.doc(id).update({cantidad: Math.max(0,(Number(item.cantidad)||0)+delta)});
+  };
+
+  if (form!==null) return <FormStock inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+
+  const bajos     = items.filter(i=>Number(i.cantidad)<=Number(i.stockMinimo||0));
+  const filtrados = items.filter(i=>i.nombre.toLowerCase().includes(buscar.toLowerCase()));
+
+  return (
+    <div>
+      <Header titulo="📦 Stock / Inventario" onAdd={()=>setForm({})}/>
+      {bajos.length>0 && (
+        <div style={{margin:'12px 16px 0', padding:'10px 14px', background:'#FEF3E2', borderRadius:10, border:'1px solid #F39C12'}}>
+          <b style={{color:'var(--naranja)', fontSize:13}}>⚠️ Stock bajo: </b>
+          <span style={{fontSize:13, color:'var(--texto2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span>
+        </div>
+      )}
+      <div style={{padding:'10px 16px 4px'}}>
+        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." style={{...S.input, marginTop:0}}/>
+      </div>
+
+      {filtrados.length===0 && items.length===0 && (
+        <div style={{textAlign:'center', padding:56}}>
+          <div style={{fontSize:52}}>📦</div>
+          <p style={{color:'var(--texto2)', marginTop:10, marginBottom:20}}>No hay productos en stock</p>
+          <button onClick={()=>setForm({})} style={S.btnV}>+ Agregar</button>
+        </div>
+      )}
+
+      <div style={{padding:'4px 16px 110px'}}>
+        {filtrados.map(item => {
+          const bajo = Number(item.cantidad)<=Number(item.stockMinimo||0);
+          return (
+            <div key={item.id} style={{background:'var(--superficie)', borderRadius:12, marginBottom:10, padding:'14px 16px', boxShadow:'var(--sombra)', border:bajo?'1px solid #F39C12':'1px solid var(--beige)'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div>
+                  <div style={{fontWeight:700, fontSize:15}}>{item.nombre}</div>
+                  <div style={{fontSize:12, color:'var(--texto2)', marginTop:2}}>Mínimo: {item.stockMinimo||0} {item.unidad}</div>
+                </div>
+                <div style={{display:'flex', alignItems:'center', gap:8}}>
+                  <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:8,border:'none',background:'var(--beige)',cursor:'pointer',fontSize:18,fontWeight:700,lineHeight:1}}>−</button>
+                  <div style={{textAlign:'center', minWidth:56}}>
+                    <div style={{fontWeight:700, fontSize:20}}>{item.cantidad||0}</div>
+                    <div style={{fontSize:10, color:'var(--texto2)'}}>{item.unidad}</div>
+                  </div>
+                  <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:8,border:'none',background:'var(--verde-claro)',color:'white',cursor:'pointer',fontSize:18,fontWeight:700,lineHeight:1}}>+</button>
+                </div>
+              </div>
+              <div style={{display:'flex', gap:8, marginTop:10}}>
+                <button onClick={()=>setForm(item)} style={{...S.btnS, fontSize:12, padding:'5px 12px'}}>✏️ Editar</button>
+                <button onClick={()=>eliminar(item.id)} style={{...S.btnS, fontSize:12, padding:'5px 12px', color:'var(--rojo)'}}>🗑️</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FormStock({ inicial, onGuardar, onCancelar }) {
+  const UNIDADES = ['kg','g','unidades','litros','atados','bandejas','docenas'];
+  const [d,setD] = useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,...inicial});
+  const set = (k,v)=>setD(p=>({...p,[k]:v}));
+  const guardar = () => { if(!d.nombre.trim()) return alert('El nombre es obligatorio'); onGuardar({...d, cantidad:Number(d.cantidad)||0, stockMinimo:Number(d.stockMinimo)||0}); };
+
+  return (
+    <div>
+      <Header titulo={d.id?'✏️ Editar':'+ Nuevo Item Stock'} onBack={onCancelar}/>
+      <div style={{padding:'16px 16px 110px'}}>
+        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
+        <label style={S.label}>Unidad</label>
+        <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:4}}>
+          {UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} style={{padding:'7px 12px',borderRadius:20,border:'none',cursor:'pointer',background:d.unidad===u?'var(--verde-claro)':'var(--beige)',color:d.unidad===u?'white':'var(--verde-oscuro)',fontWeight:600,fontSize:13}}>{u}</button>)}
+        </div>
+        <Campo label={`Cantidad actual (${d.unidad})`} value={d.cantidad} onChange={v=>set('cantidad',v)} tipo="number" placeholder="0"/>
+        <Campo label={`Stock mínimo (${d.unidad}) — alerta`} value={d.stockMinimo} onChange={v=>set('stockMinimo',v)} tipo="number" placeholder="0"/>
+        <div style={{display:'flex', gap:8, marginTop:18}}>
+          <button onClick={guardar} style={{...S.btnV, flex:1, padding:14, fontSize:15}}>{d.id?'✓ Guardar':'+ Agregar'}</button>
+          <button onClick={onCancelar} style={{...S.btnS, padding:14}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// PANTALLA: CLIENTES
+// ══════════════════════════════════════════════════════
+function PantallaClientes({ uid }) {
+  const [clientes, setClientes] = useState([]);
+  const [form, setForm]         = useState(null);
+  const [fiado, setFiado]       = useState(null); // cliente para registrar pago
+  const [buscar, setBuscar]     = useState('');
+
+  const col = db.collection(`polleria/${uid}/clientes`);
+  useEffect(() => col.orderBy('nombre','asc').onSnapshot(snap =>
+    setClientes(snap.docs.map(d=>({id:d.id,...d.data()})))
+  ), []);
+
+  const guardar = async (datos) => {
+    const {id,...resto} = datos;
+    if (id) await col.doc(id).update(resto);
+    else    await col.add({...resto, saldoFiado:0});
+    setForm(null);
+  };
+
+  const eliminar = async (id) => { if(!confirm('¿Eliminar cliente?')) return; await col.doc(id).delete(); };
+
+  const registrarPago = async (cliente, monto) => {
+    const nuevo = Math.max(0, (Number(cliente.saldoFiado)||0) - Number(monto));
+    await col.doc(cliente.id).update({saldoFiado: nuevo});
+    setFiado(null);
+  };
+
+  if (form!==null) return <FormCliente inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+  if (fiado!==null) return <ModalPago cliente={fiado} onPagar={registrarPago} onCancelar={()=>setFiado(null)}/>;
+
+  const filtrados = clientes.filter(c=>c.nombre.toLowerCase().includes(buscar.toLowerCase()));
+  const totalFiado = clientes.reduce((s,c)=>s+(Number(c.saldoFiado)||0),0);
+
+  return (
+    <div>
+      <Header titulo="👥 Clientes" onAdd={()=>setForm({})}/>
+      <div style={{padding:'10px 16px 110px'}}>
+
+        {/* Resumen fiado total */}
+        {totalFiado>0 && (
+          <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:12, padding:'12px 16px', marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{fontSize:13, opacity:0.7}}>Total fiado pendiente</span>
+            <span style={{fontFamily:'Syne', fontWeight:700, fontSize:22, color:'var(--dorado)'}}>{formatPeso(totalFiado)}</span>
+          </div>
+        )}
+
+        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar cliente..." style={{...S.input, marginTop:0, marginBottom:8}}/>
+
+        {filtrados.length===0 && clientes.length===0 && (
+          <div style={{textAlign:'center', padding:56}}>
+            <div style={{fontSize:52}}>👥</div>
+            <p style={{color:'var(--texto2)', marginTop:10, marginBottom:20}}>No hay clientes registrados</p>
+            <button onClick={()=>setForm({})} style={S.btnV}>+ Agregar cliente</button>
+          </div>
+        )}
+
+        {filtrados.map(c => {
+          const saldo = Number(c.saldoFiado)||0;
+          return (
+            <div key={c.id} style={{background:'var(--superficie)', borderRadius:12, padding:'14px 16px', marginBottom:10, border:saldo>0?'1px solid var(--naranja)':'1px solid var(--beige)', boxShadow:'var(--sombra)'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700, fontSize:15, color:'var(--verde-oscuro)'}}>{c.nombre}</div>
+                  {c.telefono && <div style={{fontSize:13, color:'var(--texto2)', marginTop:2}}>📱 <a href={`tel:${c.telefono}`} style={{color:'var(--verde-claro)'}}>{c.telefono}</a></div>}
+                  {c.direccion && <div style={{fontSize:13, color:'var(--texto2)', marginTop:1}}>📍 {c.direccion}</div>}
+                </div>
+                {saldo>0 && (
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:11, color:'var(--naranja)', fontWeight:600}}>FIADO</div>
+                    <div style={{fontWeight:800, fontSize:18, color:'var(--naranja)'}}>{formatPeso(saldo)}</div>
+                  </div>
+                )}
+              </div>
+              <div style={{display:'flex', gap:8, marginTop:10, flexWrap:'wrap'}}>
+                <button onClick={()=>setForm(c)} style={{...S.btnS, fontSize:12, padding:'6px 12px'}}>✏️ Editar</button>
+                {saldo>0 && <button onClick={()=>setFiado(c)} style={{...S.btnV, fontSize:12, padding:'6px 12px'}}>💵 Registrar pago</button>}
+                <button onClick={()=>eliminar(c.id)} style={{...S.btnS, fontSize:12, padding:'6px 12px', color:'var(--rojo)', marginLeft:'auto'}}>🗑️</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FormCliente({ inicial, onGuardar, onCancelar }) {
+  const [d,setD] = useState({nombre:'', telefono:'', direccion:'', notas:'', ...inicial});
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const guardar=()=>{ if(!d.nombre.trim()) return alert('El nombre es obligatorio'); onGuardar(d); };
+  return (
+    <div>
+      <Header titulo={d.id?'✏️ Editar Cliente':'+ Nuevo Cliente'} onBack={onCancelar}/>
+      <div style={{padding:'16px 16px 110px'}}>
+        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Nombre completo"/>
+        <Campo label="Teléfono" value={d.telefono} onChange={v=>set('telefono',v)} placeholder="381 123 4567" tipo="tel"/>
+        <Campo label="Dirección" value={d.direccion} onChange={v=>set('direccion',v)} placeholder="Ej: San Martín 456"/>
+        <Campo label="Notas" value={d.notas} onChange={v=>set('notas',v)} placeholder="Ej: prefiere pechuga, viene los jueves..." rows={2}/>
+        <div style={{display:'flex', gap:8, marginTop:18}}>
+          <button onClick={guardar} style={{...S.btnV, flex:1, padding:14, fontSize:15}}>{d.id?'✓ Guardar':'+ Agregar'}</button>
+          <button onClick={onCancelar} style={{...S.btnS, padding:14}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalPago({ cliente, onPagar, onCancelar }) {
+  const [monto, setMonto] = useState('');
+  const saldo = Number(cliente.saldoFiado)||0;
+  return (
+    <div>
+      <Header titulo="💵 Registrar Pago" onBack={onCancelar}/>
+      <div style={{padding:'24px 16px'}}>
+        <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:14, padding:20, marginBottom:20, textAlign:'center'}}>
+          <div style={{fontSize:14, opacity:0.7}}>Fiado de {cliente.nombre}</div>
+          <div style={{fontFamily:'Syne', fontSize:40, fontWeight:800, color:'var(--dorado)'}}>{formatPeso(saldo)}</div>
+        </div>
+        <Campo label="¿Cuánto pagó? ($)" value={monto} onChange={setMonto} tipo="number" placeholder="0"/>
+        {monto>0 && (
+          <div style={{background:'var(--beige)', borderRadius:10, padding:'10px 14px', marginTop:4, fontSize:13}}>
+            Saldo restante: <b style={{color:'var(--verde-claro)'}}>{formatPeso(Math.max(0,saldo-Number(monto)))}</b>
+          </div>
+        )}
+        <div style={{display:'flex', gap:8, marginTop:18}}>
+          <button onClick={()=>{ if(!monto) return alert('Ingresá el monto'); onPagar(cliente, monto); }}
+            style={{...S.btnV, flex:1, padding:14, fontSize:15}}>✓ Confirmar pago</button>
+          <button onClick={onCancelar} style={{...S.btnS, padding:14}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// PANTALLA: PEDIDOS
+// ══════════════════════════════════════════════════════
+function PantallaPedidos({ uid }) {
+  const [pedidos, setPedidos]   = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [form, setForm]         = useState(null);
+  const [filtro, setFiltro]     = useState('hoy');
+
+  useEffect(() => {
+    const u1 = db.collection(`polleria/${uid}/pedidos`).orderBy('createdAt','desc').onSnapshot(snap=>setPedidos(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2 = db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u3 = db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(snap=>setProductos(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    return ()=>{u1();u2();u3();};
+  }, []);
+
+  const guardar = async (datos) => {
+    const {id,...resto} = datos;
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    if (id) await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...resto, updatedAt:ts});
+    else    await db.collection(`polleria/${uid}/pedidos`).add({...resto, createdAt:ts, fecha:hoy(), estado:'pendiente'});
+    setForm(null);
+  };
+
+  const cambiarEstado = async (id, estado) => {
+    await db.collection(`polleria/${uid}/pedidos`).doc(id).update({estado, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  };
+
+  const eliminar = async (id) => { if(!confirm('¿Eliminar pedido?')) return; await db.collection(`polleria/${uid}/pedidos`).doc(id).delete(); };
+
+  if (form!==null) return <FormPedido inicial={form} clientes={clientes} productos={productos} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+
+  const hoyFecha = hoy();
+  const mostrar = filtro==='hoy'
+    ? pedidos.filter(p=>p.fecha===hoyFecha)
+    : filtro==='pendientes'
+      ? pedidos.filter(p=>p.estado==='pendiente')
+      : pedidos;
+
+  const totalHoy = pedidos.filter(p=>p.fecha===hoyFecha).reduce((s,p)=>s+(p.total||0),0);
+
+  return (
+    <div>
+      <Header titulo="📋 Pedidos" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()} subtitulo="Gestión Pollería 🐔"/>
+
+      {/* Resumen hoy */}
+      <div style={{margin:'10px 16px 0', background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:12, padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <span style={{fontSize:13, opacity:0.7}}>Pedidos hoy</span>
+        <div style={{textAlign:'right'}}>
+          <span style={{fontFamily:'Syne', fontWeight:700, fontSize:20, color:'var(--verde-suave)'}}>{pedidos.filter(p=>p.fecha===hoyFecha).length}</span>
+          <span style={{fontSize:13, opacity:0.7, marginLeft:8}}>— {formatPeso(totalHoy)}</span>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{padding:'10px 16px 4px', display:'flex', gap:6}}>
+        {[{k:'hoy',lbl:'Hoy'},{k:'pendientes',lbl:'Pendientes'},{k:'todos',lbl:'Todos'}].map(f=>(
+          <button key={f.k} onClick={()=>setFiltro(f.k)} style={{padding:'6px 14px', borderRadius:20, border:'none', cursor:'pointer', background:filtro===f.k?'var(--verde-claro)':'var(--beige)', color:filtro===f.k?'white':'var(--verde-oscuro)', fontWeight:600, fontSize:13}}>
+            {f.lbl}
+          </button>
+        ))}
+      </div>
+
+      {mostrar.length===0 && (
+        <div style={{textAlign:'center', padding:48}}>
+          <div style={{fontSize:52}}>🛒</div>
+          <p style={{color:'var(--texto2)', marginTop:10, marginBottom:20}}>No hay pedidos</p>
+          <button onClick={()=>setForm({})} style={S.btnV}>+ Nuevo pedido</button>
+        </div>
+      )}
+
+      <div style={{padding:'8px 16px 110px'}}>
+        {mostrar.map(p => <TarjetaPedido key={p.id} pedido={p} onEditar={()=>setForm(p)} onEstado={cambiarEstado} onEliminar={eliminar}/>)}
+      </div>
+    </div>
+  );
+}
+
+const ESTADOS_PED = {
+  pendiente:  {label:'Pendiente',  color:'#E67E22', bg:'#FEF3E2'},
+  preparando: {label:'Preparando', color:'#2980B9', bg:'#EBF5FB'},
+  listo:      {label:'Listo ✓',   color:'#27AE60', bg:'#E9F7EF'},
+  entregado:  {label:'Entregado', color:'#7F8C8D', bg:'#F2F3F4'},
+  cancelado:  {label:'Cancelado', color:'#C0392B', bg:'#FDEDEC'},
+};
+
+function TarjetaPedido({ pedido, onEditar, onEstado, onEliminar }) {
+  const [abierto, setAbierto] = useState(false);
+  const est = ESTADOS_PED[pedido.estado] || ESTADOS_PED.pendiente;
+  return (
+    <div style={{background:'var(--superficie)', borderRadius:14, marginBottom:10, boxShadow:'var(--sombra)', border:'1px solid var(--beige)', overflow:'hidden'}}>
+      <div onClick={()=>setAbierto(!abierto)} style={{padding:'14px 16px', cursor:'pointer'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700, fontSize:15, color:'var(--verde-oscuro)'}}>{pedido.clienteNombre||'Cliente s/n'}</div>
+            <div style={{fontSize:13, color:'var(--texto2)', marginTop:2}}>
+              {(pedido.items||[]).map(i=>`${i.cantidad} ${i.unidad} de ${i.nombre}`).join(', ') || '—'}
+            </div>
+          </div>
+          <div style={{textAlign:'right', flexShrink:0, marginLeft:8}}>
+            <span style={{background:est.bg, color:est.color, fontSize:11, fontWeight:700, padding:'3px 9px', borderRadius:20}}>{est.label}</span>
+            <div style={{fontWeight:700, color:'var(--verde-claro)', fontSize:15, marginTop:4}}>{formatPeso(pedido.total)}</div>
+          </div>
+        </div>
+        <div style={{fontSize:12, color:'var(--texto2)', marginTop:6}}>
+          📅 {formatFecha(pedido.fecha)} {pedido.horaEntrega ? `— ⏰ ${pedido.horaEntrega}` : ''}
+          {pedido.tipo==='delivery' && ' — 🚴 Delivery'}
+          {pedido.pagado ? ' — ✅ Pagado' : ' — 💳 Sin pagar'}
+        </div>
+      </div>
+
+      {abierto && (
+        <div style={{padding:'0 16px 14px', borderTop:'1px solid var(--beige)'}}>
+          {pedido.notas && <p style={{fontSize:13, color:'var(--texto2)', margin:'10px 0 4px', fontStyle:'italic'}}>"{pedido.notas}"</p>}
+          {pedido.tipo==='delivery' && pedido.direccion && <p style={{fontSize:13, marginTop:6}}>📍 {pedido.direccion}</p>}
+
+          <div style={{display:'flex', gap:8, marginTop:12, flexWrap:'wrap'}}>
+            <button onClick={onEditar} style={{...S.btnS, fontSize:13, padding:'7px 12px'}}>✏️ Editar</button>
+            {pedido.estado==='pendiente' && <button onClick={()=>onEstado(pedido.id,'preparando')} style={{...S.btnV, fontSize:13, padding:'7px 12px', background:'var(--azul)'}}>👨‍🍳 Preparando</button>}
+            {pedido.estado==='preparando' && <button onClick={()=>onEstado(pedido.id,'listo')} style={{...S.btnV, fontSize:13, padding:'7px 12px'}}>✓ Listo</button>}
+            {pedido.estado==='listo' && <button onClick={()=>onEstado(pedido.id,'entregado')} style={{...S.btnV, fontSize:13, padding:'7px 12px', background:'#7F8C8D'}}>📦 Entregado</button>}
+            {(pedido.estado==='pendiente'||pedido.estado==='preparando') && <button onClick={()=>onEstado(pedido.id,'cancelado')} style={{...S.btnV, fontSize:13, padding:'7px 12px', background:'var(--rojo)'}}>✕ Cancelar</button>}
+            <button onClick={()=>onEliminar(pedido.id)} style={{...S.btnS, fontSize:13, padding:'7px 12px', marginLeft:'auto', color:'var(--rojo)'}}>🗑️</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormPedido({ inicial, clientes, productos, onGuardar, onCancelar }) {
+  const [d, setD] = useState({clienteNombre:'', clienteId:'', tipo:'mostrador', direccion:'', horaEntrega:'', notas:'', pagado:false, formaPago:'efectivo', items:[], total:0, ...inicial});
+  const [prodId, setProdId] = useState('');
+  const [cant, setCant]     = useState('');
+  const set = (k,v)=>setD(p=>({...p,[k]:v}));
+
+  const agregarItem = () => {
+    if (!prodId||!cant) return alert('Elegí un producto y cantidad');
+    const prod = productos.find(p=>p.id===prodId);
+    if (!prod) return;
+    const nuevoItem = {_id:Date.now(), nombre:prod.nombre, unidad:prod.unidad||'kg', cantidad:Number(cant), precio:prod.precioVenta||0, subtotal:(prod.precioVenta||0)*Number(cant)};
+    const nuevosItems = [...d.items, nuevoItem];
+    const total = nuevosItems.reduce((s,i)=>s+i.subtotal,0);
+    setD(p=>({...p, items:nuevosItems, total}));
+    setProdId(''); setCant('');
+  };
+
+  const quitarItem = (id) => {
+    const nuevosItems = d.items.filter(i=>i._id!==id);
+    setD(p=>({...p, items:nuevosItems, total:nuevosItems.reduce((s,i)=>s+i.subtotal,0)}));
+  };
+
+  const selCliente = (id) => {
+    const c = clientes.find(c=>c.id===id);
+    if (c) setD(p=>({...p, clienteId:id, clienteNombre:c.nombre, direccion:c.direccion||p.direccion}));
+    else   setD(p=>({...p, clienteId:'', clienteNombre:''}));
+  };
+
+  const guardar = () => {
+    if (!d.clienteNombre.trim()) return alert('Ingresá el nombre del cliente');
+    onGuardar(d);
+  };
+
+  return (
+    <div>
+      <Header titulo={d.id?'✏️ Editar Pedido':'+ Nuevo Pedido'} onBack={onCancelar}/>
+      <div style={{padding:'16px 16px 110px'}}>
+
+        {/* Cliente */}
+        <label style={S.label}>Cliente</label>
+        <select value={d.clienteId} onChange={e=>selCliente(e.target.value)} style={{...S.input, marginTop:4}}>
+          <option value="">— Elegí un cliente o escribí abajo —</option>
+          {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <Campo label="O escribí el nombre" value={d.clienteNombre} onChange={v=>set('clienteNombre',v)} placeholder="Nombre del cliente *"/>
+
+        {/* Tipo */}
+        <label style={S.label}>Tipo de pedido</label>
+        <div style={{display:'flex', gap:8, marginBottom:4}}>
+          {[{k:'mostrador',lbl:'🏪 Mostrador'},{k:'delivery',lbl:'🚴 Delivery'}].map(t=>(
+            <button key={t.k} onClick={()=>set('tipo',t.k)} style={{flex:1, padding:'9px', borderRadius:10, border:'none', cursor:'pointer', background:d.tipo===t.k?'var(--verde-claro)':'var(--beige)', color:d.tipo===t.k?'white':'var(--verde-oscuro)', fontWeight:700, fontSize:14}}>
+              {t.lbl}
+            </button>
+          ))}
+        </div>
+
+        {d.tipo==='delivery' && <Campo label="Dirección de entrega" value={d.direccion} onChange={v=>set('direccion',v)} placeholder="Calle y número"/>}
+        <Campo label="Hora de entrega (opcional)" value={d.horaEntrega} onChange={v=>set('horaEntrega',v)} placeholder="Ej: 12:30" tipo="time"/>
+
+        {/* Items */}
+        <div style={{background:'var(--beige)', borderRadius:14, padding:14, marginTop:12}}>
+          <label style={{...S.label, marginTop:0}}>Agregar producto</label>
+          <select value={prodId} onChange={e=>setProdId(e.target.value)} style={{...S.input, marginTop:4}}>
+            <option value="">— Elegí un producto —</option>
+            {productos.map(p=><option key={p.id} value={p.id}>{p.nombre} — {formatPeso(p.precioVenta||0)}/{p.unidad||'kg'}</option>)}
+          </select>
+          <Campo label="Cantidad" value={cant} onChange={setCant} tipo="number" placeholder="0"/>
+          <button onClick={agregarItem} style={{...S.btnV, width:'100%', marginTop:8}}>+ Agregar</button>
+        </div>
+
+        {d.items.length>0 && (
+          <div style={{marginTop:12}}>
+            <label style={S.label}>Productos del pedido</label>
+            {d.items.map(i=>(
+              <div key={i._id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', background:'var(--superficie)', borderRadius:10, marginBottom:6, border:'1px solid var(--beige)'}}>
+                <div>
+                  <div style={{fontWeight:600, fontSize:14}}>{i.nombre}</div>
+                  <div style={{fontSize:12, color:'var(--texto2)'}}>{i.cantidad} {i.unidad} · {formatPeso(i.subtotal)}</div>
+                </div>
+                <button onClick={()=>quitarItem(i._id)} style={{background:'none', border:'none', cursor:'pointer', fontSize:20, color:'var(--rojo)'}}>✕</button>
+              </div>
+            ))}
+            <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:10, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <span style={{fontWeight:700}}>Total</span>
+              <span style={{fontFamily:'Syne', fontWeight:800, fontSize:22, color:'var(--verde-suave)'}}>{formatPeso(d.total)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Pago */}
+        <label style={S.label}>Forma de pago</label>
+        <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:4}}>
+          {[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transferencia'},{k:'fiado',lbl:'📒 Fiado'},{k:'tarjeta',lbl:'💳 Tarjeta'}].map(fp=>(
+            <button key={fp.k} onClick={()=>set('formaPago',fp.k)} style={{padding:'7px 12px', borderRadius:20, border:'none', cursor:'pointer', background:d.formaPago===fp.k?'var(--verde-claro)':'var(--beige)', color:d.formaPago===fp.k?'white':'var(--verde-oscuro)', fontWeight:600, fontSize:13}}>
+              {fp.lbl}
+            </button>
+          ))}
+        </div>
+
+        <label style={{...S.label, marginTop:12, display:'flex', alignItems:'center', gap:8, cursor:'pointer'}}>
+          <input type="checkbox" checked={d.pagado} onChange={e=>set('pagado',e.target.checked)} style={{width:18,height:18}}/> ✅ Ya pagó
+        </label>
+
+        <Campo label="Notas (opcional)" value={d.notas} onChange={v=>set('notas',v)} placeholder="Ej: sin menudos, al horno..." rows={2}/>
+
+        <div style={{display:'flex', gap:8, marginTop:18}}>
+          <button onClick={guardar} style={{...S.btnV, flex:1, padding:14, fontSize:15}}>{d.id?'✓ Guardar':'+ Crear pedido'}</button>
+          <button onClick={onCancelar} style={{...S.btnS, padding:14}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// PANTALLA: CAJA DEL DÍA
+// ══════════════════════════════════════════════════════
+function PantallaCaja({ uid }) {
+  const [seccion, setSeccion] = useState('caja');
+  const [pedidos, setPedidos] = useState([]);
+  const [movimientos, setMov] = useState([]);
+  const [formMov, setFormMov] = useState(null);
+  const [fechaCaja, setFechaCaja] = useState(hoy());
+
+  const colMov = db.collection(`polleria/${uid}/movimientos`);
+
+  useEffect(() => {
+    const u1 = db.collection(`polleria/${uid}/pedidos`).where('fecha','==',fechaCaja).onSnapshot(snap=>setPedidos(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2 = colMov.where('fecha','==',fechaCaja).orderBy('createdAt','asc').onSnapshot(snap=>setMov(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    return ()=>{u1();u2();};
+  }, [fechaCaja]);
+
+  const guardarMov = async (datos) => {
+    const {id,...resto} = datos;
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    if (id) await colMov.doc(id).update(resto);
+    else    await colMov.add({...resto, fecha:fechaCaja, createdAt:ts});
+    setFormMov(null);
+  };
+
+  const eliminarMov = async (id) => { if(!confirm('¿Eliminar movimiento?')) return; await colMov.doc(id).delete(); };
+
+  if (formMov!==null) return <FormMovimiento inicial={formMov} onGuardar={guardarMov} onCancelar={()=>setFormMov(null)}/>;
+
+  // Calcular totales
+  const pedPagados  = pedidos.filter(p=>p.pagado && p.estado!=='cancelado');
+  const ventaEfectivo = pedPagados.filter(p=>p.formaPago==='efectivo').reduce((s,p)=>s+(p.total||0),0);
+  const ventaTransf   = pedPagados.filter(p=>p.formaPago==='transferencia').reduce((s,p)=>s+(p.total||0),0);
+  const ventaTarjeta  = pedPagados.filter(p=>p.formaPago==='tarjeta').reduce((s,p)=>s+(p.total||0),0);
+  const ventaFiado    = pedidos.filter(p=>p.formaPago==='fiado' && p.estado!=='cancelado').reduce((s,p)=>s+(p.total||0),0);
+  const totalVentas   = ventaEfectivo + ventaTransf + ventaTarjeta;
+
+  const ingrExt    = movimientos.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+(Number(m.monto)||0),0);
+  const egresoExt  = movimientos.filter(m=>m.tipo==='egreso').reduce((s,m)=>s+(Number(m.monto)||0),0);
+
+  const cajaFinal  = ventaEfectivo + ingrExt - egresoExt;
+  const transfPend = movimientos.filter(m=>m.tipo==='transferencia' && !m.confirmada);
+
+  return (
+    <div>
+      <Header titulo="🧾 Caja del Día"/>
+      <div style={{padding:'10px 16px 0', display:'flex', gap:6}}>
+        {[{k:'caja',lbl:'💵 Caja'},{k:'transferencias',lbl:'📲 Transf.'},{k:'arqueo',lbl:'🔒 Arqueo'}].map(s=>(
+          <button key={s.k} onClick={()=>setSeccion(s.k)} style={{flex:1, padding:'8px', borderRadius:10, border:'none', cursor:'pointer', background:seccion===s.k?'var(--verde-claro)':'var(--beige)', color:seccion===s.k?'white':'var(--verde-oscuro)', fontWeight:700, fontSize:12}}>
+            {s.lbl}
+          </button>
+        ))}
+      </div>
+
+      {/* Selector de fecha */}
+      <div style={{padding:'8px 16px 0', display:'flex', alignItems:'center', gap:8}}>
+        <label style={{...S.label, margin:0, flexShrink:0}}>Fecha:</label>
+        <input type="date" value={fechaCaja} onChange={e=>setFechaCaja(e.target.value)} style={{...S.input, margin:0, flex:1}}/>
+      </div>
+
+      {/* ─── CAJA ─── */}
+      {seccion==='caja' && (
+        <div style={{padding:'10px 16px 110px'}}>
+
+          {/* Resumen ventas */}
+          <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:14, padding:18, marginBottom:14}}>
+            <div style={{fontFamily:'Syne', fontSize:13, opacity:0.6, marginBottom:10}}>VENTAS DEL DÍA</div>
+            {[{lbl:'💵 Efectivo', val:ventaEfectivo},{lbl:'📲 Transferencia', val:ventaTransf},{lbl:'💳 Tarjeta', val:ventaTarjeta},{lbl:'📒 Fiado', val:ventaFiado}].map(r=>(
+              <div key={r.lbl} style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
+                <span style={{fontSize:13, opacity:0.8}}>{r.lbl}</span>
+                <span style={{fontWeight:700}}>{formatPeso(r.val)}</span>
+              </div>
+            ))}
+            <div style={{borderTop:'1px solid rgba(255,255,255,0.15)', paddingTop:10, marginTop:4, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <span style={{fontWeight:700}}>Total cobrado</span>
+              <span style={{fontFamily:'Syne', fontWeight:800, fontSize:24, color:'var(--verde-suave)'}}>{formatPeso(totalVentas)}</span>
+            </div>
+          </div>
+
+          {/* Movimientos extra */}
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+            <label style={{...S.label, margin:0}}>Otros ingresos / egresos</label>
+            <button onClick={()=>setFormMov({})} style={{...S.btnV, fontSize:12, padding:'6px 12px'}}>+ Agregar</button>
+          </div>
+
+          {movimientos.map(m=>(
+            <div key={m.id} style={{background:'var(--superficie)', borderRadius:10, padding:'12px 14px', marginBottom:8, border:'1px solid var(--beige)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <div>
+                <div style={{fontWeight:600, fontSize:14}}>{m.descripcion||'—'}</div>
+                <div style={{fontSize:12, color:'var(--texto2)'}}>{m.tipo==='ingreso'?'Ingreso':'Egreso'}{m.tipo==='transferencia'?' — Transferencia':''}</div>
+              </div>
+              <div style={{textAlign:'right', display:'flex', alignItems:'center', gap:8}}>
+                <span style={{fontWeight:700, color:m.tipo==='egreso'?'var(--rojo)':'var(--verde-claro)', fontSize:16}}>
+                  {m.tipo==='egreso'?'-':'+' }{formatPeso(m.monto)}
+                </span>
+                <button onClick={()=>eliminarMov(m.id)} style={{background:'none', border:'none', cursor:'pointer', color:'var(--rojo)', fontSize:16}}>🗑️</button>
+              </div>
+            </div>
+          ))}
+
+          {/* Caja final */}
+          <div style={{background:'var(--verde-medio)', color:'#F8FAF5', borderRadius:12, padding:'14px 16px', marginTop:8, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{fontWeight:700}}>💵 Dinero en caja (efectivo)</span>
+            <span style={{fontFamily:'Syne', fontWeight:800, fontSize:22}}>{formatPeso(cajaFinal)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TRANSFERENCIAS ─── */}
+      {seccion==='transferencias' && (
+        <div style={{padding:'10px 16px 110px'}}>
+          <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:12, padding:'12px 16px', marginBottom:14, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{opacity:0.8}}>Total transferencias</span>
+            <span style={{fontFamily:'Syne', fontWeight:700, fontSize:22, color:'var(--verde-suave)'}}>{formatPeso(ventaTransf)}</span>
+          </div>
+
+          {pedidos.filter(p=>p.formaPago==='transferencia' && p.estado!=='cancelado').map(p=>(
+            <div key={p.id} style={{background:'var(--superficie)', borderRadius:12, padding:'12px 14px', marginBottom:8, border:`1px solid ${p.pagado?'var(--verde-suave)':'var(--naranja)'}`, boxShadow:'var(--sombra)'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div>
+                  <div style={{fontWeight:700, fontSize:15}}>{p.clienteNombre}</div>
+                  <div style={{fontSize:12, color:'var(--texto2)', marginTop:2}}>{(p.items||[]).map(i=>`${i.cantidad} ${i.unidad} de ${i.nombre}`).join(', ')}</div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontWeight:800, fontSize:18, color:'var(--verde-claro)'}}>{formatPeso(p.total)}</div>
+                  <span style={{fontSize:11, fontWeight:700, padding:'3px 8px', borderRadius:20, background:p.pagado?'#E9F7EF':'#FEF3E2', color:p.pagado?'#27AE60':'var(--naranja)'}}>
+                    {p.pagado?'✅ Confirmado':'⏳ Pendiente'}
+                  </span>
+                </div>
+              </div>
+              {!p.pagado && (
+                <button onClick={async()=>{ await db.collection(`polleria/${uid}/pedidos`).doc(p.id).update({pagado:true}); }}
+                  style={{...S.btnV, width:'100%', marginTop:10, fontSize:13, padding:'8px'}}>
+                  ✅ Confirmar transferencia
+                </button>
+              )}
+            </div>
+          ))}
+
+          {pedidos.filter(p=>p.formaPago==='transferencia').length===0 && (
+            <p style={{textAlign:'center', color:'var(--texto2)', padding:32}}>No hay transferencias hoy</p>
+          )}
+        </div>
+      )}
+
+      {/* ─── ARQUEO ─── */}
+      {seccion==='arqueo' && (
+        <div style={{padding:'10px 16px 110px'}}>
+          <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:14, padding:20, marginBottom:14}}>
+            <div style={{fontFamily:'Syne', fontSize:14, opacity:0.6, marginBottom:14, textAlign:'center'}}>ARQUEO DE CAJA — {formatFecha(fechaCaja)}</div>
+            {[
+              {lbl:'Ventas efectivo', val:ventaEfectivo, color:'var(--verde-suave)'},
+              {lbl:'Ventas transferencia', val:ventaTransf, color:'var(--verde-suave)'},
+              {lbl:'Ventas tarjeta', val:ventaTarjeta, color:'var(--verde-suave)'},
+              {lbl:'Ventas fiado', val:ventaFiado, color:'var(--dorado)'},
+              {lbl:'Otros ingresos', val:ingrExt, color:'var(--verde-suave)'},
+              {lbl:'Egresos / gastos', val:egresoExt, color:'#FF8A80'},
+            ].map(r=>(
+              <div key={r.lbl} style={{display:'flex', justifyContent:'space-between', marginBottom:8, paddingBottom:8, borderBottom:'1px solid rgba(255,255,255,0.08)'}}>
+                <span style={{fontSize:13, opacity:0.8}}>{r.lbl}</span>
+                <span style={{fontWeight:700, color:r.color}}>{formatPeso(r.val)}</span>
+              </div>
+            ))}
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:6}}>
+              <span style={{fontWeight:700}}>💵 Efectivo en caja</span>
+              <span style={{fontFamily:'Syne', fontWeight:800, fontSize:22, color:'var(--verde-suave)'}}>{formatPeso(cajaFinal)}</span>
+            </div>
+            <div style={{display:'flex', justifyContent:'space-between'}}>
+              <span style={{fontWeight:700}}>📊 Total facturado</span>
+              <span style={{fontFamily:'Syne', fontWeight:800, fontSize:22, color:'var(--dorado)'}}>{formatPeso(totalVentas+ventaFiado)}</span>
+            </div>
+          </div>
+
+          <div style={{background:'var(--beige)', borderRadius:12, padding:14}}>
+            <p style={{fontSize:13, color:'var(--texto2)', textAlign:'center'}}>
+              {pedidos.filter(p=>p.estado!=='cancelado').length} pedidos totales · {pedidos.filter(p=>p.estado==='cancelado').length} cancelados
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormMovimiento({ inicial, onGuardar, onCancelar }) {
+  const [d,setD] = useState({tipo:'egreso', descripcion:'', monto:'', ...inicial});
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const guardar=()=>{ if(!d.monto) return alert('Ingresá el monto'); onGuardar({...d, monto:Number(d.monto)||0}); };
+  return (
+    <div>
+      <Header titulo="+ Movimiento de Caja" onBack={onCancelar}/>
+      <div style={{padding:'16px 16px 110px'}}>
+        <label style={S.label}>Tipo</label>
+        <div style={{display:'flex', gap:8, marginBottom:4}}>
+          {[{k:'egreso',lbl:'💸 Egreso / Gasto'},{k:'ingreso',lbl:'💵 Ingreso extra'}].map(t=>(
+            <button key={t.k} onClick={()=>set('tipo',t.k)} style={{flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:d.tipo===t.k?'var(--verde-claro)':'var(--beige)', color:d.tipo===t.k?'white':'var(--verde-oscuro)', fontWeight:700, fontSize:13}}>
+              {t.lbl}
+            </button>
+          ))}
+        </div>
+        <Campo label="Descripción" value={d.descripcion} onChange={v=>set('descripcion',v)} placeholder="Ej: compra de pollos, pago de luz..."/>
+        <Campo label="Monto ($)" value={d.monto} onChange={v=>set('monto',v)} tipo="number" placeholder="0"/>
+        <div style={{display:'flex', gap:8, marginTop:18}}>
+          <button onClick={guardar} style={{...S.btnV, flex:1, padding:14, fontSize:15}}>+ Agregar</button>
+          <button onClick={onCancelar} style={{...S.btnS, padding:14}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// APP PRINCIPAL
+// ══════════════════════════════════════════════════════
+function App() {
+  const [user, setUser] = useState(undefined);
+  const [tab, setTab]   = useState('pedidos');
+
+  useEffect(() => auth.onAuthStateChanged(u=>setUser(u)), []);
+
+  if (user===undefined) return (
+    <div style={{minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14}}>
+      <div style={{fontSize:56}}>🐔</div>
+      <p style={{color:'var(--texto2)', fontSize:15}}>Cargando...</p>
+    </div>
+  );
+
+  if (!user) return <Login/>;
+
+  const pantallas = {
+    pedidos:  <PantallaPedidos  uid={user.uid}/>,
+    precios:  <PantallaPrecios  uid={user.uid}/>,
+    stock:    <PantallaStock    uid={user.uid}/>,
+    clientes: <PantallaClientes uid={user.uid}/>,
+    caja:     <PantallaCaja     uid={user.uid}/>,
+  };
+
+  return (
+    <div style={{paddingBottom:72}}>
+      {pantallas[tab]||pantallas.pedidos}
+      <NavBar activo={tab} onChange={setTab}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
