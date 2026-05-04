@@ -323,15 +323,136 @@ function FormProducto({ inicial, onGuardar, onCancelar, categorias }) {
 // ══════════════════════════════════════════════════════
 // PANTALLA: STOCK
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// CALCULADORA CAJÓN DE POLLO
+// ══════════════════════════════════════════════════════
+function CalculadoraCajon({ productos }) {
+  const [cajones, setCajones] = useState(1);
+  const [pollosPorCajon, setPollosPorCajon] = useState(9);
+  const [pesoPromedio, setPesoPromedio] = useState(2.2);
+  const [modo, setModo] = useState('completo'); // 'completo' | 'piezas' | 'filet'
+
+  const totalPollos   = cajones * pollosPorCajon;
+  const totalKg       = totalPollos * pesoPromedio;
+
+  // Rendimientos por modo
+  const MODOS = {
+    completo: {
+      label: '🐔 Pollo entero',
+      piezas: [
+        { nombre: 'Pollos enteros', cantidad: totalPollos, unidad: 'unid' },
+        { nombre: 'Peso total', cantidad: +(totalKg).toFixed(1), unidad: 'kg' },
+      ]
+    },
+    piezas: {
+      label: '🍗 Trozado en piezas',
+      piezas: [
+        { nombre: 'Pechugas', cantidad: totalPollos * 1,  unidad: 'unid', nota:'(1 por pollo, doble filete)' },
+        { nombre: 'Pata-muslo', cantidad: totalPollos * 2, unidad: 'unid', nota:'(2 por pollo)' },
+        { nombre: 'Patas', cantidad: totalPollos * 2, unidad: 'unid', nota:'(2 por pollo)' },
+        { nombre: 'Muslos', cantidad: totalPollos * 2, unidad: 'unid', nota:'(2 por pollo)' },
+        { nombre: 'Alas', cantidad: totalPollos * 2, unidad: 'unid', nota:'(2 por pollo)' },
+        { nombre: 'Carcasas / Menudos', cantidad: totalPollos, unidad: 'unid', nota:'' },
+      ]
+    },
+    filet: {
+      label: '🥩 Filet / Milanesas',
+      piezas: [
+        { nombre: 'Filet de pechuga', cantidad: +(totalPollos * 0.55).toFixed(1), unidad: 'kg', nota:'(≈550g por pollo)' },
+        { nombre: 'Milanesas de pechuga', cantidad: totalPollos * 4, unidad: 'unid', nota:'(≈4 por pollo)' },
+        { nombre: 'Pata-muslo', cantidad: totalPollos * 2, unidad: 'unid', nota:'(para grill/horno)' },
+        { nombre: 'Alitas', cantidad: totalPollos * 2, unidad: 'unid', nota:'' },
+        { nombre: 'Carcasas para caldo', cantidad: totalPollos, unidad: 'unid', nota:'' },
+      ]
+    },
+  };
+
+  const modoActual = MODOS[modo];
+
+  // Precio de venta estimado
+  const precPechuga  = productos.find(p => p.nombre.toLowerCase().includes('pechuga'));
+  const precPataMus  = productos.find(p => p.nombre.toLowerCase().includes('pata') || p.nombre.toLowerCase().includes('muslo'));
+  const precFilet    = productos.find(p => p.nombre.toLowerCase().includes('filet') || p.nombre.toLowerCase().includes('milanesa'));
+
+  return (
+    <div style={{background:'var(--superficie)', borderRadius:14, padding:16, marginBottom:14, border:'2px solid var(--verde-suave)', boxShadow:'var(--sombra)'}}>
+      <div style={{fontFamily:'Syne', fontWeight:700, fontSize:16, color:'var(--verde-oscuro)', marginBottom:12}}>
+        🧮 Calculadora de Cajón de Pollo
+      </div>
+
+      {/* Parámetros */}
+      <div style={{display:'flex', gap:10, marginBottom:12, flexWrap:'wrap'}}>
+        <div style={{flex:1, minWidth:80}}>
+          <label style={S.label}>Cajones</label>
+          <input type="number" value={cajones} onChange={e=>setCajones(Math.max(1,Number(e.target.value)))}
+            style={{...S.input, marginTop:4, textAlign:'center', fontWeight:700, fontSize:18}}/>
+        </div>
+        <div style={{flex:1, minWidth:80}}>
+          <label style={S.label}>Pollos/cajón</label>
+          <input type="number" value={pollosPorCajon} onChange={e=>setPollosPorCajon(Math.max(1,Number(e.target.value)))}
+            style={{...S.input, marginTop:4, textAlign:'center', fontWeight:700, fontSize:18}}/>
+        </div>
+        <div style={{flex:1, minWidth:80}}>
+          <label style={S.label}>Kg promedio</label>
+          <input type="number" step="0.1" value={pesoPromedio} onChange={e=>setPesoPromedio(Math.max(0.5,Number(e.target.value)))}
+            style={{...S.input, marginTop:4, textAlign:'center', fontWeight:700, fontSize:18}}/>
+        </div>
+      </div>
+
+      {/* Resumen */}
+      <div style={{background:'var(--verde-oscuro)', color:'#F8FAF5', borderRadius:10, padding:'10px 14px', marginBottom:12, display:'flex', justifyContent:'space-between'}}>
+        <span style={{fontSize:13, opacity:0.8}}>Total pollos: <b>{totalPollos}</b></span>
+        <span style={{fontSize:13, opacity:0.8}}>Total kg: <b>{totalKg.toFixed(1)} kg</b></span>
+      </div>
+
+      {/* Selector modo */}
+      <label style={S.label}>Tipo de corte / aprovechamiento</label>
+      <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:12}}>
+        {Object.entries(MODOS).map(([k,v]) => (
+          <button key={k} onClick={()=>setModo(k)}
+            style={{padding:'7px 12px', borderRadius:20, border:'none', cursor:'pointer',
+              background:modo===k?'var(--verde-claro)':'var(--beige)',
+              color:modo===k?'white':'var(--verde-oscuro)',
+              fontWeight:600, fontSize:12}}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Resultado */}
+      <div style={{background:'var(--beige)', borderRadius:10, padding:12}}>
+        <div style={{fontWeight:700, fontSize:13, color:'var(--verde-oscuro)', marginBottom:8}}>
+          Rendimiento — {modoActual.label}
+        </div>
+        {modoActual.piezas.map((p, i) => (
+          <div key={i} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:'1px solid var(--beige2)'}}>
+            <div>
+              <span style={{fontSize:14, fontWeight:600}}>{p.nombre}</span>
+              {p.nota && <span style={{fontSize:11, color:'var(--texto2)', marginLeft:6}}>{p.nota}</span>}
+            </div>
+            <div style={{fontFamily:'Syne', fontWeight:800, fontSize:18, color:'var(--verde-claro)'}}>
+              {p.cantidad} <span style={{fontSize:11, fontWeight:400, color:'var(--texto2)'}}>{p.unidad}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PantallaStock({ uid }) {
-  const [items, setItems]   = useState([]);
-  const [form, setForm]     = useState(null);
-  const [buscar, setBuscar] = useState('');
+  const [items, setItems]     = useState([]);
+  const [productos, setProd]  = useState([]);
+  const [form, setForm]       = useState(null);
+  const [buscar, setBuscar]   = useState('');
+  const [seccion, setSeccion] = useState('stock'); // 'stock' | 'cajon'
 
   const col = db.collection(`polleria/${uid}/stock`);
-  useEffect(() => col.orderBy('nombre','asc').onSnapshot(snap =>
-    setItems(snap.docs.map(d=>({id:d.id,...d.data()})))
-  ), []);
+  useEffect(() => {
+    const u1 = col.orderBy('nombre','asc').onSnapshot(snap=>setItems(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2 = db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(snap=>setProd(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    return ()=>{u1();u2();};
+  }, []);
 
   const guardar = async (datos) => {
     const {id,...resto} = datos;
@@ -354,52 +475,83 @@ function PantallaStock({ uid }) {
 
   return (
     <div>
-      <Header titulo="📦 Stock / Inventario" onAdd={()=>setForm({})}/>
-      {bajos.length>0 && (
-        <div style={{margin:'12px 16px 0', padding:'10px 14px', background:'#FEF3E2', borderRadius:10, border:'1px solid #F39C12'}}>
-          <b style={{color:'var(--naranja)', fontSize:13}}>⚠️ Stock bajo: </b>
-          <span style={{fontSize:13, color:'var(--texto2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span>
-        </div>
-      )}
-      <div style={{padding:'10px 16px 4px'}}>
-        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." style={{...S.input, marginTop:0}}/>
+      <Header titulo="📦 Stock / Inventario" onAdd={seccion==='stock' ? ()=>setForm({}) : null}/>
+
+      {/* Selector sección */}
+      <div style={{padding:'10px 16px 0', display:'flex', gap:8}}>
+        {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🧮 Cajón de pollo'}].map(s=>(
+          <button key={s.k} onClick={()=>setSeccion(s.k)}
+            style={{flex:1, padding:'9px', borderRadius:10, border:'none', cursor:'pointer',
+              background:seccion===s.k?'var(--verde-claro)':'var(--beige)',
+              color:seccion===s.k?'white':'var(--verde-oscuro)',
+              fontWeight:700, fontSize:13}}>
+            {s.lbl}
+          </button>
+        ))}
       </div>
 
-      {filtrados.length===0 && items.length===0 && (
-        <div style={{textAlign:'center', padding:56}}>
-          <div style={{fontSize:52}}>📦</div>
-          <p style={{color:'var(--texto2)', marginTop:10, marginBottom:20}}>No hay productos en stock</p>
-          <button onClick={()=>setForm({})} style={S.btnV}>+ Agregar</button>
-        </div>
-      )}
-
-      <div style={{padding:'4px 16px 110px'}}>
-        {filtrados.map(item => {
-          const bajo = Number(item.cantidad)<=Number(item.stockMinimo||0);
-          return (
-            <div key={item.id} style={{background:'var(--superficie)', borderRadius:12, marginBottom:10, padding:'14px 16px', boxShadow:'var(--sombra)', border:bajo?'1px solid #F39C12':'1px solid var(--beige)'}}>
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                <div>
-                  <div style={{fontWeight:700, fontSize:15}}>{item.nombre}</div>
-                  <div style={{fontSize:12, color:'var(--texto2)', marginTop:2}}>Mínimo: {item.stockMinimo||0} {item.unidad}</div>
-                </div>
-                <div style={{display:'flex', alignItems:'center', gap:8}}>
-                  <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:8,border:'none',background:'var(--beige)',cursor:'pointer',fontSize:18,fontWeight:700,lineHeight:1}}>−</button>
-                  <div style={{textAlign:'center', minWidth:56}}>
-                    <div style={{fontWeight:700, fontSize:20}}>{item.cantidad||0}</div>
-                    <div style={{fontSize:10, color:'var(--texto2)'}}>{item.unidad}</div>
-                  </div>
-                  <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:8,border:'none',background:'var(--verde-claro)',color:'white',cursor:'pointer',fontSize:18,fontWeight:700,lineHeight:1}}>+</button>
-                </div>
-              </div>
-              <div style={{display:'flex', gap:8, marginTop:10}}>
-                <button onClick={()=>setForm(item)} style={{...S.btnS, fontSize:12, padding:'5px 12px'}}>✏️ Editar</button>
-                <button onClick={()=>eliminar(item.id)} style={{...S.btnS, fontSize:12, padding:'5px 12px', color:'var(--rojo)'}}>🗑️</button>
-              </div>
+      {/* ─── INVENTARIO ─── */}
+      {seccion==='stock' && (
+        <>
+          {bajos.length>0 && (
+            <div style={{margin:'12px 16px 0', padding:'10px 14px', background:'#FEF3E2', borderRadius:10, border:'1px solid #F39C12'}}>
+              <b style={{color:'var(--naranja)', fontSize:13}}>⚠️ Stock bajo: </b>
+              <span style={{fontSize:13, color:'var(--texto2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span>
             </div>
-          );
-        })}
-      </div>
+          )}
+          <div style={{padding:'10px 16px 4px'}}>
+            <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." style={{...S.input, marginTop:0}}/>
+          </div>
+
+          {filtrados.length===0 && items.length===0 && (
+            <div style={{textAlign:'center', padding:56}}>
+              <div style={{fontSize:52}}>📦</div>
+              <p style={{color:'var(--texto2)', marginTop:10, marginBottom:20}}>No hay productos en stock</p>
+              <button onClick={()=>setForm({})} style={S.btnV}>+ Agregar</button>
+            </div>
+          )}
+
+          <div style={{padding:'4px 16px 110px'}}>
+            {filtrados.map(item => {
+              const bajo = Number(item.cantidad)<=Number(item.stockMinimo||0);
+              return (
+                <div key={item.id} style={{background:'var(--superficie)', borderRadius:12, marginBottom:10, padding:'14px 16px', boxShadow:'var(--sombra)', border:bajo?'1px solid #F39C12':'1px solid var(--beige)'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <div>
+                      <div style={{fontWeight:700, fontSize:15}}>{item.nombre}</div>
+                      <div style={{fontSize:12, color:'var(--texto2)', marginTop:2}}>Mínimo: {item.stockMinimo||0} {item.unidad}</div>
+                    </div>
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                      <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:8,border:'none',background:'var(--beige)',cursor:'pointer',fontSize:18,fontWeight:700,lineHeight:1}}>−</button>
+                      <div style={{textAlign:'center', minWidth:56}}>
+                        <div style={{fontWeight:700, fontSize:20}}>{item.cantidad||0}</div>
+                        <div style={{fontSize:10, color:'var(--texto2)'}}>{item.unidad}</div>
+                      </div>
+                      <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:8,border:'none',background:'var(--verde-claro)',color:'white',cursor:'pointer',fontSize:18,fontWeight:700,lineHeight:1}}>+</button>
+                    </div>
+                  </div>
+                  <div style={{display:'flex', gap:8, marginTop:10}}>
+                    <button onClick={()=>setForm(item)} style={{...S.btnS, fontSize:12, padding:'5px 12px'}}>✏️ Editar</button>
+                    <button onClick={()=>eliminar(item.id)} style={{...S.btnS, fontSize:12, padding:'5px 12px', color:'var(--rojo)'}}>🗑️</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ─── CALCULADORA CAJÓN ─── */}
+      {seccion==='cajon' && (
+        <div style={{padding:'12px 16px 110px'}}>
+          <CalculadoraCajon productos={productos}/>
+          <div style={{background:'var(--beige)', borderRadius:12, padding:14}}>
+            <p style={{fontSize:12, color:'var(--texto2)', lineHeight:1.6}}>
+              💡 <b>Tip:</b> Estos valores son estimados promedio. Ajustá los kilos por pollo según tu proveedor. Los precios de venta se toman automáticamente de tu lista de precios.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1028,7 +1180,7 @@ function FormMovimiento({ inicial, onGuardar, onCancelar }) {
 // ══════════════════════════════════════════════════════
 function App() {
   const [user, setUser] = useState(undefined);
-  const [tab, setTab]   = useState('pedidos');
+  const [tab, setTab]   = useState('precios');
 
   useEffect(() => auth.onAuthStateChanged(u=>setUser(u)), []);
 
