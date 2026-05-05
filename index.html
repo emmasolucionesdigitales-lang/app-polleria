@@ -573,7 +573,7 @@ function PantallaPrecios({uid}){
                   <div className="card-body">
                     <div className="card-head">
                       {/* Miniatura */}
-                      <div style={{width:48,height:48,borderRadius:var('--radius'),background:cs.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,overflow:'hidden',flexShrink:0,marginRight:10}}>
+                      <div style={{width:48,height:48,borderRadius:'var(--radius)',background:cs.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,overflow:'hidden',flexShrink:0,marginRight:10}}>
                         {p.foto ? <img src={p.foto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : cs.emoji}
                       </div>
                       <div style={{flex:1}}>
