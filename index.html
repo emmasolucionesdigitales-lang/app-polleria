@@ -19,11 +19,12 @@
   --bg:#fff;--bg2:#f5f5f4;--bg3:#fafaf9;
   --txt:#1c1917;--txt2:#78716c;--txt3:#a8a29e;
   --border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.25);
-  --radius:8px;--radius-lg:12px;
+  --radius:8px;--radius-lg:14px;
   --green:#3B6D11;--green-bg:#EAF3DE;
   --orange:#854F0B;--orange-bg:#FAEEDA;
   --red:#A32D2D;--red-bg:#FCEBEB;
   --blue:#185FA5;--blue-bg:#E6F1FB;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
 }
 .dark{
   --bg:#1c1917;--bg2:#292524;--bg3:#0c0a09;
@@ -33,9 +34,12 @@
   --orange:#d97706;--orange-bg:#2a1a00;
   --red:#e05555;--red-bg:#2a0a0a;
   --blue:#4b9fe0;--blue-bg:#0a1a2a;
+  --shadow:0 2px 8px rgba(0,0,0,.3);
 }
 html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--txt);}
-#root{max-width:700px;margin:0 auto;min-height:100vh;background:var(--bg3);}
+#root{max-width:900px;margin:0 auto;min-height:100vh;background:var(--bg3);}
+
+/* ── HEADER ── */
 .header{background:var(--bg);border-bottom:1px solid var(--border);padding:10px 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;}
 .header-left{display:flex;align-items:center;gap:8px;}
 .header-title{font-size:16px;font-weight:700;color:var(--txt);}
@@ -43,18 +47,22 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 .header-right{display:flex;align-items:center;gap:6px;}
 .btn-dark{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:5px 9px;font-size:16px;cursor:pointer;}
 .btn-back{background:none;border:none;font-size:22px;cursor:pointer;color:var(--txt);padding:0 4px;line-height:1;}
-.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:700px;background:var(--bg);border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
-.nav-btn{flex:1;padding:10px 4px 8px;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;}
-.nav-icon{font-size:22px;line-height:1;}
+
+/* ── NAV ── */
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:900px;background:var(--bg);border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
+.nav-btn{flex:1;padding:9px 4px 7px;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.nav-icon{font-size:20px;line-height:1;}
 .nav-label{font-size:10px;color:var(--txt2);}
 .nav-btn.activo .nav-label{color:var(--txt);font-weight:700;}
+
+/* ── BOTONES ── */
 .btn-pri{background:var(--txt);color:var(--bg);border:none;border-radius:var(--radius);padding:9px 16px;font-size:14px;font-weight:700;cursor:pointer;}
 .btn-sec{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px;font-size:14px;cursor:pointer;color:var(--txt2);}
 .btn-full{width:100%;padding:13px;border-radius:var(--radius);font-size:16px;font-weight:700;cursor:pointer;border:none;background:var(--txt);color:var(--bg);}
-.field{margin-bottom:.85rem;}
-.field label{display:block;font-size:12px;color:var(--txt2);margin-bottom:4px;font-weight:600;}
-.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius);font-size:15px;background:var(--bg);color:var(--txt);font-family:inherit;}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--border2);}
+.btn-full:disabled{opacity:.3;cursor:not-allowed;}
+.btn-ic{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--txt2);}
+
+/* ── LAYOUT ── */
 .app-body{padding:.85rem 1rem 80px;}
 .search{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:15px;background:var(--bg);color:var(--txt);font-family:inherit;display:block;}
 .search:focus{outline:none;border-color:var(--border2);}
@@ -67,7 +75,6 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 .card-name{font-size:15px;font-weight:700;color:var(--txt);}
 .card-sub{font-size:12px;color:var(--txt2);margin-top:2px;}
 .card-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
-.btn-ic{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--txt2);}
 .pill{font-size:11px;padding:3px 9px;border-radius:99px;font-weight:700;white-space:nowrap;}
 .pill-green{background:var(--green-bg);color:var(--green);}
 .pill-orange{background:var(--orange-bg);color:var(--orange);}
@@ -81,8 +88,86 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 .chip{padding:6px 12px;border-radius:99px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:600;background:var(--bg);color:var(--txt2);}
 .chip.activo{background:var(--txt);color:var(--bg);border-color:var(--txt);}
 .empty{text-align:center;padding:2.5rem 1rem;color:var(--txt2);font-size:14px;line-height:1.7;}
-.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--txt);color:var(--bg);padding:9px 22px;border-radius:99px;font-size:14px;z-index:200;white-space:nowrap;}
 .suma-band{background:var(--bg2);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+
+/* ── MODAL OVERLAY ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+@media(min-width:600px){.overlay{align-items:center;}}
+.modal{background:var(--bg);border-radius:var(--radius-lg) var(--radius-lg) 0 0;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:1.25rem;}
+@media(min-width:600px){.modal{border-radius:var(--radius-lg);max-height:85vh;}}
+.modal-drag{width:40px;height:4px;background:var(--border2);border-radius:99px;margin:0 auto 16px;}
+@media(min-width:600px){.modal-drag{display:none;}}
+
+/* ══════════════════════════════
+   CATÁLOGO  (nuevo)
+══════════════════════════════ */
+.catalogo-header{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.catalogo-search{flex:1;}
+.catalogo-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+}
+@media(min-width:480px){.catalogo-grid{grid-template-columns:repeat(3,1fr);}}
+@media(min-width:700px){.catalogo-grid{grid-template-columns:repeat(4,1fr);}}
+
+.prod-card{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  cursor:pointer;
+  transition:transform .12s,box-shadow .12s;
+  box-shadow:var(--shadow);
+}
+.prod-card:active,.prod-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.12);}
+.prod-card-foto{
+  width:100%;
+  height:120px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:56px;
+  position:relative;
+  overflow:hidden;
+}
+@media(min-width:600px){.prod-card-foto{height:140px;}}
+.prod-card-foto img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;}
+.prod-card-info{padding:10px 10px 12px;}
+.prod-card-nombre{font-size:13px;font-weight:700;color:var(--txt);line-height:1.3;margin-bottom:2px;}
+.prod-card-unidad{font-size:11px;color:var(--txt2);}
+.prod-card-precio{font-size:17px;font-weight:700;color:var(--txt);margin-top:4px;}
+.prod-card-btn{
+  width:100%;margin-top:8px;padding:7px;border:none;border-radius:var(--radius);
+  font-size:13px;font-weight:700;cursor:pointer;
+  background:var(--txt);color:var(--bg);
+}
+
+/* MODAL VENTA RAPIDA */
+.venta-prod-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.venta-prod-foto{width:64px;height:64px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:34px;overflow:hidden;flex-shrink:0;}
+.venta-prod-foto img{width:100%;height:100%;object-fit:cover;}
+.venta-metodos{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:12px;}
+.btn-metodo{padding:8px 4px;border:1px solid var(--border);border-radius:var(--radius);font-size:11px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--txt2);text-align:center;}
+.btn-metodo.activo{background:var(--txt);color:var(--bg);border-color:var(--txt);}
+.qty-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.qty-btn{width:44px;height:44px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:22px;font-weight:700;color:var(--txt);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.qty-input{flex:1;padding:10px;border:1px solid var(--border);border-radius:var(--radius);font-size:22px;font-weight:700;text-align:center;background:var(--bg);color:var(--txt);font-family:inherit;}
+.qty-input:focus{outline:none;border-color:var(--border2);}
+.total-grande{font-size:32px;font-weight:700;color:var(--txt);text-align:center;margin:10px 0 16px;}
+
+/* FOTO UPLOAD */
+.foto-upload-area{border:2px dashed var(--border);border-radius:var(--radius);height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg2);position:relative;overflow:hidden;gap:6px;}
+.foto-upload-area img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.foto-upload-area p{font-size:12px;color:var(--txt2);text-align:center;padding:0 8px;z-index:1;}
+.foto-upload-area input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.foto-upload-area span{font-size:28px;z-index:1;}
+
+/* FORMUARLOS */
+.inp{display:block;width:100%;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--txt);fontSize:15px;outline:none;font-family:inherit;font-size:15px;}
+.inp:focus{border-color:var(--border2);}
+.lbl{font-size:12px;color:var(--txt2);font-weight:600;display:block;margin-bottom:4px;margin-top:12px;}
+
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-thumb{background:var(--bg2);border-radius:4px;}
 </style>
@@ -90,7 +175,7 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef, useCallback } = React;
 
 const firebaseConfig = {
   apiKey:"AIzaSyDl2QhPwVToc4t6UQEGlCydRLzdE4oAx8A",
@@ -104,34 +189,66 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+/* ─── UTILS ─── */
 const hoy = () => new Date().toISOString().split('T')[0];
-const formatFecha = f => { if(!f) return '—'; const [y,m,d]=f.split('-'); return `${d}/${m}/${y}`; };
-const formatPeso  = n => '$'+Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:0});
-const ahora      = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+const formatFecha = f => { if(!f) return '─'; const [y,m,d]=f.split('-'); return `${d}/${m}/${y}`; };
+const formatPeso = n => '$'+Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:0});
+const ahora = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 const fechaCorta = () => new Date().toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
 
-const S = {
-  inp: {display:'block',width:'100%',marginTop:4,padding:'9px 11px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',color:'var(--txt)',fontSize:15,outline:'none',marginBottom:2,fontFamily:'inherit'},
-  lbl: {fontSize:12,color:'var(--txt2)',fontWeight:600,display:'block',marginBottom:2,marginTop:12},
+/* Colores e iconos por categoría */
+const CAT_STYLE = {
+  '🐔 Pollo':          { bg:'#FFF8E1', emoji:'🐔' },
+  '🥩 Carne':           { bg:'#FDEDEC', emoji:'🥩' },
+  '🥦 Verduras':        { bg:'#EAF3DE', emoji:'🥦' },
+  '🍋 Frutas':          { bg:'#FEFCE8', emoji:'🍋' },
+  '🥚 Huevos y lácteos':{ bg:'#FDF2E9', emoji:'🥚' },
+  '🧀 Fiambres':        { bg:'#FEF3E2', emoji:'🧀' },
+  '🛒 Almacén':         { bg:'#E6F1FB', emoji:'🛒' },
+  'Otro':               { bg:'#F5F5F4', emoji:'📦' },
 };
+const catStyle = cat => CAT_STYLE[cat] || { bg:'#F5F5F4', emoji:'📦' };
 
+/* Comprimir imagen antes de guardar */
+const comprimirImagen = (file, maxPx=300, quality=0.75) => new Promise(res => {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w=img.width, h=img.height;
+      if(w>h && w>maxPx){ h=h*maxPx/w; w=maxPx; }
+      else if(h>maxPx){ w=w*maxPx/h; h=maxPx; }
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      res(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ─── CAMPO SIMPLE ─── */
 function Campo({label,value,onChange,placeholder,tipo='text',rows}){
-  return(<><label style={S.lbl}>{label}</label>{rows
-    ?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{...S.inp,resize:'vertical'}}/>
-    :<input type={tipo} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={S.inp}/>
-  }</>);
+  return(<>
+    <label className="lbl">{label}</label>
+    {rows
+      ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} className="inp" style={{resize:'vertical'}}/>
+      : <input type={tipo} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="inp"/>
+    }
+  </>);
 }
 
 /* ─── HEADER ─── */
 function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
   const [dark,setDark]=useState(()=>document.documentElement.classList.contains('dark'));
   const [hora,setHora]=useState(ahora());
-  useEffect(()=>{const t=setInterval(()=>setHora(ahora()),30000);return()=>clearInterval(t);},[]);
-  const toggleDark=()=>{document.documentElement.classList.toggle('dark');document.body.classList.toggle('dark');setDark(d=>!d);};
+  useEffect(()=>{ const t=setInterval(()=>setHora(ahora()),30000); return()=>clearInterval(t); },[]);
+  const toggleDark=()=>{ document.documentElement.classList.toggle('dark'); document.body.classList.toggle('dark'); setDark(d=>!d); };
   return(
     <header className="header">
       <div className="header-left">
-        {onBack&&<button onClick={onBack} className="btn-back">←</button>}
+        {onBack && <button onClick={onBack} className="btn-back">←</button>}
         <div>
           <div className="header-title">🐔 {titulo}</div>
           <div className="header-sub">{subtitulo||fechaCorta()}</div>
@@ -139,16 +256,22 @@ function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
       </div>
       <div className="header-right">
         <span style={{fontSize:14,fontWeight:700,color:'var(--txt)',fontVariantNumeric:'tabular-nums'}}>{hora}</span>
-        {onAdd&&<button onClick={onAdd} className="btn-pri" style={{fontSize:20,padding:'3px 12px',lineHeight:1}}>+</button>}
+        {onAdd && <button onClick={onAdd} className="btn-pri" style={{fontSize:20,padding:'3px 12px',lineHeight:1}}>+</button>}
         <button onClick={toggleDark} className="btn-dark">{dark?'☀️':'🌙'}</button>
-        {onLogout&&<button onClick={onLogout} className="btn-sec" style={{fontSize:12,padding:'6px 10px'}}>Salir</button>}
+        {onLogout && <button onClick={onLogout} className="btn-sec" style={{fontSize:12,padding:'6px 10px'}}>Salir</button>}
       </div>
     </header>
   );
 }
 
-/* ─── NAVBAR ─── */
-const TABS=[{id:'pedidos',icon:'📋',label:'Pedidos'},{id:'precios',icon:'💰',label:'Precios'},{id:'stock',icon:'📦',label:'Stock'},{id:'clientes',icon:'👥',label:'Clientes'},{id:'caja',icon:'🧾',label:'Caja'}];
+/* ─── NAV BAR ─── */
+const TABS=[
+  {id:'catalogo', icon:'🛒', label:'Vender'},
+  {id:'pedidos',  icon:'📋', label:'Pedidos'},
+  {id:'precios',  icon:'💰', label:'Precios'},
+  {id:'stock',    icon:'📦', label:'Stock'},
+  {id:'caja',     icon:'🧾', label:'Caja'},
+];
 function NavBar({activo,onChange}){
   return(
     <nav className="nav">
@@ -165,23 +288,264 @@ function NavBar({activo,onChange}){
 /* ─── LOGIN ─── */
 function Login(){
   const [email,setEmail]=useState('');const [pass,setPass]=useState('');const [error,setError]=useState('');const [carg,setCarg]=useState(false);
-  const ingresar=async()=>{if(!email||!pass)return setError('Completá los dos campos');setCarg(true);setError('');try{await auth.signInWithEmailAndPassword(email,pass);}catch{setError('Email o contraseña incorrectos');setCarg(false);}};
+  const ingresar=async()=>{
+    if(!email||!pass) return setError('Completá los dos campos');
+    setCarg(true);setError('');
+    try{ await auth.signInWithEmailAndPassword(email,pass); }
+    catch{ setError('Email o contraseña incorrectos');setCarg(false); }
+  };
   return(
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',background:'var(--bg3)'}}>
-      <div style={{fontSize:56,marginBottom:8}}>🐔</div>
+      <div style={{fontSize:60,marginBottom:8}}>🐔</div>
       <div style={{fontSize:22,fontWeight:700,color:'var(--txt)',marginBottom:4}}>Gestión Pollería</div>
       <p style={{color:'var(--txt2)',marginBottom:32,fontSize:14}}>Tu negocio bajo control</p>
       <div style={{width:'100%',maxWidth:340,background:'var(--bg)',borderRadius:'var(--radius-lg)',padding:24,border:'1px solid var(--border)'}}>
-        {error&&<div style={{background:'var(--red-bg)',color:'var(--red)',padding:'10px 14px',borderRadius:'var(--radius)',marginBottom:14,fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
+        {error && <div style={{background:'var(--red-bg)',color:'var(--red)',padding:'10px 14px',borderRadius:'var(--radius)',marginBottom:14,fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
         <Campo label="Email" value={email} onChange={setEmail} placeholder="tu@email.com" tipo="email"/>
         <Campo label="Contraseña" value={pass} onChange={setPass} placeholder="••••••••" tipo="password"/>
-        <button onClick={ingresar} disabled={carg} className="btn-full" style={{marginTop:18,opacity:carg?0.7:1}}>{carg?'Ingresando...':'🐔 Ingresar'}</button>
+        <button onClick={ingresar} disabled={carg} className="btn-full" style={{marginTop:18,opacity:carg?0.7:1}}>
+          {carg ? 'Ingresando...' : '🐔 Ingresar'}
+        </button>
       </div>
     </div>
   );
 }
 
-/* ─── PRECIOS ─── */
+/* ══════════════════════════════════════
+   MODAL VENTA RÁPIDA
+══════════════════════════════════════ */
+function ModalVentaRapida({producto, clientes, uid, onCerrar}){
+  const [cant,setCant]=useState('1');
+  const [pago,setPago]=useState('efectivo');
+  const [clienteId,setClienteId]=useState('');
+  const [cargando,setCargando]=useState(false);
+  const cs = catStyle(producto.categoria);
+  const precio = Number(producto.precioVenta)||0;
+  const cantidad = parseFloat(cant)||0;
+  const total = precio * cantidad;
+
+  const ajustarCant = delta => {
+    const paso = ['kg','litro','litros'].includes(producto.unidad||'') ? 0.5 : 1;
+    setCant(v => Math.max(0, (parseFloat(v)||0)+delta*paso).toString());
+  };
+
+  const confirmar = async () => {
+    if(!cantidad||cantidad<=0) return alert('Ingresá una cantidad válida');
+    setCargando(true);
+    try {
+      const cliente = clientes.find(c=>c.id===clienteId);
+      const ts = firebase.firestore.FieldValue.serverTimestamp();
+      // Guardar como venta directa en pedidos
+      await db.collection(`polleria/${uid}/pedidos`).add({
+        clienteNombre: cliente ? cliente.nombre : 'Venta directa',
+        clienteId: clienteId||'',
+        tipo:'mostrador',
+        estado:'entregado',
+        pagado: pago !== 'fiado',
+        formaPago: pago,
+        items:[{
+          _id: Date.now(),
+          nombre: producto.nombre,
+          unidad: producto.unidad||'kg',
+          cantidad,
+          precio,
+          subtotal: total,
+        }],
+        total,
+        fecha: hoy(),
+        createdAt: ts,
+      });
+      // Si es fiado, actualizar saldo del cliente
+      if(pago==='fiado' && clienteId){
+        const ref = db.collection(`polleria/${uid}/clientes`).doc(clienteId);
+        const snap = await ref.get();
+        if(snap.exists){
+          await ref.update({ saldoFiado: (Number(snap.data().saldoFiado)||0)+total });
+        }
+      }
+      onCerrar(true);
+    } catch(e){ alert('Error al guardar: '+e.message); }
+    setCargando(false);
+  };
+
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onCerrar(false)}>
+      <div className="modal">
+        <div className="modal-drag"/>
+        {/* Cabecera producto */}
+        <div className="venta-prod-header">
+          <div className="venta-prod-foto" style={{background:cs.bg}}>
+            {producto.foto
+              ? <img src={producto.foto} alt={producto.nombre}/>
+              : <span>{cs.emoji}</span>
+            }
+          </div>
+          <div>
+            <div style={{fontWeight:700,fontSize:17,color:'var(--txt)'}}>{producto.nombre}</div>
+            <div style={{fontSize:13,color:'var(--txt2)'}}>{formatPeso(precio)} / {producto.unidad||'kg'}</div>
+            {producto.descripcion && <div style={{fontSize:12,color:'var(--txt3)',marginTop:2}}>{producto.descripcion}</div>}
+          </div>
+        </div>
+
+        {/* Cantidad */}
+        <label className="lbl">Cantidad ({producto.unidad||'kg'})</label>
+        <div className="qty-row">
+          <button className="qty-btn" onClick={()=>ajustarCant(-1)}>−</button>
+          <input
+            type="number"
+            value={cant}
+            onChange={e=>setCant(e.target.value)}
+            className="qty-input"
+            step={['kg','litro','litros'].includes(producto.unidad||'')?'0.5':'1'}
+            min="0"
+          />
+          <button className="qty-btn" onClick={()=>ajustarCant(1)}>+</button>
+        </div>
+
+        {/* Total */}
+        <div className="total-grande">{formatPeso(total)}</div>
+
+        {/* Forma de pago */}
+        <label className="lbl">Forma de pago</label>
+        <div className="venta-metodos">
+          {[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transf.'},{k:'fiado',lbl:'📒 Fiado'},{k:'tarjeta',lbl:'💳 Tarjeta'}].map(m=>(
+            <button key={m.k} onClick={()=>setPago(m.k)} className={`btn-metodo${pago===m.k?' activo':''}`}>{m.lbl}</button>
+          ))}
+        </div>
+
+        {/* Cliente (opcional, requerido si es fiado) */}
+        <label className="lbl">Cliente {pago==='fiado'?'*':'(opcional)'}</label>
+        <select value={clienteId} onChange={e=>setClienteId(e.target.value)} className="inp" style={{marginBottom:16}}>
+          <option value="">— Sin cliente / Venta directa —</option>
+          {clientes.map(c=>(
+            <option key={c.id} value={c.id}>
+              {c.nombre}{Number(c.saldoFiado)>0?` (fiado: ${formatPeso(c.saldoFiado)})`:''}
+            </option>
+          ))}
+        </select>
+
+        <button
+          onClick={confirmar}
+          disabled={cargando||!cantidad}
+          className="btn-full"
+          style={{background:'var(--green)',marginBottom:8}}
+        >
+          {cargando ? 'Guardando...' : `✓ Confirmar venta — ${formatPeso(total)}`}
+        </button>
+        <button onClick={()=>onCerrar(false)} className="btn-full" style={{background:'none',border:'1px solid var(--border)',color:'var(--txt2)',padding:10,fontSize:14}}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+function Toast({msg}){
+  return msg ? <div className="toast">{msg}</div> : null;
+}
+
+/* ══════════════════════════════════════
+   PANTALLA CATÁLOGO / VENDER  (nueva)
+══════════════════════════════════════ */
+function PantallaCatalogo({uid}){
+  const [productos,setProductos]=useState([]);
+  const [clientes,setClientes]=useState([]);
+  const [buscar,setBuscar]=useState('');
+  const [catFiltro,setCatFiltro]=useState('Todos');
+  const [ventaModal,setVentaModal]=useState(null);
+  const [toast,setToast]=useState('');
+
+  useEffect(()=>{
+    const u1=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
+    return()=>{u1();u2();};
+  },[]);
+
+  const mostrarToast = msg => { setToast(msg); setTimeout(()=>setToast(''),2200); };
+
+  const handleCerrarVenta = (guardado) => {
+    setVentaModal(null);
+    if(guardado) mostrarToast('✅ Venta registrada');
+  };
+
+  const CATS = ['Todos', ...new Set(productos.map(p=>p.categoria||'Otro'))];
+  const filtrados = productos.filter(p=>{
+    const okBuscar = p.nombre.toLowerCase().includes(buscar.toLowerCase());
+    const okCat = catFiltro==='Todos' || (p.categoria||'Otro')===catFiltro;
+    return okBuscar && okCat;
+  });
+
+  return(
+    <div>
+      <Header titulo="Catálogo / Vender" onLogout={()=>auth.signOut()} subtitulo="Tocá un producto para vender"/>
+      <div className="app-body">
+        {/* Búsqueda */}
+        <input
+          value={buscar}
+          onChange={e=>setBuscar(e.target.value)}
+          placeholder="🔍 Buscar producto..."
+          className="search"
+          style={{marginBottom:10}}
+        />
+        {/* Filtro categorías */}
+        <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:4}}>
+          {CATS.map(c=>(
+            <button key={c} onClick={()=>setCatFiltro(c)} className={`chip${catFiltro===c?' activo':''}`} style={{flexShrink:0}}>
+              {c==='Todos'?'🐔 Todos':c}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid de productos */}
+        {filtrados.length===0 && (
+          <div className="empty">
+            <div style={{fontSize:48,marginBottom:12}}>🐔</div>
+            No hay productos.<br/>Agregá productos en la sección <b>Precios</b>.
+          </div>
+        )}
+        <div className="catalogo-grid">
+          {filtrados.map(p=>{
+            const cs = catStyle(p.categoria);
+            return(
+              <div key={p.id} className="prod-card" onClick={()=>setVentaModal(p)}>
+                {/* Foto o emoji */}
+                <div className="prod-card-foto" style={{background:cs.bg}}>
+                  {p.foto
+                    ? <img src={p.foto} alt={p.nombre}/>
+                    : <span>{cs.emoji}</span>
+                  }
+                </div>
+                {/* Info */}
+                <div className="prod-card-info">
+                  <div className="prod-card-nombre">{p.nombre}</div>
+                  <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
+                  <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
+                  <button className="prod-card-btn">+ Vender</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Modal venta */}
+      {ventaModal && (
+        <ModalVentaRapida
+          producto={ventaModal}
+          clientes={clientes}
+          uid={uid}
+          onCerrar={handleCerrarVenta}
+        />
+      )}
+      <Toast msg={toast}/>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
+   PRECIOS  (con upload de foto)
+══════════════════════════════════════ */
 function PantallaPrecios({uid}){
   const [productos,setProductos]=useState([]);const [form,setForm]=useState(null);const [buscar,setBuscar]=useState('');
   const CATS=['🐔 Pollo','🥩 Carne','🥦 Verduras','🍋 Frutas','🥚 Huevos y lácteos','🧀 Fiambres','🛒 Almacén','Otro'];
@@ -189,34 +553,38 @@ function PantallaPrecios({uid}){
   useEffect(()=>col.orderBy('nombre','asc').onSnapshot(snap=>setProductos(snap.docs.map(d=>({id:d.id,...d.data()})))),[]);
   const guardar=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add(r);setForm(null);};
   const eliminar=async id=>{if(!confirm('¿Eliminar producto?'))return;await col.doc(id).delete();};
-  if(form!==null)return<FormProducto inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)} categorias={CATS}/>;
+  if(form!==null) return <FormProducto inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)} categorias={CATS}/>;
   const filtrados=productos.filter(p=>p.nombre.toLowerCase().includes(buscar.toLowerCase())||(p.categoria||'').toLowerCase().includes(buscar.toLowerCase()));
   const porCat={};filtrados.forEach(p=>{const c=p.categoria||'Otro';if(!porCat[c])porCat[c]=[];porCat[c].push(p);});
   return(
     <div>
       <Header titulo="Lista de Precios" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()}/>
       <div className="app-body">
-        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar producto..." className="search" style={{marginBottom:12}}/>
-        {productos.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🐔</div>No hay productos todavía<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar producto</button></div>}
+        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{marginBottom:12}}/>
+        {productos.length===0 && <div className="empty"><div style={{fontSize:48,marginBottom:12}}>🐔</div>No hay productos<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
         {Object.entries(porCat).map(([cat,prods])=>(
           <div key={cat} style={{marginBottom:16}}>
             <div className="sec-title">{cat} <span style={{fontWeight:400}}>({prods.length})</span></div>
             {prods.map(p=>{
               const m=p.precioCosto>0?Math.round(((Number(p.precioVenta)-Number(p.precioCosto))/Number(p.precioCosto))*100):null;
-              const pillC=m===null?'pill pill-gray':m>=30?'pill pill-green':m>=10?'pill pill-orange':'pill pill-red';
+              const cs=catStyle(p.categoria);
               return(
                 <div key={p.id} className="card">
                   <div className="card-body">
                     <div className="card-head">
+                      {/* Miniatura */}
+                      <div style={{width:48,height:48,borderRadius:var('--radius'),background:cs.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,overflow:'hidden',flexShrink:0,marginRight:10}}>
+                        {p.foto ? <img src={p.foto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : cs.emoji}
+                      </div>
                       <div style={{flex:1}}>
                         <div className="card-name">{p.nombre}</div>
-                        {p.descripcion&&<div className="card-sub">{p.descripcion}</div>}
+                        {p.descripcion && <div className="card-sub">{p.descripcion}</div>}
                         <div className="card-sub">por {p.unidad||'kg'}</div>
                       </div>
                       <div style={{textAlign:'right',flexShrink:0,marginLeft:10}}>
-                        {p.precioCosto>0&&<div style={{fontSize:11,color:'var(--txt2)',textDecoration:'line-through'}}>{formatPeso(p.precioCosto)}</div>}
+                        {p.precioCosto>0 && <div style={{fontSize:11,color:'var(--txt2)',textDecoration:'line-through'}}>{formatPeso(p.precioCosto)}</div>}
                         <div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{formatPeso(p.precioVenta||0)}</div>
-                        {m!==null&&<span className={pillC}>{m}%</span>}
+                        {m!==null && <span className={m>=30?'pill pill-green':m>=10?'pill pill-orange':'pill pill-red'}>{m}%</span>}
                       </div>
                     </div>
                     <div className="card-actions">
@@ -236,22 +604,57 @@ function PantallaPrecios({uid}){
 
 function FormProducto({inicial,onGuardar,onCancelar,categorias}){
   const UNIDADES=['kg','g','unidad','docena','litro','atado','bandeja'];
-  const [d,setD]=useState({nombre:'',categoria:'🐔 Pollo',descripcion:'',precioCosto:'',precioVenta:'',unidad:'kg',...inicial});
+  const [d,setD]=useState({nombre:'',categoria:'🐔 Pollo',descripcion:'',precioCosto:'',precioVenta:'',unidad:'kg',foto:'',...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
   const m=d.precioCosto>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):0;
-  const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});};
+  const cs=catStyle(d.categoria);
+
+  const handleFoto=async e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const base64=await comprimirImagen(file,300,0.75);
+    set('foto',base64);
+  };
+
+  const guardar=()=>{
+    if(!d.nombre.trim())return alert('El nombre es obligatorio');
+    onGuardar({...d,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});
+  };
+
   return(
     <div>
       <Header titulo={d.id?'Editar Producto':'Nuevo Producto'} onBack={onCancelar}/>
       <div className="app-body">
+        {/* Foto ilustrativa */}
+        <label className="lbl">Foto del producto (opcional)</label>
+        <div className="foto-upload-area">
+          {d.foto
+            ? <img src={d.foto} alt="foto"/>
+            : <>
+                <span>{cs.emoji}</span>
+                <p>Tocá para subir una foto<br/>(se comprime automáticamente)</p>
+              </>
+          }
+          <input type="file" accept="image/*" onChange={handleFoto}/>
+        </div>
+        {d.foto && <button onClick={()=>set('foto','')} className="btn-ic" style={{marginTop:6,fontSize:12,color:'var(--red)'}}>🗑️ Quitar foto</button>}
+
         <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
-        <label style={S.lbl}>Categoría</label>
-        <div className="chip-group">{categorias.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}</div>
-        <label style={S.lbl}>Unidad de venta</label>
-        <div className="chip-group">{UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}</div>
+
+        <label className="lbl">Categoría</label>
+        <div className="chip-group">
+          {categorias.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}
+        </div>
+
+        <label className="lbl">Unidad de venta</label>
+        <div className="chip-group">
+          {UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}
+        </div>
+
         <Campo label="Descripción (opcional)" value={d.descripcion} onChange={v=>set('descripcion',v)} placeholder="Ej: fresco, de granja" rows={2}/>
         <Campo label="💸 Precio de costo ($)" value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
         <Campo label="💰 Precio de venta ($)" value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
+
         {Number(d.precioCosto)>0&&Number(d.precioVenta)>0&&(
           <div style={{background:m>=0?'var(--green-bg)':'var(--red-bg)',border:`1px solid ${m>=0?'var(--green)':'var(--red)'}`,borderRadius:'var(--radius)',padding:'10px 14px',marginTop:4,display:'flex',justifyContent:'space-between'}}>
             <span style={{fontSize:13,color:'var(--txt2)'}}>Ganancia:</span>
@@ -267,14 +670,16 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
   );
 }
 
-/* ─── STOCK ─── */
+/* ══════════════════════════════════════
+   STOCK
+══════════════════════════════════════ */
 function CalculadoraCajon(){
   const [cajones,setCajones]=useState(1);const [ppc,setPpc]=useState(9);const [kg,setKg]=useState(2.2);const [modo,setModo]=useState('completo');
   const tot=cajones*ppc;const totKg=tot*kg;
   const MODOS={
-    completo:{label:'🐔 Entero',piezas:[{n:'Pollos enteros',c:tot,u:'unid'},{n:'Peso total',c:+totKg.toFixed(1),u:'kg'}]},
-    piezas:  {label:'🍗 Trozado', piezas:[{n:'Pechugas',c:tot,u:'unid',nota:'(1 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Alas',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Carcasas',c:tot,u:'unid',nota:''}]},
-    filet:   {label:'🥩 Filet',   piezas:[{n:'Filet pechuga',c:+(tot*0.55).toFixed(1),u:'kg',nota:'(≈550g c/u)'},{n:'Milanesas pechuga',c:tot*4,u:'unid',nota:'(≈4 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:''},{n:'Carcasas caldo',c:tot,u:'unid',nota:''}]},
+    completo:{label:'🐔 Entero',piezas:[{n:'Pollos',c:tot,u:'unid'},{n:'Peso total',c:+totKg.toFixed(1),u:'kg'}]},
+    piezas:  {label:'🍗 Trozado',piezas:[{n:'Pechugas',c:tot,u:'unid',nota:'(1 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Alas',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Muslos',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Carcasas',c:tot,u:'unid',nota:''}]},
+    filet:   {label:'🥩 Filet',  piezas:[{n:'Filet pechuga',c:+(tot*0.55).toFixed(1),u:'kg',nota:'(≈550g c/u)'},{n:'Milanesas',c:tot*4,u:'unid',nota:'(≈4 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:''},{n:'Carcasas caldo',c:tot,u:'unid',nota:''}]},
   };
   const M=MODOS[modo];
   return(
@@ -283,8 +688,8 @@ function CalculadoraCajon(){
       <div style={{display:'flex',gap:10,marginBottom:12}}>
         {[{lbl:'Cajones',v:cajones,set:v=>setCajones(Math.max(1,v))},{lbl:'Pollos/cajón',v:ppc,set:v=>setPpc(Math.max(1,v))},{lbl:'Kg prom.',v:kg,set:v=>setKg(Math.max(0.5,v)),step:0.1}].map(f=>(
           <div key={f.lbl} style={{flex:1}}>
-            <label style={{...S.lbl,marginTop:0}}>{f.lbl}</label>
-            <input type="number" step={f.step||1} value={f.v} onChange={e=>f.set(Number(e.target.value))} style={{...S.inp,textAlign:'center',fontWeight:700,fontSize:18}}/>
+            <label className="lbl" style={{marginTop:0}}>{f.lbl}</label>
+            <input type="number" step={f.step||1} value={f.v} onChange={e=>f.set(Number(e.target.value))} className="inp" style={{textAlign:'center',fontWeight:700,fontSize:18,marginTop:4}}/>
           </div>
         ))}
       </div>
@@ -292,12 +697,17 @@ function CalculadoraCajon(){
         <span style={{fontSize:13,color:'var(--txt2)'}}>Total pollos: <b style={{color:'var(--txt)'}}>{tot}</b></span>
         <span style={{fontSize:13,color:'var(--txt2)'}}>Total kg: <b style={{color:'var(--txt)'}}>{totKg.toFixed(1)}</b></span>
       </div>
-      <label style={{...S.lbl,marginTop:0}}>Tipo de corte</label>
-      <div className="chip-group" style={{marginBottom:12}}>{Object.entries(MODOS).map(([k,v])=><button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>)}</div>
+      <label className="lbl" style={{marginTop:0}}>Tipo de corte</label>
+      <div className="chip-group" style={{marginBottom:12}}>
+        {Object.entries(MODOS).map(([k,v])=><button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>)}
+      </div>
       <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12}}>
         {M.piezas.map((p,i)=>(
           <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
-            <div><span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>{p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}</div>
+            <div>
+              <span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>
+              {p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}
+            </div>
             <div style={{fontWeight:700,fontSize:18,color:'var(--green)'}}>{p.c} <span style={{fontSize:11,fontWeight:400,color:'var(--txt2)'}}>{p.u}</span></div>
           </div>
         ))}
@@ -313,7 +723,7 @@ function PantallaStock({uid}){
   const guardar=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add(r);setForm(null);};
   const eliminar=async id=>{if(!confirm('¿Eliminar?'))return;await col.doc(id).delete();};
   const ajustar=async(id,delta)=>{const i=items.find(x=>x.id===id);if(!i)return;await col.doc(id).update({cantidad:Math.max(0,(Number(i.cantidad)||0)+delta)});};
-  if(form!==null)return<FormStock inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+  if(form!==null) return <FormStock inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
   const bajos=items.filter(i=>Number(i.cantidad)<=Number(i.stockMinimo||0));
   const filtrados=items.filter(i=>i.nombre.toLowerCase().includes(buscar.toLowerCase()));
   return(
@@ -328,7 +738,7 @@ function PantallaStock({uid}){
         {sec==='stock'&&<>
           {bajos.length>0&&<div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:10}}><b style={{color:'var(--orange)',fontSize:13}}>⚠️ Stock bajo: </b><span style={{fontSize:13,color:'var(--txt2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span></div>}
           <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{marginBottom:12}}/>
-          {filtrados.length===0&&items.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>📦</div>No hay stock cargado<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
+          {filtrados.length===0&&items.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>📦</div>No hay stock<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
           {filtrados.map(item=>{
             const bajo=Number(item.cantidad)<=Number(item.stockMinimo||0);
             return(
@@ -337,9 +747,9 @@ function PantallaStock({uid}){
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                     <div><div className="card-name">{item.nombre}</div><div className="card-sub">Mínimo: {item.stockMinimo||0} {item.unidad}</div></div>
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:18,lineHeight:1,color:'var(--txt)'}}>−</button>
+                      <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:18,color:'var(--txt)'}}>−</button>
                       <div style={{textAlign:'center',minWidth:56}}><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{item.cantidad||0}</div><div style={{fontSize:10,color:'var(--txt2)'}}>{item.unidad}</div></div>
-                      <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'none',background:'var(--txt)',color:'var(--bg)',cursor:'pointer',fontSize:18,lineHeight:1}}>+</button>
+                      <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'none',background:'var(--txt)',color:'var(--bg)',cursor:'pointer',fontSize:18}}>+</button>
                     </div>
                   </div>
                   <div className="card-actions">
@@ -364,10 +774,10 @@ function FormStock({inicial,onGuardar,onCancelar}){
   const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,cantidad:Number(d.cantidad)||0,stockMinimo:Number(d.stockMinimo)||0});};
   return(
     <div>
-      <Header titulo={d.id?'Editar Item':'Nuevo Item Stock'} onBack={onCancelar}/>
+      <Header titulo={d.id?'Editar Item':'Nuevo Item'} onBack={onCancelar}/>
       <div className="app-body">
         <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
-        <label style={S.lbl}>Unidad</label>
+        <label className="lbl">Unidad</label>
         <div className="chip-group">{UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}</div>
         <Campo label={`Cantidad actual (${d.unidad})`} value={d.cantidad} onChange={v=>set('cantidad',v)} tipo="number" placeholder="0"/>
         <Campo label={`Stock mínimo (${d.unidad})`} value={d.stockMinimo} onChange={v=>set('stockMinimo',v)} tipo="number" placeholder="0"/>
@@ -380,99 +790,9 @@ function FormStock({inicial,onGuardar,onCancelar}){
   );
 }
 
-/* ─── CLIENTES ─── */
-function PantallaClientes({uid}){
-  const [clientes,setClientes]=useState([]);const [form,setForm]=useState(null);const [fiado,setFiado]=useState(null);const [buscar,setBuscar]=useState('');
-  const col=db.collection(`polleria/${uid}/clientes`);
-  useEffect(()=>col.orderBy('nombre','asc').onSnapshot(snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()})))),[]);
-  const guardar=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add({...r,saldoFiado:0});setForm(null);};
-  const eliminar=async id=>{if(!confirm('¿Eliminar cliente?'))return;await col.doc(id).delete();};
-  const registrarPago=async(cliente,monto)=>{await col.doc(cliente.id).update({saldoFiado:Math.max(0,(Number(cliente.saldoFiado)||0)-Number(monto))});setFiado(null);};
-  if(form!==null)return<FormCliente inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
-  if(fiado!==null)return<ModalPago cliente={fiado} onPagar={registrarPago} onCancelar={()=>setFiado(null)}/>;
-  const filtrados=clientes.filter(c=>c.nombre.toLowerCase().includes(buscar.toLowerCase()));
-  const totalFiado=clientes.reduce((s,c)=>s+(Number(c.saldoFiado)||0),0);
-  return(
-    <div>
-      <Header titulo="Clientes" onAdd={()=>setForm({})}/>
-      <div className="app-body">
-        {totalFiado>0&&<div className="suma-band"><span style={{fontSize:13,color:'var(--txt2)'}}>Total fiado pendiente</span><span style={{fontWeight:700,fontSize:20,color:'var(--orange)'}}>{formatPeso(totalFiado)}</span></div>}
-        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar cliente..." className="search" style={{marginBottom:12}}/>
-        {filtrados.length===0&&clientes.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>👥</div>No hay clientes registrados<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar cliente</button></div>}
-        {filtrados.map(c=>{
-          const saldo=Number(c.saldoFiado)||0;
-          return(
-            <div key={c.id} className="card" style={{borderColor:saldo>0?'var(--orange)':'var(--border)'}}>
-              <div className="card-body">
-                <div className="card-head">
-                  <div style={{flex:1}}>
-                    <div className="card-name">{c.nombre}</div>
-                    {c.telefono&&<div className="card-sub">📱 <a href={`tel:${c.telefono}`} style={{color:'var(--blue)'}}>{c.telefono}</a></div>}
-                    {c.direccion&&<div className="card-sub">📍 {c.direccion}</div>}
-                  </div>
-                  {saldo>0&&<div style={{textAlign:'right'}}>
-                    <div className="pill pill-orange">FIADO</div>
-                    <div style={{fontWeight:700,fontSize:18,color:'var(--orange)',marginTop:2}}>{formatPeso(saldo)}</div>
-                  </div>}
-                </div>
-                <div className="card-actions">
-                  <button onClick={()=>setForm(c)} className="btn-ic">✏️ Editar</button>
-                  {saldo>0&&<button onClick={()=>setFiado(c)} className="btn-pri" style={{fontSize:12,padding:'5px 12px'}}>💵 Registrar pago</button>}
-                  <button onClick={()=>eliminar(c.id)} className="btn-ic" style={{color:'var(--red)',marginLeft:'auto'}}>🗑️</button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function FormCliente({inicial,onGuardar,onCancelar}){
-  const [d,setD]=useState({nombre:'',telefono:'',direccion:'',notas:'',...inicial});
-  const set=(k,v)=>setD(p=>({...p,[k]:v}));
-  const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar(d);};
-  return(
-    <div>
-      <Header titulo={d.id?'Editar Cliente':'Nuevo Cliente'} onBack={onCancelar}/>
-      <div className="app-body">
-        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Nombre completo"/>
-        <Campo label="Teléfono" value={d.telefono} onChange={v=>set('telefono',v)} placeholder="381 123 4567" tipo="tel"/>
-        <Campo label="Dirección" value={d.direccion} onChange={v=>set('direccion',v)} placeholder="Ej: San Martín 456"/>
-        <Campo label="Notas" value={d.notas} onChange={v=>set('notas',v)} placeholder="Ej: prefiere pechuga..." rows={2}/>
-        <div style={{display:'flex',gap:8,marginTop:18}}>
-          <button onClick={guardar} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>{d.id?'✓ Guardar':'+ Agregar'}</button>
-          <button onClick={onCancelar} className="btn-sec" style={{padding:14}}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ModalPago({cliente,onPagar,onCancelar}){
-  const [monto,setMonto]=useState('');
-  const saldo=Number(cliente.saldoFiado)||0;
-  return(
-    <div>
-      <Header titulo="Registrar Pago" onBack={onCancelar}/>
-      <div className="app-body">
-        <div className="panel" style={{textAlign:'center',marginBottom:16}}>
-          <div style={{fontSize:13,color:'var(--txt2)',marginBottom:4}}>Fiado de {cliente.nombre}</div>
-          <div style={{fontWeight:700,fontSize:40,color:'var(--orange)'}}>{formatPeso(saldo)}</div>
-        </div>
-        <Campo label="¿Cuánto pagó? ($)" value={monto} onChange={setMonto} tipo="number" placeholder="0"/>
-        {monto>0&&<div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',marginTop:4,fontSize:13}}>Saldo restante: <b style={{color:'var(--green)'}}>{formatPeso(Math.max(0,saldo-Number(monto)))}</b></div>}
-        <div style={{display:'flex',gap:8,marginTop:18}}>
-          <button onClick={()=>{if(!monto)return alert('Ingresá el monto');onPagar(cliente,monto);}} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>✓ Confirmar pago</button>
-          <button onClick={onCancelar} className="btn-sec" style={{padding:14}}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── PEDIDOS ─── */
+/* ══════════════════════════════════════
+   PEDIDOS
+══════════════════════════════════════ */
 const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},entregado:{label:'Entregado',pillC:'pill pill-gray'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
 
 function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
@@ -485,7 +805,9 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
           <div style={{flex:1}}>
             <div className="card-name">{pedido.clienteNombre||'Cliente s/n'}</div>
             <div className="card-sub">{(pedido.items||[]).map(i=>`${i.cantidad} ${i.unidad} de ${i.nombre}`).join(', ')||'—'}</div>
-            <div className="card-sub" style={{marginTop:4}}>📅 {formatFecha(pedido.fecha)}{pedido.horaEntrega?` · ⏰ ${pedido.horaEntrega}`:''}{pedido.tipo==='delivery'?' · 🚴':''}{pedido.pagado?' · ✅':' · 💳'}</div>
+            <div className="card-sub" style={{marginTop:4}}>
+              📅 {formatFecha(pedido.fecha)}{pedido.horaEntrega?` · ⏰ ${pedido.horaEntrega}`:''}{pedido.tipo==='delivery'?' · 🚴':''}{pedido.pagado?' · ✅':' · 💳'}
+            </div>
           </div>
           <div style={{textAlign:'right',flexShrink:0,marginLeft:8}}>
             <span className={est.pillC}>{est.label}</span>
@@ -497,7 +819,7 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
         {pedido.notas&&<p style={{fontSize:13,color:'var(--txt2)',margin:'10px 0 4px',fontStyle:'italic'}}>"{pedido.notas}"</p>}
         {pedido.tipo==='delivery'&&pedido.direccion&&<p style={{fontSize:13,marginTop:6,color:'var(--txt)'}}>📍 {pedido.direccion}</p>}
         <div className="card-actions">
-          <button onClick={onEditar} className="btn-ic">✏️ Editar</button>
+          <button onClick={onEditar} className="btn-ic">✏️</button>
           {pedido.estado==='pendiente'&&<button onClick={()=>onEstado(pedido.id,'preparando')} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--blue)'}}>👨‍🍳 Preparando</button>}
           {pedido.estado==='preparando'&&<button onClick={()=>onEstado(pedido.id,'listo')} className="btn-pri" style={{fontSize:13,padding:'7px 12px'}}>✓ Listo</button>}
           {pedido.estado==='listo'&&<button onClick={()=>onEstado(pedido.id,'entregado')} className="btn-ic" style={{fontSize:13}}>📦 Entregado</button>}
@@ -512,29 +834,28 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
 function PantallaPedidos({uid}){
   const [pedidos,setPedidos]=useState([]);const [clientes,setClientes]=useState([]);const [productos,setProductos]=useState([]);const [form,setForm]=useState(null);const [filtro,setFiltro]=useState('hoy');
   useEffect(()=>{
-    const u1=db.collection(`polleria/${uid}/pedidos`).orderBy('createdAt','desc').onSnapshot(snap=>setPedidos(snap.docs.map(d=>({id:d.id,...d.data()}))));
-    const u2=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()}))));
-    const u3=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(snap=>setProductos(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u1=db.collection(`polleria/${uid}/pedidos`).orderBy('createdAt','desc').onSnapshot(s=>setPedidos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u3=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data()}))));
     return()=>{u1();u2();u3();};
   },[]);
   const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente'});setForm(null);};
   const cambiarEstado=async(id,estado)=>await db.collection(`polleria/${uid}/pedidos`).doc(id).update({estado,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
   const eliminar=async id=>{if(!confirm('¿Eliminar pedido?'))return;await db.collection(`polleria/${uid}/pedidos`).doc(id).delete();};
-  if(form!==null)return<FormPedido inicial={form} clientes={clientes} productos={productos} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+  if(form!==null) return <FormPedido inicial={form} clientes={clientes} productos={productos} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
   const hoyF=hoy();
-  const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'):pedidos;
-  const totalHoy=pedidos.filter(p=>p.fecha===hoyF).reduce((s,p)=>s+(p.total||0),0);
-  const countHoy=pedidos.filter(p=>p.fecha===hoyF).length;
+  const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'||p.estado==='preparando'):pedidos;
+  const totalHoy=pedidos.filter(p=>p.fecha===hoyF&&p.pagado&&p.estado!=='cancelado').reduce((s,p)=>s+(p.total||0),0);
   return(
     <div>
       <Header titulo="Pedidos" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()} subtitulo="Gestión Pollería"/>
       <div className="app-body">
         <div className="suma-band" style={{marginBottom:12}}>
-          <div><div style={{fontSize:11,color:'var(--txt2)'}}>Pedidos hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{countHoy}</div></div>
-          <div style={{textAlign:'right'}}><div style={{fontSize:11,color:'var(--txt2)'}}>Total cobrado hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--green)'}}>{formatPeso(totalHoy)}</div></div>
+          <div><div style={{fontSize:11,color:'var(--txt2)'}}>Pedidos hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{pedidos.filter(p=>p.fecha===hoyF).length}</div></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:11,color:'var(--txt2)'}}>Cobrado hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--green)'}}>{formatPeso(totalHoy)}</div></div>
         </div>
         <div className="tab-bar">
-          {[{k:'hoy',lbl:'Hoy'},{k:'pendientes',lbl:'Pendientes'},{k:'todos',lbl:'Todos'}].map(f=>(
+          {[{k:'hoy',lbl:'Hoy'},{k:'pendientes',lbl:'En proceso'},{k:'todos',lbl:'Todos'}].map(f=>(
             <button key={f.k} onClick={()=>setFiltro(f.k)} className={`tab-btn${filtro===f.k?' activo':''}`}>{f.lbl}</button>
           ))}
         </div>
@@ -549,7 +870,14 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar}){
   const [d,setD]=useState({clienteNombre:'',clienteId:'',tipo:'mostrador',direccion:'',horaEntrega:'',notas:'',pagado:false,formaPago:'efectivo',items:[],total:0,...inicial});
   const [prodId,setProdId]=useState('');const [cant,setCant]=useState('');
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
-  const agregarItem=()=>{if(!prodId||!cant)return alert('Elegí un producto y cantidad');const prod=productos.find(p=>p.id===prodId);if(!prod)return;const item={_id:Date.now(),nombre:prod.nombre,unidad:prod.unidad||'kg',cantidad:Number(cant),precio:prod.precioVenta||0,subtotal:(prod.precioVenta||0)*Number(cant)};const items=[...d.items,item];setD(p=>({...p,items,total:items.reduce((s,i)=>s+i.subtotal,0)}));setProdId('');setCant('');};
+  const agregarItem=()=>{
+    if(!prodId||!cant) return alert('Elegí un producto y cantidad');
+    const prod=productos.find(p=>p.id===prodId);if(!prod)return;
+    const item={_id:Date.now(),nombre:prod.nombre,unidad:prod.unidad||'kg',cantidad:Number(cant),precio:prod.precioVenta||0,subtotal:(prod.precioVenta||0)*Number(cant)};
+    const items=[...d.items,item];
+    setD(p=>({...p,items,total:items.reduce((s,i)=>s+i.subtotal,0)}));
+    setProdId('');setCant('');
+  };
   const quitarItem=id=>{const items=d.items.filter(i=>i._id!==id);setD(p=>({...p,items,total:items.reduce((s,i)=>s+i.subtotal,0)}));};
   const selCliente=id=>{const c=clientes.find(c=>c.id===id);if(c)setD(p=>({...p,clienteId:id,clienteNombre:c.nombre,direccion:c.direccion||p.direccion}));else setD(p=>({...p,clienteId:'',clienteNombre:''}));};
   const guardar=()=>{if(!d.clienteNombre.trim())return alert('Ingresá el nombre del cliente');onGuardar(d);};
@@ -557,28 +885,28 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar}){
     <div>
       <Header titulo={d.id?'Editar Pedido':'Nuevo Pedido'} onBack={onCancelar}/>
       <div className="app-body">
-        <Campo label="Cliente" value="" onChange={()=>{}}/>
-        <select value={d.clienteId} onChange={e=>selCliente(e.target.value)} style={{...S.inp,marginBottom:6}}>
+        <label className="lbl">Cliente</label>
+        <select value={d.clienteId} onChange={e=>selCliente(e.target.value)} className="inp" style={{marginBottom:6}}>
           <option value="">— Elegí un cliente o escribí abajo —</option>
           {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         <Campo label="O escribí el nombre" value={d.clienteNombre} onChange={v=>set('clienteNombre',v)} placeholder="Nombre del cliente *"/>
-        <label style={S.lbl}>Tipo de pedido</label>
+        <label className="lbl">Tipo</label>
         <div className="chip-group">
           {[{k:'mostrador',lbl:'🏪 Mostrador'},{k:'delivery',lbl:'🚴 Delivery'}].map(t=><button key={t.k} onClick={()=>set('tipo',t.k)} className={`chip${d.tipo===t.k?' activo':''}`}>{t.lbl}</button>)}
         </div>
-        {d.tipo==='delivery'&&<Campo label="Dirección de entrega" value={d.direccion} onChange={v=>set('direccion',v)} placeholder="Calle y número"/>}
-        <Campo label="Hora de entrega (opcional)" value={d.horaEntrega} onChange={v=>set('horaEntrega',v)} placeholder="Ej: 12:30" tipo="time"/>
+        {d.tipo==='delivery'&&<Campo label="Dirección" value={d.direccion} onChange={v=>set('direccion',v)} placeholder="Calle y número"/>}
+        <Campo label="Hora de entrega" value={d.horaEntrega} onChange={v=>set('horaEntrega',v)} tipo="time"/>
         <div className="panel" style={{marginTop:12}}>
           <div className="ptitle">Agregar producto</div>
-          <select value={prodId} onChange={e=>setProdId(e.target.value)} style={{...S.inp}}>
-            <option value="">— Elegí un producto —</option>
+          <select value={prodId} onChange={e=>setProdId(e.target.value)} className="inp">
+            <option value="">— Elegí —</option>
             {productos.map(p=><option key={p.id} value={p.id}>{p.nombre} — {formatPeso(p.precioVenta||0)}/{p.unidad||'kg'}</option>)}
           </select>
           <Campo label="Cantidad" value={cant} onChange={setCant} tipo="number" placeholder="0"/>
           <button onClick={agregarItem} className="btn-full" style={{marginTop:8}}>+ Agregar</button>
         </div>
-        {d.items.length>0&&<div style={{marginTop:12}}>
+        {d.items.length>0&&<>
           <div className="sec-title">Productos del pedido</div>
           {d.items.map(i=>(
             <div key={i._id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',background:'var(--bg)',borderRadius:'var(--radius)',marginBottom:6,border:'1px solid var(--border)'}}>
@@ -586,13 +914,13 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar}){
               <button onClick={()=>quitarItem(i._id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,color:'var(--red)'}}>✕</button>
             </div>
           ))}
-          <div className="suma-band"><span style={{fontWeight:700,color:'var(--txt)'}}>Total</span><span style={{fontWeight:700,fontSize:22,color:'var(--green)'}}>{formatPeso(d.total)}</span></div>
-        </div>}
-        <label style={S.lbl}>Forma de pago</label>
+          <div className="suma-band"><span style={{fontWeight:700}}>Total</span><span style={{fontWeight:700,fontSize:22,color:'var(--green)'}}>{formatPeso(d.total)}</span></div>
+        </>}
+        <label className="lbl">Forma de pago</label>
         <div className="chip-group">
           {[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transferencia'},{k:'fiado',lbl:'📒 Fiado'},{k:'tarjeta',lbl:'💳 Tarjeta'}].map(fp=><button key={fp.k} onClick={()=>set('formaPago',fp.k)} className={`chip${d.formaPago===fp.k?' activo':''}`}>{fp.lbl}</button>)}
         </div>
-        <label style={{...S.lbl,marginTop:12,display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+        <label className="lbl" style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
           <input type="checkbox" checked={d.pagado} onChange={e=>set('pagado',e.target.checked)} style={{width:18,height:18}}/> ✅ Ya pagó
         </label>
         <Campo label="Notas (opcional)" value={d.notas} onChange={v=>set('notas',v)} placeholder="Ej: sin menudos, al horno..." rows={2}/>
@@ -605,18 +933,20 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar}){
   );
 }
 
-/* ─── CAJA ─── */
+/* ══════════════════════════════════════
+   CAJA
+══════════════════════════════════════ */
 function PantallaCaja({uid}){
   const [sec,setSec]=useState('caja');const [pedidos,setPedidos]=useState([]);const [movimientos,setMov]=useState([]);const [formMov,setFormMov]=useState(null);const [fechaCaja,setFechaCaja]=useState(hoy());
   const colMov=db.collection(`polleria/${uid}/movimientos`);
   useEffect(()=>{
-    const u1=db.collection(`polleria/${uid}/pedidos`).where('fecha','==',fechaCaja).onSnapshot(snap=>setPedidos(snap.docs.map(d=>({id:d.id,...d.data()}))));
-    const u2=colMov.where('fecha','==',fechaCaja).orderBy('createdAt','asc').onSnapshot(snap=>setMov(snap.docs.map(d=>({id:d.id,...d.data()}))));
+    const u1=db.collection(`polleria/${uid}/pedidos`).where('fecha','==',fechaCaja).onSnapshot(s=>setPedidos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2=colMov.where('fecha','==',fechaCaja).orderBy('createdAt','asc').onSnapshot(s=>setMov(s.docs.map(d=>({id:d.id,...d.data()}))));
     return()=>{u1();u2();};
   },[fechaCaja]);
   const guardarMov=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await colMov.doc(id).update(r);else await colMov.add({...r,fecha:fechaCaja,createdAt:ts});setFormMov(null);};
   const eliminarMov=async id=>{if(!confirm('¿Eliminar?'))return;await colMov.doc(id).delete();};
-  if(formMov!==null)return<FormMovimiento inicial={formMov} onGuardar={guardarMov} onCancelar={()=>setFormMov(null)}/>;
+  if(formMov!==null) return <FormMovimiento inicial={formMov} onGuardar={guardarMov} onCancelar={()=>setFormMov(null)}/>;
   const pagados=pedidos.filter(p=>p.pagado&&p.estado!=='cancelado');
   const vEfec=pagados.filter(p=>p.formaPago==='efectivo').reduce((s,p)=>s+(p.total||0),0);
   const vTransf=pagados.filter(p=>p.formaPago==='transferencia').reduce((s,p)=>s+(p.total||0),0);
@@ -636,14 +966,13 @@ function PantallaCaja({uid}){
           ))}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-          <label style={{fontSize:12,color:'var(--txt2)',fontWeight:600,whiteSpace:'nowrap'}}>Fecha:</label>
-          <input type="date" value={fechaCaja} onChange={e=>setFechaCaja(e.target.value)} style={{...S.inp,flex:1,margin:0}}/>
+          <label className="lbl" style={{margin:0,flexShrink:0}}>Fecha:</label>
+          <input type="date" value={fechaCaja} onChange={e=>setFechaCaja(e.target.value)} className="inp" style={{flex:1}}/>
         </div>
-
         {sec==='caja'&&<>
           <div className="panel">
             <div className="ptitle">Ventas del día</div>
-            {[{lbl:'💵 Efectivo',val:vEfec},{lbl:'📲 Transferencia',val:vTransf},{lbl:'💳 Tarjeta',val:vTarj},{lbl:'📒 Fiado',val:vFiado}].map(r=>(
+            {[{lbl:'💵 Efectivo',val:vEfec},{lbl:'📲 Transferencia',val:vTransf},{lbl:'💳 Tarjeta',val:vTarj},{lbl:'📒 Fiado (pendiente)',val:vFiado}].map(r=>(
               <div key={r.lbl} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,color:'var(--txt2)'}}>{r.lbl}</span>
                 <span style={{fontWeight:700,color:'var(--txt)'}}>{formatPeso(r.val)}</span>
@@ -655,7 +984,7 @@ function PantallaCaja({uid}){
             </div>
           </div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div className="sec-title" style={{margin:0}}>Otros ingresos / egresos</div>
+            <div className="sec-title" style={{margin:0}}>Otros movimientos</div>
             <button onClick={()=>setFormMov({})} className="btn-pri" style={{fontSize:12,padding:'6px 12px'}}>+ Agregar</button>
           </div>
           {movimientos.map(m=>(
@@ -670,11 +999,10 @@ function PantallaCaja({uid}){
             </div>
           ))}
           <div className="suma-band" style={{marginTop:8}}>
-            <span style={{fontWeight:700,color:'var(--txt)'}}>💵 Dinero en caja</span>
+            <span style={{fontWeight:700}}>💵 Dinero en caja</span>
             <span style={{fontWeight:700,fontSize:22,color:'var(--green)'}}>{formatPeso(cajaFinal)}</span>
           </div>
         </>}
-
         {sec==='transferencias'&&<>
           <div className="suma-band"><span style={{color:'var(--txt2)'}}>Total transferencias</span><span style={{fontWeight:700,fontSize:20,color:'var(--blue)'}}>{formatPeso(vTransf)}</span></div>
           {pedidos.filter(p=>p.formaPago==='transferencia'&&p.estado!=='cancelado').map(p=>(
@@ -693,7 +1021,6 @@ function PantallaCaja({uid}){
           ))}
           {pedidos.filter(p=>p.formaPago==='transferencia').length===0&&<p style={{textAlign:'center',color:'var(--txt2)',padding:32}}>No hay transferencias hoy</p>}
         </>}
-
         {sec==='arqueo'&&<>
           <div className="panel">
             <div className="ptitle" style={{textAlign:'center'}}>Arqueo — {formatFecha(fechaCaja)}</div>
@@ -703,18 +1030,10 @@ function PantallaCaja({uid}){
                 <span style={{fontWeight:700,color:r.c}}>{formatPeso(r.val)}</span>
               </div>
             ))}
-            <div style={{display:'flex',justifyContent:'space-between',paddingTop:10,marginTop:4}}>
-              <span style={{fontWeight:700}}>💵 Efectivo en caja</span>
-              <span style={{fontWeight:700,fontSize:22,color:'var(--green)'}}>{formatPeso(cajaFinal)}</span>
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:6}}>
-              <span style={{fontWeight:700}}>📊 Total facturado</span>
-              <span style={{fontWeight:700,fontSize:22,color:'var(--txt)'}}>{formatPeso(totalVentas+vFiado)}</span>
-            </div>
+            <div style={{display:'flex',justifyContent:'space-between',paddingTop:10,marginTop:4}}><span style={{fontWeight:700}}>💵 Efectivo en caja</span><span style={{fontWeight:700,fontSize:22,color:'var(--green)'}}>{formatPeso(cajaFinal)}</span></div>
+            <div style={{display:'flex',justifyContent:'space-between',marginTop:6}}><span style={{fontWeight:700}}>📊 Total facturado</span><span style={{fontWeight:700,fontSize:22,color:'var(--txt)'}}>{formatPeso(totalVentas+vFiado)}</span></div>
           </div>
-          <div className="suma-band">
-            <span style={{fontSize:13,color:'var(--txt2)'}}>{pedidos.filter(p=>p.estado!=='cancelado').length} pedidos · {pedidos.filter(p=>p.estado==='cancelado').length} cancelados</span>
-          </div>
+          <div className="suma-band"><span style={{fontSize:13,color:'var(--txt2)'}}>{pedidos.filter(p=>p.estado!=='cancelado').length} pedidos · {pedidos.filter(p=>p.estado==='cancelado').length} cancelados</span></div>
         </>}
       </div>
     </div>
@@ -729,11 +1048,11 @@ function FormMovimiento({inicial,onGuardar,onCancelar}){
     <div>
       <Header titulo="Movimiento de Caja" onBack={onCancelar}/>
       <div className="app-body">
-        <label style={S.lbl}>Tipo</label>
+        <label className="lbl">Tipo</label>
         <div className="chip-group">
           {[{k:'egreso',lbl:'💸 Egreso / Gasto'},{k:'ingreso',lbl:'💵 Ingreso extra'}].map(t=><button key={t.k} onClick={()=>set('tipo',t.k)} className={`chip${d.tipo===t.k?' activo':''}`}>{t.lbl}</button>)}
         </div>
-        <Campo label="Descripción" value={d.descripcion} onChange={v=>set('descripcion',v)} placeholder="Ej: compra de pollos, pago de luz..."/>
+        <Campo label="Descripción" value={d.descripcion} onChange={v=>set('descripcion',v)} placeholder="Ej: compra de pollos..."/>
         <Campo label="Monto ($)" value={d.monto} onChange={v=>set('monto',v)} tipo="number" placeholder="0"/>
         <div style={{display:'flex',gap:8,marginTop:18}}>
           <button onClick={guardar} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>+ Agregar</button>
@@ -744,14 +1063,33 @@ function FormMovimiento({inicial,onGuardar,onCancelar}){
   );
 }
 
-/* ─── APP ─── */
+/* ══════════════════════════════════════
+   APP PRINCIPAL
+══════════════════════════════════════ */
 function App(){
-  const [user,setUser]=useState(undefined);const [tab,setTab]=useState('pedidos');
+  const [user,setUser]=useState(undefined);
+  const [tab,setTab]=useState('catalogo');
   useEffect(()=>auth.onAuthStateChanged(u=>setUser(u)),[]);
-  if(user===undefined)return<div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg3)'}}><div style={{fontSize:56}}>🐔</div><p style={{color:'var(--txt2)',fontSize:15}}>Cargando...</p></div>;
-  if(!user)return<Login/>;
-  const pantallas={pedidos:<PantallaPedidos uid={user.uid}/>,precios:<PantallaPrecios uid={user.uid}/>,stock:<PantallaStock uid={user.uid}/>,clientes:<PantallaClientes uid={user.uid}/>,caja:<PantallaCaja uid={user.uid}/>};
-  return(<div style={{paddingBottom:72}}>{pantallas[tab]||pantallas.pedidos}<NavBar activo={tab} onChange={setTab}/></div>);
+  if(user===undefined) return(
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg3)'}}>
+      <div style={{fontSize:56}}>🐔</div>
+      <p style={{color:'var(--txt2)',fontSize:15}}>Cargando...</p>
+    </div>
+  );
+  if(!user) return <Login/>;
+  const pantallas={
+    catalogo:<PantallaCatalogo uid={user.uid}/>,
+    pedidos: <PantallaPedidos  uid={user.uid}/>,
+    precios: <PantallaPrecios  uid={user.uid}/>,
+    stock:   <PantallaStock    uid={user.uid}/>,
+    caja:    <PantallaCaja     uid={user.uid}/>,
+  };
+  return(
+    <div style={{paddingBottom:72}}>
+      {pantallas[tab]||pantallas.catalogo}
+      <NavBar activo={tab} onChange={setTab}/>
+    </div>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
