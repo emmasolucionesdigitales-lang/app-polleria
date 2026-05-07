@@ -673,95 +673,338 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
 /* ══════════════════════════════════════
    STOCK
 ══════════════════════════════════════ */
-function CalculadoraCajon(){
+function CalculadoraCajon({uid}){
   const [cajones,setCajones]=useState(1);const [ppc,setPpc]=useState(9);const [kg,setKg]=useState(2.2);const [modo,setModo]=useState('completo');
+  const [precioCajon,setPrecioCajon]=useState('');const [porcGanancia,setPorcGanancia]=useState(30);
+  const [guardando,setGuardando]=useState(false);const [toastMsg,setToastMsg]=useState('');
   const tot=cajones*ppc;const totKg=tot*kg;
+  const precioTotalPagado=Number(precioCajon)*cajones||0;
+  const costoPorKg=totKg>0&&precioTotalPagado>0?precioTotalPagado/totKg:0;
+  const precioVentaKg=costoPorKg>0?costoPorKg*(1+porcGanancia/100):0;
+  const gananciaTotal=(precioVentaKg-costoPorKg)*totKg;
   const MODOS={
     completo:{label:'🐔 Entero',piezas:[{n:'Pollos',c:tot,u:'unid'},{n:'Peso total',c:+totKg.toFixed(1),u:'kg'}]},
     piezas:  {label:'🍗 Trozado',piezas:[{n:'Pechugas',c:tot,u:'unid',nota:'(1 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Alas',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Muslos',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Carcasas',c:tot,u:'unid',nota:''}]},
     filet:   {label:'🥩 Filet',  piezas:[{n:'Filet pechuga',c:+(tot*0.55).toFixed(1),u:'kg',nota:'(≈550g c/u)'},{n:'Milanesas',c:tot*4,u:'unid',nota:'(≈4 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:''},{n:'Carcasas caldo',c:tot,u:'unid',nota:''}]},
   };
   const M=MODOS[modo];
+  const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+  const agregarAlStock=async()=>{
+    if(!precioCajon||Number(precioCajon)<=0)return alert('Ingresá el precio pagado por cajón');
+    setGuardando(true);
+    try{
+      const nombre=`Pollo ${M.label.replace(/^\S+\s/,'')} (${cajones} cajón${cajones>1?'es':''})`;
+      await db.collection(`polleria/${uid}/stock`).add({
+        nombre,categoria:'Pollo',tipo:'cajon',corte:modo,
+        cantidad:+totKg.toFixed(2),unidad:'kg',cajones,pollosPorCajon:ppc,kgPromedio:kg,
+        precioCajon:Number(precioCajon),precioCosto:+costoPorKg.toFixed(2),precioVenta:+precioVentaKg.toFixed(2),
+        porcGanancia:Number(porcGanancia),stockMinimo:0,fecha:hoy(),
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      mostrarToast('✅ Cajones agregados al inventario');
+    }catch(e){alert('Error al guardar: '+e.message);}
+    setGuardando(false);
+  };
   return(
-    <div className="panel">
-      <div className="ptitle">🧮 Calculadora de Cajón</div>
-      <div style={{display:'flex',gap:10,marginBottom:12}}>
-        {[{lbl:'Cajones',v:cajones,set:v=>setCajones(Math.max(1,v))},{lbl:'Pollos/cajón',v:ppc,set:v=>setPpc(Math.max(1,v))},{lbl:'Kg prom.',v:kg,set:v=>setKg(Math.max(0.5,v)),step:0.1}].map(f=>(
-          <div key={f.lbl} style={{flex:1}}>
-            <label className="lbl" style={{marginTop:0}}>{f.lbl}</label>
-            <input type="number" step={f.step||1} value={f.v} onChange={e=>f.set(Number(e.target.value))} className="inp" style={{textAlign:'center',fontWeight:700,fontSize:18,marginTop:4}}/>
-          </div>
-        ))}
-      </div>
-      <div className="suma-band">
-        <span style={{fontSize:13,color:'var(--txt2)'}}>Total pollos: <b style={{color:'var(--txt)'}}>{tot}</b></span>
-        <span style={{fontSize:13,color:'var(--txt2)'}}>Total kg: <b style={{color:'var(--txt)'}}>{totKg.toFixed(1)}</b></span>
-      </div>
-      <label className="lbl" style={{marginTop:0}}>Tipo de corte</label>
-      <div className="chip-group" style={{marginBottom:12}}>
-        {Object.entries(MODOS).map(([k,v])=><button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>)}
-      </div>
-      <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12}}>
-        {M.piezas.map((p,i)=>(
-          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
-            <div>
-              <span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>
-              {p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}
+    <div>
+      <div className="panel">
+        <div className="ptitle">🧮 Calculadora de Cajón</div>
+        <div style={{display:'flex',gap:10,marginBottom:12}}>
+          {[{lbl:'Cajones',v:cajones,set:v=>setCajones(Math.max(1,v))},{lbl:'Pollos/cajón',v:ppc,set:v=>setPpc(Math.max(1,v))},{lbl:'Kg prom.',v:kg,set:v=>setKg(Math.max(0.5,v)),step:0.1}].map(f=>(
+            <div key={f.lbl} style={{flex:1}}>
+              <label className="lbl" style={{marginTop:0}}>{f.lbl}</label>
+              <input type="number" step={f.step||1} value={f.v} onChange={e=>f.set(Number(e.target.value))} className="inp" style={{textAlign:'center',fontWeight:700,fontSize:18,marginTop:4}}/>
             </div>
-            <div style={{fontWeight:700,fontSize:18,color:'var(--green)'}}>{p.c} <span style={{fontSize:11,fontWeight:400,color:'var(--txt2)'}}>{p.u}</span></div>
+          ))}
+        </div>
+        <div className="suma-band">
+          <span style={{fontSize:13,color:'var(--txt2)'}}>Total pollos: <b style={{color:'var(--txt)'}}>{tot}</b></span>
+          <span style={{fontSize:13,color:'var(--txt2)'}}>Total kg: <b style={{color:'var(--txt)'}}>{totKg.toFixed(1)}</b></span>
+        </div>
+        <label className="lbl">Tipo de corte</label>
+        <div className="chip-group" style={{marginBottom:12}}>
+          {Object.entries(MODOS).map(([k,v])=><button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>)}
+        </div>
+        <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12}}>
+          {M.piezas.map((p,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
+              <div>
+                <span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>
+                {p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}
+              </div>
+              <div style={{fontWeight:700,fontSize:18,color:'var(--green)'}}>{p.c} <span style={{fontSize:11,fontWeight:400,color:'var(--txt2)'}}>{p.u}</span></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <div className="ptitle">💰 Precio y Ganancia</div>
+        <div style={{display:'flex',gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>Precio pagado por cajón ($)</label>
+            <input type="number" value={precioCajon} onChange={e=>setPrecioCajon(e.target.value)} className="inp" placeholder="0" style={{fontWeight:700,fontSize:18}}/>
           </div>
-        ))}
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>% Ganancia</label>
+            <input type="number" value={porcGanancia} onChange={e=>setPorcGanancia(Number(e.target.value))} className="inp" style={{fontWeight:700,fontSize:18}} min={0}/>
+          </div>
+        </div>
+        {costoPorKg>0&&(
+          <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:12}}>
+            {[
+              {lbl:'💸 Total pagado',val:formatPeso(precioTotalPagado),c:'var(--red)'},
+              {lbl:'📦 Costo por kg',val:formatPeso(costoPorKg),c:'var(--txt)'},
+              {lbl:'🏷️ Precio de venta / kg',val:formatPeso(precioVentaKg),c:'var(--blue)'},
+              {lbl:`✨ Ganancia (${porcGanancia}%)`,val:formatPeso(gananciaTotal),c:'var(--green)'},
+            ].map(r=>(
+              <div key={r.lbl} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontSize:13,color:'var(--txt2)'}}>{r.lbl}</span>
+                <span style={{fontWeight:700,color:r.c}}>{r.val}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={agregarAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full"
+          style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
+          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario'}
+        </button>
+        {toastMsg&&<div style={{textAlign:'center',color:'var(--green)',fontWeight:700,marginTop:10,fontSize:14}}>{toastMsg}</div>}
+      </div>
+    </div>
+  );
+}
+
+function CalculadoraCongelados({uid}){
+  const [nombre,setNombre]=useState('');
+  const [cajas,setCajas]=useState(1);const [kgCaja,setKgCaja]=useState(5);
+  const [precioCaja,setPrecioCaja]=useState('');const [porcGanancia,setPorcGanancia]=useState(30);
+  const [guardando,setGuardando]=useState(false);const [toastMsg,setToastMsg]=useState('');
+  const totKg=cajas*kgCaja;
+  const precioTotalPagado=Number(precioCaja)*cajas||0;
+  const costoPorKg=totKg>0&&precioTotalPagado>0?precioTotalPagado/totKg:0;
+  const precioVentaKg=costoPorKg>0?costoPorKg*(1+porcGanancia/100):0;
+  const gananciaTotal=(precioVentaKg-costoPorKg)*totKg;
+  const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+  const agregarAlStock=async()=>{
+    if(!nombre.trim())return alert('Ingresá el nombre del producto');
+    if(!precioCaja||Number(precioCaja)<=0)return alert('Ingresá el precio pagado por caja');
+    setGuardando(true);
+    try{
+      await db.collection(`polleria/${uid}/stock`).add({
+        nombre:nombre.trim(),categoria:'Congelados',tipo:'congelado',
+        cantidad:+totKg.toFixed(2),unidad:'kg',cajas,kgPorCaja:kgCaja,
+        precioCaja:Number(precioCaja),precioCosto:+costoPorKg.toFixed(2),precioVenta:+precioVentaKg.toFixed(2),
+        porcGanancia:Number(porcGanancia),stockMinimo:0,fecha:hoy(),
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      mostrarToast('✅ Congelado agregado al inventario');
+      setNombre('');setPrecioCaja('');
+    }catch(e){alert('Error al guardar: '+e.message);}
+    setGuardando(false);
+  };
+  return(
+    <div>
+      <div className="panel">
+        <div className="ptitle">❄️ Calculadora de Congelados</div>
+        <Campo label="Nombre del producto *" value={nombre} onChange={setNombre} placeholder="Ej: Medallones, Nuggets, Hamburguesas..."/>
+        <div style={{display:'flex',gap:10,marginBottom:4}}>
+          {[{lbl:'Cajas',v:cajas,set:v=>setCajas(Math.max(1,v))},{lbl:'Kg por caja',v:kgCaja,set:v=>setKgCaja(Math.max(0.5,v)),step:0.5}].map(f=>(
+            <div key={f.lbl} style={{flex:1}}>
+              <label className="lbl">{f.lbl}</label>
+              <input type="number" step={f.step||1} value={f.v} onChange={e=>f.set(Number(e.target.value))} className="inp" style={{textAlign:'center',fontWeight:700,fontSize:18}}/>
+            </div>
+          ))}
+        </div>
+        <div className="suma-band">
+          <span style={{fontSize:13,color:'var(--txt2)'}}>Total kg: <b style={{color:'var(--txt)'}}>{totKg.toFixed(1)}</b></span>
+          <span style={{fontSize:13,color:'var(--txt2)'}}>Cajas: <b style={{color:'var(--txt)'}}>{cajas}</b></span>
+        </div>
+      </div>
+      <div className="panel">
+        <div className="ptitle">💰 Precio y Ganancia</div>
+        <div style={{display:'flex',gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>Precio pagado por caja ($)</label>
+            <input type="number" value={precioCaja} onChange={e=>setPrecioCaja(e.target.value)} className="inp" placeholder="0" style={{fontWeight:700,fontSize:18}}/>
+          </div>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>% Ganancia</label>
+            <input type="number" value={porcGanancia} onChange={e=>setPorcGanancia(Number(e.target.value))} className="inp" style={{fontWeight:700,fontSize:18}} min={0}/>
+          </div>
+        </div>
+        {costoPorKg>0&&(
+          <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:12}}>
+            {[
+              {lbl:'💸 Total pagado',val:formatPeso(precioTotalPagado),c:'var(--red)'},
+              {lbl:'📦 Costo por kg',val:formatPeso(costoPorKg),c:'var(--txt)'},
+              {lbl:'🏷️ Precio de venta / kg',val:formatPeso(precioVentaKg),c:'var(--blue)'},
+              {lbl:`✨ Ganancia (${porcGanancia}%)`,val:formatPeso(gananciaTotal),c:'var(--green)'},
+            ].map(r=>(
+              <div key={r.lbl} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontSize:13,color:'var(--txt2)'}}>{r.lbl}</span>
+                <span style={{fontWeight:700,color:r.c}}>{r.val}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={agregarAlStock} disabled={guardando||!precioCaja||Number(precioCaja)<=0||!nombre.trim()} className="btn-full"
+          style={{background:'var(--blue)',opacity:(!precioCaja||Number(precioCaja)<=0||!nombre.trim())?0.4:1}}>
+          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario'}
+        </button>
+        {toastMsg&&<div style={{textAlign:'center',color:'var(--green)',fontWeight:700,marginTop:10,fontSize:14}}>{toastMsg}</div>}
+      </div>
+    </div>
+  );
+}
+
+function SeccionVerduleria({items,onAgregar,onEditar,onEliminar,onAjustar}){
+  return(
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div className="sec-title" style={{margin:0}}>🥦 Productos Verdulería</div>
+        <button onClick={onAgregar} className="btn-pri" style={{fontSize:13,padding:'7px 14px'}}>+ Agregar</button>
+      </div>
+      {items.length===0&&(
+        <div className="empty">
+          <div style={{fontSize:48,marginBottom:12}}>🥦</div>
+          No hay productos de verdulería.<br/>
+          <button onClick={onAgregar} className="btn-pri" style={{marginTop:16}}>+ Agregar producto</button>
+        </div>
+      )}
+      {items.map(item=>{
+        const bajo=Number(item.cantidad)<=Number(item.stockMinimo||0);
+        const ganPct=item.precioCosto>0&&item.precioVenta>0?Math.round(((item.precioVenta-item.precioCosto)/item.precioCosto)*100):null;
+        return(
+          <div key={item.id} className="card" style={{borderColor:bajo?'var(--orange)':'var(--border)'}}>
+            <div className="card-body">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div className="card-name">{item.nombre}</div>
+                  {item.precioCosto>0&&<div className="card-sub">Costo: {formatPeso(item.precioCosto)}/{item.unidad} · Venta: {formatPeso(item.precioVenta)}/{item.unidad}</div>}
+                  {item.stockMinimo>0&&<div className="card-sub">Mínimo: {item.stockMinimo} {item.unidad}</div>}
+                  {ganPct!==null&&<span className={ganPct>=30?'pill pill-green':ganPct>=10?'pill pill-orange':'pill pill-red'} style={{marginTop:4,display:'inline-block'}}>Ganancia: {ganPct}%</span>}
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <button onClick={()=>onAjustar(item.id,-1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:18,color:'var(--txt)'}}>−</button>
+                  <div style={{textAlign:'center',minWidth:56}}>
+                    <div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{item.cantidad||0}</div>
+                    <div style={{fontSize:10,color:'var(--txt2)'}}>{item.unidad}</div>
+                  </div>
+                  <button onClick={()=>onAjustar(item.id,1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'none',background:'var(--txt)',color:'var(--bg)',cursor:'pointer',fontSize:18}}>+</button>
+                </div>
+              </div>
+              <div className="card-actions">
+                <button onClick={()=>onEditar(item)} className="btn-ic">✏️ Editar</button>
+                <button onClick={()=>onEliminar(item.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FormVerduleria({inicial,onGuardar,onCancelar}){
+  const UNIDADES=['kg','unidades','atados','bandejas','litros','g'];
+  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',precioCosto:'',precioVenta:'',stockMinimo:0,...inicial});
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const ganPct=Number(d.precioCosto)>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):null;
+  const guardar=()=>{
+    if(!d.nombre.trim())return alert('El nombre es obligatorio');
+    onGuardar({...d,cantidad:Number(d.cantidad)||0,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0,stockMinimo:Number(d.stockMinimo)||0});
+  };
+  return(
+    <div>
+      <Header titulo={d.id?'Editar Verdura':'Nueva Verdura'} onBack={onCancelar}/>
+      <div className="app-body">
+        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Papas, Tomates, Cebollas..."/>
+        <label className="lbl">Unidad</label>
+        <div className="chip-group">{UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}</div>
+        <Campo label={`Cantidad actual (${d.unidad})`} value={d.cantidad} onChange={v=>set('cantidad',v)} tipo="number" placeholder="0"/>
+        <Campo label={`Stock mínimo (${d.unidad})`} value={d.stockMinimo} onChange={v=>set('stockMinimo',v)} tipo="number" placeholder="0"/>
+        <Campo label="💸 Precio de costo ($)" value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
+        <Campo label="💰 Precio de venta ($)" value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
+        {ganPct!==null&&(
+          <div style={{background:ganPct>=0?'var(--green-bg)':'var(--red-bg)',border:`1px solid ${ganPct>=0?'var(--green)':'var(--red)'}`,borderRadius:'var(--radius)',padding:'10px 14px',marginTop:4,display:'flex',justifyContent:'space-between'}}>
+            <span style={{fontSize:13,color:'var(--txt2)'}}>Ganancia:</span>
+            <span style={{fontWeight:700,color:ganPct>=0?'var(--green)':'var(--red)',fontSize:15}}>{ganPct}% — {formatPeso(Number(d.precioVenta)-Number(d.precioCosto))}</span>
+          </div>
+        )}
+        <div style={{display:'flex',gap:8,marginTop:18}}>
+          <button onClick={guardar} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>{d.id?'✓ Guardar':'+ Agregar'}</button>
+          <button onClick={onCancelar} className="btn-sec" style={{padding:14}}>Cancelar</button>
+        </div>
       </div>
     </div>
   );
 }
 
 function PantallaStock({uid}){
-  const [items,setItems]=useState([]);const [form,setForm]=useState(null);const [buscar,setBuscar]=useState('');const [sec,setSec]=useState('stock');
+  const [items,setItems]=useState([]);const [form,setForm]=useState(null);const [verduForm,setVerduForm]=useState(null);
+  const [buscar,setBuscar]=useState('');const [sec,setSec]=useState('stock');
   const col=db.collection(`polleria/${uid}/stock`);
   useEffect(()=>col.orderBy('nombre','asc').onSnapshot(snap=>setItems(snap.docs.map(d=>({id:d.id,...d.data()})))),[]);
   const guardar=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add(r);setForm(null);};
+  const guardarVerdu=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add({...r,tipo:'verduleria',categoria:'Verdulería'});setVerduForm(null);};
   const eliminar=async id=>{if(!confirm('¿Eliminar?'))return;await col.doc(id).delete();};
   const ajustar=async(id,delta)=>{const i=items.find(x=>x.id===id);if(!i)return;await col.doc(id).update({cantidad:Math.max(0,(Number(i.cantidad)||0)+delta)});};
   if(form!==null) return <FormStock inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+  if(verduForm!==null) return <FormVerduleria inicial={verduForm} onGuardar={guardarVerdu} onCancelar={()=>setVerduForm(null)}/>;
   const bajos=items.filter(i=>Number(i.cantidad)<=Number(i.stockMinimo||0));
   const filtrados=items.filter(i=>i.nombre.toLowerCase().includes(buscar.toLowerCase()));
+  const CAT_ICONS={'Pollo':'🐔','Congelados':'❄️','Verdulería':'🥦','General':'📦'};
+  const porCat={};filtrados.forEach(i=>{const cat=i.categoria||'General';if(!porCat[cat])porCat[cat]=[];porCat[cat].push(i);});
+  const headerAdd=sec==='stock'?()=>setForm({}):sec==='verduleria'?()=>setVerduForm({}):null;
   return(
     <div>
-      <Header titulo="Stock / Inventario" onAdd={sec==='stock'?()=>setForm({}):null}/>
+      <Header titulo="Stock / Inventario" onAdd={headerAdd}/>
       <div className="app-body">
-        <div className="tab-bar">
-          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🧮 Cajón'}].map(s=>(
-            <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`}>{s.lbl}</button>
+        <div className="tab-bar" style={{overflowX:'auto'}}>
+          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'}].map(s=>(
+            <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`} style={{flexShrink:0,whiteSpace:'nowrap'}}>{s.lbl}</button>
           ))}
         </div>
         {sec==='stock'&&<>
           {bajos.length>0&&<div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:10}}><b style={{color:'var(--orange)',fontSize:13}}>⚠️ Stock bajo: </b><span style={{fontSize:13,color:'var(--txt2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span></div>}
           <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{marginBottom:12}}/>
           {filtrados.length===0&&items.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>📦</div>No hay stock<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
-          {filtrados.map(item=>{
-            const bajo=Number(item.cantidad)<=Number(item.stockMinimo||0);
-            return(
-              <div key={item.id} className="card" style={{borderColor:bajo?'var(--orange)':'var(--border)'}}>
-                <div className="card-body">
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <div><div className="card-name">{item.nombre}</div><div className="card-sub">Mínimo: {item.stockMinimo||0} {item.unidad}</div></div>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:18,color:'var(--txt)'}}>−</button>
-                      <div style={{textAlign:'center',minWidth:56}}><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{item.cantidad||0}</div><div style={{fontSize:10,color:'var(--txt2)'}}>{item.unidad}</div></div>
-                      <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'none',background:'var(--txt)',color:'var(--bg)',cursor:'pointer',fontSize:18}}>+</button>
+          {Object.entries(porCat).map(([cat,catItems])=>(
+            <div key={cat}>
+              <div className="sec-title">{CAT_ICONS[cat]||'📦'} {cat} ({catItems.length})</div>
+              {catItems.map(item=>{
+                const bajo=Number(item.cantidad)<=Number(item.stockMinimo||0);
+                const ganPct=item.precioCosto>0&&item.precioVenta>0?Math.round(((item.precioVenta-item.precioCosto)/item.precioCosto)*100):null;
+                return(
+                  <div key={item.id} className="card" style={{borderColor:bajo?'var(--orange)':'var(--border)'}}>
+                    <div className="card-body">
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <div>
+                          <div className="card-name">{item.nombre}</div>
+                          {item.precioCosto>0&&<div className="card-sub">Costo: {formatPeso(item.precioCosto)}/{item.unidad} · Venta: {formatPeso(item.precioVenta)}/{item.unidad}</div>}
+                          {item.stockMinimo>0&&<div className="card-sub">Mínimo: {item.stockMinimo} {item.unidad}</div>}
+                          {ganPct!==null&&<span className={ganPct>=30?'pill pill-green':ganPct>=10?'pill pill-orange':'pill pill-red'} style={{marginTop:4,display:'inline-block'}}>Ganancia: {ganPct}%</span>}
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:18,color:'var(--txt)'}}>−</button>
+                          <div style={{textAlign:'center',minWidth:56}}><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{item.cantidad||0}</div><div style={{fontSize:10,color:'var(--txt2)'}}>{item.unidad}</div></div>
+                          <button onClick={()=>ajustar(item.id,1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'none',background:'var(--txt)',color:'var(--bg)',cursor:'pointer',fontSize:18}}>+</button>
+                        </div>
+                      </div>
+                      <div className="card-actions">
+                        <button onClick={()=>item.tipo==='verduleria'?setVerduForm(item):setForm(item)} className="btn-ic">✏️ Editar</button>
+                        <button onClick={()=>eliminar(item.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+                      </div>
                     </div>
                   </div>
-                  <div className="card-actions">
-                    <button onClick={()=>setForm(item)} className="btn-ic">✏️ Editar</button>
-                    <button onClick={()=>eliminar(item.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          ))}
         </>}
-        {sec==='cajon'&&<CalculadoraCajon/>}
+        {sec==='cajon'&&<CalculadoraCajon uid={uid}/>}
+        {sec==='congelados'&&<CalculadoraCongelados uid={uid}/>}
+        {sec==='verduleria'&&<SeccionVerduleria items={items.filter(i=>i.tipo==='verduleria')} onAgregar={()=>setVerduForm({})} onEditar={item=>setVerduForm(item)} onEliminar={eliminar} onAjustar={ajustar}/>}
       </div>
     </div>
   );
