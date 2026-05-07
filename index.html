@@ -682,29 +682,79 @@ function CalculadoraCajon({uid}){
   const costoPorKg=totKg>0&&precioTotalPagado>0?precioTotalPagado/totKg:0;
   const precioVentaKg=costoPorKg>0?costoPorKg*(1+porcGanancia/100):0;
   const gananciaTotal=(precioVentaKg-costoPorKg)*totKg;
+
+  // pesoU = peso estimado por unidad en kg (para calcular precio por pieza)
+  // solo_display = no se agrega al inventario, es informativo
   const MODOS={
-    completo:{label:'🐔 Entero',piezas:[{n:'Pollos',c:tot,u:'unid'},{n:'Peso total',c:+totKg.toFixed(1),u:'kg'}]},
-    piezas:  {label:'🍗 Trozado',piezas:[{n:'Pechugas',c:tot,u:'unid',nota:'(1 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Alas',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Muslos',c:tot*2,u:'unid',nota:'(2 c/u)'},{n:'Carcasas',c:tot,u:'unid',nota:''}]},
-    filet:   {label:'🥩 Filet',  piezas:[{n:'Filet pechuga',c:+(tot*0.55).toFixed(1),u:'kg',nota:'(≈550g c/u)'},{n:'Milanesas',c:tot*4,u:'unid',nota:'(≈4 c/u)'},{n:'Pata-muslo',c:tot*2,u:'unid',nota:''},{n:'Carcasas caldo',c:tot,u:'unid',nota:''}]},
+    completo:{label:'🐔 Entero',piezas:[
+      {n:'Pollo entero',c:tot,u:'unidad',pesoU:kg,nota:''},
+      {n:'Peso total',c:+totKg.toFixed(1),u:'kg',solo_display:true},
+    ]},
+    piezas:{label:'🍗 Trozado',piezas:[
+      {n:'Pechugas',      c:tot,    u:'unidad',pesoU:0.55,nota:'(1 c/u)'},
+      {n:'Pata-muslo',    c:tot*2,  u:'unidad',pesoU:0.40,nota:'(2 c/u)'},
+      {n:'Alas',          c:tot*2,  u:'unidad',pesoU:0.20,nota:'(2 c/u)'},
+      {n:'Muslos',        c:tot*2,  u:'unidad',pesoU:0.20,nota:'(2 c/u)'},
+      {n:'Carcasas',      c:tot,    u:'unidad',pesoU:0.30,nota:''},
+    ]},
+    filet:{label:'🥩 Filet',piezas:[
+      {n:'Filet pechuga', c:+(tot*0.55).toFixed(1),u:'kg',   pesoU:null,nota:'(≈550g c/u)'},
+      {n:'Milanesas',     c:tot*4,  u:'unidad',pesoU:0.15,nota:'(≈4 c/u)'},
+      {n:'Pata-muslo',    c:tot*2,  u:'unidad',pesoU:0.40,nota:''},
+      {n:'Carcasas caldo',c:tot,    u:'unidad',pesoU:0.30,nota:''},
+    ]},
   };
   const M=MODOS[modo];
+
+  // Calcula precio de venta estimado por pieza
+  const precioPieza=(p)=>{
+    if(!precioVentaKg) return null;
+    if(p.u==='kg') return precioVentaKg;
+    return precioVentaKg*(p.pesoU||1);
+  };
+  const costoPieza=(p)=>{
+    if(!costoPorKg) return null;
+    if(p.u==='kg') return costoPorKg;
+    return costoPorKg*(p.pesoU||1);
+  };
+
   const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+
   const agregarAlStock=async()=>{
     if(!precioCajon||Number(precioCajon)<=0)return alert('Ingresá el precio pagado por cajón');
     setGuardando(true);
     try{
-      const nombre=`Pollo ${M.label.replace(/^\S+\s/,'')} (${cajones} cajón${cajones>1?'es':''})`;
-      await db.collection(`polleria/${uid}/stock`).add({
-        nombre,categoria:'Pollo',tipo:'cajon',corte:modo,
-        cantidad:+totKg.toFixed(2),unidad:'kg',cajones,pollosPorCajon:ppc,kgPromedio:kg,
-        precioCajon:Number(precioCajon),precioCosto:+costoPorKg.toFixed(2),precioVenta:+precioVentaKg.toFixed(2),
-        porcGanancia:Number(porcGanancia),stockMinimo:0,fecha:hoy(),
-        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
-      });
-      mostrarToast('✅ Cajones agregados al inventario');
+      const stockCol=db.collection(`polleria/${uid}/stock`);
+      const prodCol=db.collection(`polleria/${uid}/productos`);
+      const piezasVendibles=M.piezas.filter(p=>!p.solo_display);
+      for(const p of piezasVendibles){
+        // ID determinístico por nombre de pieza para poder hacer upsert
+        const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const pVenta=+(precioPieza(p)||0).toFixed(2);
+        const pCosto=+(costoPieza(p)||0).toFixed(2);
+        // STOCK: sumar a la cantidad existente
+        const stockRef=stockCol.doc(docId);
+        const snap=await stockRef.get();
+        const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
+        await stockRef.set({
+          nombre:p.n,categoria:'Pollo',tipo:'cajon',
+          cantidad:+(cantActual+Number(p.c)).toFixed(2),
+          unidad:p.u,precioCosto:pCosto,precioVenta:pVenta,
+          porcGanancia:Number(porcGanancia),stockMinimo:0,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        // PRODUCTOS (catálogo): upsert precio, sin pisar foto u otros datos
+        await prodCol.doc(docId).set({
+          nombre:p.n,categoria:'🐔 Pollo',unidad:p.u,
+          precioCosto:pCosto,precioVenta:pVenta,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        },{merge:true});
+      }
+      mostrarToast(`✅ ${piezasVendibles.length} productos en inventario y catálogo`);
     }catch(e){alert('Error al guardar: '+e.message);}
     setGuardando(false);
   };
+
   return(
     <div>
       <div className="panel">
@@ -725,18 +775,32 @@ function CalculadoraCajon({uid}){
         <div className="chip-group" style={{marginBottom:12}}>
           {Object.entries(MODOS).map(([k,v])=><button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>)}
         </div>
+        {/* Detalle de piezas con precio estimado por pieza */}
         <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12}}>
-          {M.piezas.map((p,i)=>(
-            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid var(--border)'}}>
-              <div>
-                <span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>
-                {p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}
+          {M.piezas.map((p,i)=>{
+            const pv=precioPieza(p);
+            return(
+              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                <div>
+                  <span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>
+                  {p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}
+                  {!p.solo_display&&pv&&(
+                    <div style={{fontSize:11,color:'var(--blue)',marginTop:2}}>
+                      💲 {formatPeso(pv)} / {p.u}
+                    </div>
+                  )}
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontWeight:700,fontSize:18,color:p.solo_display?'var(--txt2)':'var(--green)'}}>
+                    {p.c} <span style={{fontSize:11,fontWeight:400,color:'var(--txt2)'}}>{p.u}</span>
+                  </div>
+                </div>
               </div>
-              <div style={{fontWeight:700,fontSize:18,color:'var(--green)'}}>{p.c} <span style={{fontSize:11,fontWeight:400,color:'var(--txt2)'}}>{p.u}</span></div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
       <div className="panel">
         <div className="ptitle">💰 Precio y Ganancia</div>
         <div style={{display:'flex',gap:10,marginBottom:10}}>
@@ -766,7 +830,7 @@ function CalculadoraCajon({uid}){
         )}
         <button onClick={agregarAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full"
           style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
-          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario'}
+          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario y Catálogo'}
         </button>
         {toastMsg&&<div style={{textAlign:'center',color:'var(--green)',fontWeight:700,marginTop:10,fontSize:14}}>{toastMsg}</div>}
       </div>
