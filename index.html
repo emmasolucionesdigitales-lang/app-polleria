@@ -753,7 +753,7 @@ function Toast({msg}){
 /* ══════════════════════════════════════
    CARRITO PANEL (componente compartido)
 ══════════════════════════════════════ */
-function CarritoPanel({carrito,onCambiarCantidad,onLimpiar,uid,clientes,onVentaConfirmada}){
+function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLimpiar,uid,clientes,onVentaConfirmada}){
   const [pago,setPago]=useState('efectivo');
   const [clienteNombre,setClienteNombre]=useState('');
   const [telefono,setTelefono]=useState('');
@@ -799,20 +799,39 @@ function CarritoPanel({carrito,onCambiarCantidad,onLimpiar,uid,clientes,onVentaC
         <button onClick={onLimpiar} style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:12,fontWeight:600}}>🗑️ Limpiar</button>
       </div>
       <div style={{flex:1,overflowY:'auto',marginBottom:8}}>
-        {carrito.map(item=>(
-          <div key={item.prod.id} className="carrito-item">
-            <div style={{flex:1,minWidth:0}}>
-              <div className="carrito-item-name">{item.prod.nombre}</div>
-              <div className="carrito-item-sub">{formatPeso(item.prod.precioVenta||0)} / {item.prod.unidad||'kg'}</div>
+        {carrito.map(item=>{
+          const esPeso=esPorPeso(item.prod.unidad);
+          return(
+            <div key={item.prod.id} className="carrito-item">
+              <div style={{flex:1,minWidth:0}}>
+                <div className="carrito-item-name">{item.prod.nombre}</div>
+                <div className="carrito-item-sub">{formatPeso(item.prod.precioVenta||0)} / {item.prod.unidad||'kg'}</div>
+              </div>
+              {/* Peso: input editable con botón para abrir modal */}
+              {esPeso?(
+                <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                  <input type="number" step="0.001" min="0"
+                    value={item.cantidad}
+                    onChange={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))onSetCantidad(item.prod.id,v);}}
+                    style={{width:68,textAlign:'center',padding:'4px 6px',border:'1px solid var(--border)',borderRadius:'var(--radius)',background:'var(--bg2)',color:'var(--txt)',fontSize:15,fontWeight:700,outline:'none'}}
+                  />
+                  <span style={{fontSize:11,color:'var(--txt2)',flexShrink:0}}>{item.prod.unidad||'kg'}</span>
+                  <button onClick={()=>onEditarPeso&&onEditarPeso(item.prod)}
+                    style={{width:26,height:26,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',cursor:'pointer',fontSize:13,color:'var(--txt2)',flexShrink:0}}
+                    title="Cambiar peso">⚖️</button>
+                </div>
+              ):(
+                /* Unidades: +/- */
+                <div className="carrito-qty">
+                  <button onClick={()=>onCambiarCantidad(item.prod.id,-1)} className="carrito-qty-btn">−</button>
+                  <span className="carrito-qty-val">{item.cantidad}</span>
+                  <button onClick={()=>onCambiarCantidad(item.prod.id,1)} className="carrito-qty-btn">+</button>
+                </div>
+              )}
+              <div className="carrito-item-precio">{formatPeso((item.prod.precioVenta||0)*item.cantidad)}</div>
             </div>
-            <div className="carrito-qty">
-              <button onClick={()=>onCambiarCantidad(item.prod.id,-getStep(item.prod))} className="carrito-qty-btn">−</button>
-              <span className="carrito-qty-val">{item.cantidad}</span>
-              <button onClick={()=>onCambiarCantidad(item.prod.id,getStep(item.prod))} className="carrito-qty-btn">+</button>
-            </div>
-            <div className="carrito-item-precio">{formatPeso((item.prod.precioVenta||0)*item.cantidad)}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {/* Pago, datos, total y confirmar */}
       <div style={{borderTop:'2px solid var(--border)',paddingTop:10,flexShrink:0}}>
@@ -843,7 +862,56 @@ function CarritoPanel({carrito,onCambiarCantidad,onLimpiar,uid,clientes,onVentaC
   );
 }
 
-function getStep(prod){return ['kg','litro','litros'].includes(prod.unidad||'kg')?0.5:1;}
+const esPorPeso=u=>['kg','litro','litros'].includes(u||'kg');
+
+/* ── Modal ingreso de peso para productos por kg/litro ── */
+function ModalPeso({prod,cantActual,onAgregar,onCerrar}){
+  const [val,setVal]=useState(cantActual>0?String(cantActual):'');
+  const num=parseFloat(val)||0;
+  const total=num*(prod.precioVenta||0);
+  const confirmar=()=>{if(num>0){onAgregar(num);onCerrar();}};
+  return(
+    <div className="overlay" onClick={onCerrar}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-drag"/>
+        <div style={{fontWeight:700,fontSize:16,color:'var(--txt)',marginBottom:2}}>{prod.nombre}</div>
+        <div style={{fontSize:13,color:'var(--txt2)',marginBottom:14}}>{formatPeso(prod.precioVenta||0)} / {prod.unidad||'kg'}</div>
+        <label className="lbl">Ingresá el peso ({prod.unidad||'kg'})</label>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+          <input type="number" step="0.001" min="0" autoFocus
+            value={val} onChange={e=>setVal(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&confirmar()}
+            className="inp" style={{flex:1,fontSize:28,textAlign:'center',fontWeight:700,padding:'10px'}}
+            placeholder="0.000"/>
+          <span style={{fontSize:16,fontWeight:700,color:'var(--txt2)',minWidth:28}}>{prod.unidad||'kg'}</span>
+        </div>
+        {/* Pesos rápidos */}
+        <div style={{display:'flex',gap:5,marginBottom:14,flexWrap:'wrap'}}>
+          {[0.25,0.5,1,1.5,2,3,5].map(v=>(
+            <button key={v} onClick={()=>setVal(String(v))}
+              style={{flex:'1 0 auto',minWidth:40,padding:'7px 4px',borderRadius:'var(--radius)',
+                border:`1px solid ${parseFloat(val)===v?'var(--green)':'var(--border)'}`,
+                background:parseFloat(val)===v?'var(--green-bg)':'var(--bg2)',
+                color:parseFloat(val)===v?'var(--green)':'var(--txt)',
+                fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              {v}
+            </button>
+          ))}
+        </div>
+        {num>0&&(
+          <div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:13,color:'var(--green)',fontWeight:600}}>Total</span>
+            <span style={{fontSize:22,fontWeight:700,color:'var(--green)'}}>{formatPeso(total)}</span>
+          </div>
+        )}
+        <button onClick={confirmar} disabled={num<=0} className="btn-full"
+          style={{background:'var(--green)',opacity:num<=0?0.4:1}}>
+          {cantActual>0?'🔄 Actualizar en carrito':'🛒 Agregar al carrito'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════
    PANTALLA CATÁLOGO / VENDER  (nueva)
@@ -855,6 +923,7 @@ function PantallaCatalogo({uid}){
   const [catFiltro,setCatFiltro]=useState('Todos');
   const [carrito,setCarrito]=useState([]);
   const [carritoMovil,setCarritoMovil]=useState(false);
+  const [modalPeso,setModalPeso]=useState(null); // producto seleccionado para ingresar peso
   const [comprobante,setComprobante]=useState(null);
   const [toast,setToast]=useState('');
 
@@ -866,17 +935,38 @@ function PantallaCatalogo({uid}){
 
   const mostrarToast=msg=>{setToast(msg);setTimeout(()=>setToast(''),2200);};
 
-  const agregarAlCarrito=prod=>{
-    const step=getStep(prod);
+  // Tocar tarjeta: si es por peso abre modal; si es por unidad agrega directo
+  const handleTarjeta=prod=>{
+    if(esPorPeso(prod.unidad)){
+      const enC=carrito.find(i=>i.prod.id===prod.id);
+      setModalPeso({prod,cantActual:enC?enC.cantidad:0});
+    } else {
+      setCarrito(prev=>{
+        const ex=prev.find(i=>i.prod.id===prod.id);
+        if(ex) return prev.map(i=>i.prod.id===prod.id?{...i,cantidad:i.cantidad+1}:i);
+        return[...prev,{prod,cantidad:1}];
+      });
+    }
+  };
+
+  // Recibe peso desde el modal
+  const confirmarPeso=(prodId,peso)=>{
     setCarrito(prev=>{
-      const ex=prev.find(i=>i.prod.id===prod.id);
-      if(ex) return prev.map(i=>i.prod.id===prod.id?{...i,cantidad:+(i.cantidad+step).toFixed(1)}:i);
-      return[...prev,{prod,cantidad:step}];
+      const ex=prev.find(i=>i.prod.id===prodId);
+      if(ex) return prev.map(i=>i.prod.id===prodId?{...i,cantidad:peso}:i);
+      const prod=productos.find(p=>p.id===prodId);
+      return[...prev,{prod,cantidad:peso}];
     });
   };
 
+  // Cambia cantidad en carrito (para unidades con +/-)
   const cambiarCantidad=(prodId,delta)=>{
-    setCarrito(prev=>prev.map(i=>i.prod.id===prodId?{...i,cantidad:Math.max(0,+(i.cantidad+delta).toFixed(1))}:i).filter(i=>i.cantidad>0));
+    setCarrito(prev=>prev.map(i=>i.prod.id===prodId?{...i,cantidad:Math.max(0,+(i.cantidad+delta).toFixed(3))}:i).filter(i=>i.cantidad>0));
+  };
+
+  // Setea cantidad exacta (para el input de peso en el carrito)
+  const setCantidadDirecta=(prodId,val)=>{
+    setCarrito(prev=>prev.map(i=>i.prod.id===prodId?{...i,cantidad:+parseFloat(val).toFixed(3)}:i).filter(i=>i.cantidad>0));
   };
 
   const limpiarCarrito=()=>{if(carrito.length&&confirm('¿Limpiar el carrito?'))setCarrito([]);};
@@ -895,11 +985,18 @@ function PantallaCatalogo({uid}){
     return okB&&okC;
   });
 
-  const carritoPanel=<CarritoPanel carrito={carrito} onCambiarCantidad={cambiarCantidad} onLimpiar={limpiarCarrito} uid={uid} clientes={clientes} onVentaConfirmada={onVentaConfirmada}/>;
+  const carritoPanel=<CarritoPanel
+    carrito={carrito}
+    onCambiarCantidad={cambiarCantidad}
+    onSetCantidad={setCantidadDirecta}
+    onEditarPeso={prod=>{const enC=carrito.find(i=>i.prod.id===prod.id);setModalPeso({prod,cantActual:enC?enC.cantidad:0});}}
+    onLimpiar={limpiarCarrito}
+    uid={uid} clientes={clientes}
+    onVentaConfirmada={onVentaConfirmada}/>;
 
   return(
     <div>
-      <Header titulo="Catálogo / Vender" onLogout={()=>auth.signOut()} subtitulo="Seleccioná productos para vender"/>
+      <Header titulo="Catálogo / Vender" subtitulo="Seleccioná productos para vender"/>
       <div className="split-layout">
         {/* IZQUIERDA – catálogo */}
         <div className="split-left">
@@ -916,18 +1013,19 @@ function PantallaCatalogo({uid}){
             {filtrados.map(p=>{
               const cs=catStyle(p.categoria);
               const enC=carrito.find(i=>i.prod.id===p.id);
+              const esPeso=esPorPeso(p.unidad);
               return(
-                <div key={p.id} className="prod-card" onClick={()=>agregarAlCarrito(p)}>
+                <div key={p.id} className="prod-card" onClick={()=>handleTarjeta(p)}>
                   <div className="prod-card-foto" style={{background:cs.bg}}>
                     {p.foto?<img src={p.foto} alt={p.nombre}/>:<span>{cs.emoji}</span>}
-                    {enC&&<div className="prod-badge">{enC.cantidad}</div>}
+                    {enC&&<div className="prod-badge">{enC.cantidad}{esPeso?p.unidad||'kg':''}</div>}
                   </div>
                   <div className="prod-card-info">
                     <div className="prod-card-nombre">{p.nombre}</div>
                     <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
                     <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
                     <button className="prod-card-btn" style={{background:enC?'var(--green)':'var(--txt)'}}>
-                      {enC?`🛒 ${enC.cantidad} ${p.unidad||'kg'}`:'+  Agregar'}
+                      {enC?(esPeso?`⚖️ ${enC.cantidad} ${p.unidad||'kg'}`:`🛒 ${enC.cantidad} unid.`):(esPeso?'⚖️ Ingresar peso':'+ Agregar')}
                     </button>
                   </div>
                 </div>
@@ -956,6 +1054,16 @@ function PantallaCatalogo({uid}){
             {carritoPanel}
           </div>
         </div>
+      )}
+
+      {/* Modal de ingreso de peso */}
+      {modalPeso&&(
+        <ModalPeso
+          prod={modalPeso.prod}
+          cantActual={modalPeso.cantActual}
+          onAgregar={peso=>confirmarPeso(modalPeso.prod.id,peso)}
+          onCerrar={()=>setModalPeso(null)}
+        />
       )}
 
       {comprobante&&<Comprobante data={comprobante} onCerrar={()=>setComprobante(null)}/>}
