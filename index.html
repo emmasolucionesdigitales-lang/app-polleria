@@ -224,6 +224,78 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
   .btn-full{padding:15px;}
   .btn-ic{padding:8px 14px;min-height:38px;}
 }
+
+/* ══════════════════════════════
+   8 TEMAS DE COLOR
+══════════════════════════════ */
+[data-tema="clasico"]{--bg:#fff;--bg2:#f5f5f4;--bg3:#fafaf9;--txt:#1c1917;--txt2:#78716c;--txt3:#a8a29e;--border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.25);--green:#3B6D11;--green-bg:#EAF3DE;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--shadow:0 2px 8px rgba(0,0,0,.08);}
+[data-tema="oceano"]{--bg:#fff;--bg2:#f0f9ff;--bg3:#e0f2fe;--txt:#0c2340;--txt2:#0369a1;--txt3:#7dd3fc;--border:rgba(3,105,161,.14);--border2:rgba(3,105,161,.35);--green:#0369a1;--green-bg:#bae6fd;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#0284c7;--blue-bg:#e0f2fe;--shadow:0 2px 8px rgba(3,105,161,.1);}
+[data-tema="bosque"]{--bg:#fff;--bg2:#f0fdf4;--bg3:#dcfce7;--txt:#052e16;--txt2:#166534;--txt3:#86efac;--border:rgba(22,101,52,.14);--border2:rgba(22,101,52,.35);--green:#166534;--green-bg:#bbf7d0;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--shadow:0 2px 8px rgba(22,101,52,.1);}
+[data-tema="lavanda"]{--bg:#fff;--bg2:#faf5ff;--bg3:#f3e8ff;--txt:#1e1037;--txt2:#7c3aed;--txt3:#c4b5fd;--border:rgba(124,58,237,.14);--border2:rgba(124,58,237,.35);--green:#7c3aed;--green-bg:#ede9fe;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#7c3aed;--blue-bg:#ede9fe;--shadow:0 2px 8px rgba(124,58,237,.1);}
+[data-tema="oscuro"]{--bg:#1c1917;--bg2:#292524;--bg3:#0c0a09;--txt:#fafaf9;--txt2:#a8a29e;--txt3:#78716c;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);--green:#6aad2e;--green-bg:#1a2e0a;--orange:#d97706;--orange-bg:#2a1a00;--red:#e05555;--red-bg:#2a0a0a;--blue:#4b9fe0;--blue-bg:#0a1a2a;--shadow:0 2px 8px rgba(0,0,0,.35);}
+[data-tema="medianoche"]{--bg:#0f172a;--bg2:#1e293b;--bg3:#020617;--txt:#e2e8f0;--txt2:#94a3b8;--txt3:#64748b;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.18);--green:#38bdf8;--green-bg:#0c2a40;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#818cf8;--blue-bg:#1e1b4b;--shadow:0 2px 8px rgba(0,0,0,.4);}
+[data-tema="selva"]{--bg:#052e16;--bg2:#14532d;--bg3:#020f09;--txt:#dcfce7;--txt2:#86efac;--txt3:#4ade80;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.22);--green:#4ade80;--green-bg:#14532d;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#60a5fa;--blue-bg:#1e3a5f;--shadow:0 2px 8px rgba(0,0,0,.4);}
+[data-tema="violeta"]{--bg:#1e1037;--bg2:#2d1b69;--bg3:#0d0521;--txt:#f3e8ff;--txt2:#c4b5fd;--txt3:#a78bfa;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.22);--green:#a78bfa;--green-bg:#2d1b69;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#818cf8;--blue-bg:#1e1b4b;--shadow:0 2px 8px rgba(0,0,0,.4);}
+
+/* ── SELECTOR DE TEMA ── */
+.tema-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px;}
+.tema-btn{border:2px solid transparent;border-radius:var(--radius-lg);padding:0;cursor:pointer;overflow:hidden;aspect-ratio:1;transition:border-color .15s,transform .1s;}
+.tema-btn.activo{border-color:var(--txt);}
+.tema-swatch{width:100%;height:100%;display:flex;flex-direction:column;}
+.tema-swatch-top{flex:1;}
+.tema-swatch-bot{height:32%;}
+@media(hover:hover){.tema-btn:hover{transform:scale(1.06);}}
+
+/* ══════════════════════════════
+   CARRITO / PANTALLA DIVIDIDA
+══════════════════════════════ */
+.split-layout{display:flex;min-height:calc(100vh - 52px);}
+.split-left{flex:1;padding:.85rem 1rem 80px;overflow-y:auto;min-width:0;}
+.split-right{width:360px;flex-shrink:0;background:var(--bg);border-left:1px solid var(--border);padding:14px 14px 14px;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;display:flex;flex-direction:column;}
+@media(max-width:699px){.split-right{display:none;}.split-left{padding:.85rem 1rem 80px;}}
+@media(min-width:700px){.split-left{padding:1rem 1.25rem 1rem;}#root{max-width:1100px;}}
+
+/* Items del carrito */
+.carrito-titulo{font-size:13px;font-weight:700;color:var(--txt);margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.carrito-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+.carrito-item-name{flex:1;font-size:13px;font-weight:600;color:var(--txt);line-height:1.3;}
+.carrito-item-sub{font-size:11px;color:var(--txt2);}
+.carrito-qty{display:flex;align-items:center;gap:3px;flex-shrink:0;}
+.carrito-qty-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:15px;font-weight:700;color:var(--txt);display:flex;align-items:center;justify-content:center;}
+.carrito-qty-val{min-width:30px;text-align:center;font-size:13px;font-weight:700;color:var(--txt);}
+.carrito-item-precio{font-size:12px;font-weight:700;color:var(--txt);min-width:64px;text-align:right;flex-shrink:0;}
+
+/* Badge cantidad en tarjeta de producto */
+.prod-badge{position:absolute;top:6px;right:6px;background:var(--green);color:#fff;border-radius:99px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;padding:0 5px;}
+
+/* Botón flotante carrito (solo móvil) */
+.carrito-fab{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;border:none;border-radius:99px;padding:12px 22px;font-weight:700;font-size:14px;box-shadow:0 4px 20px rgba(0,0,0,.28);z-index:200;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;}
+@media(min-width:700px){.carrito-fab{display:none!important;}}
+
+/* Formas de pago en carrito: 3 cols en móvil, 5 en fila en PC */
+.pago-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;}
+@media(min-width:700px){.pago-grid{grid-template-columns:repeat(5,1fr);}}
+
+/* ══════════════════════════════
+   IMPRESIÓN / COMPROBANTE
+══════════════════════════════ */
+.comp-preview{background:var(--bg2);border-radius:var(--radius);padding:16px;font-family:monospace;font-size:13px;margin-bottom:14px;max-height:55vh;overflow-y:auto;}
+@media print{
+  body *{visibility:hidden;}
+  .comp-print,.comp-print *{visibility:visible;}
+  .comp-print{position:fixed;top:0;left:0;width:100%;padding:20px;font-family:monospace;font-size:13px;color:#000;}
+  .comp-print-titulo{text-align:center;font-size:18px;font-weight:bold;border-bottom:2px dashed #000;padding-bottom:8px;margin-bottom:10px;}
+  .comp-print-fila{display:flex;justify-content:space-between;padding:2px 0;}
+  .comp-print-total{font-size:17px;font-weight:bold;border-top:2px solid #000;margin-top:8px;padding-top:8px;}
+  .comp-print-footer{text-align:center;margin-top:16px;font-size:10px;border-top:1px dashed #000;padding-top:8px;}
+}
+
+/* ══════════════════════════════
+   EMMA BRANDING
+══════════════════════════════ */
+.emma-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:var(--bg2);border:1px solid var(--border);}
+.emma-badge-logo{font-size:14px;}
+.emma-badge-txt{font-size:10px;font-weight:700;color:var(--txt2);letter-spacing:.04em;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -293,28 +365,149 @@ function Campo({label,value,onChange,placeholder,tipo='text',rows}){
   </>);
 }
 
-/* ─── HEADER ─── */
-function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
-  const [dark,setDark]=useState(()=>document.documentElement.classList.contains('dark'));
-  const [hora,setHora]=useState(ahora());
-  useEffect(()=>{ const t=setInterval(()=>setHora(ahora()),30000); return()=>clearInterval(t); },[]);
-  const toggleDark=()=>{ document.documentElement.classList.toggle('dark'); document.body.classList.toggle('dark'); setDark(d=>!d); };
+/* ─── DATOS DE TEMAS ─── */
+const TEMAS_CLAROS=[
+  {id:'clasico',  nombre:'Clásico',   top:'#fafaf9',bot:'#3B6D11'},
+  {id:'oceano',   nombre:'Océano',    top:'#e0f2fe',bot:'#0369a1'},
+  {id:'bosque',   nombre:'Bosque',    top:'#dcfce7',bot:'#166534'},
+  {id:'lavanda',  nombre:'Lavanda',   top:'#f3e8ff',bot:'#7c3aed'},
+];
+const TEMAS_OSCUROS=[
+  {id:'oscuro',      nombre:'Oscuro',      top:'#1c1917',bot:'#6aad2e'},
+  {id:'medianoche',  nombre:'Medianoche',  top:'#0f172a',bot:'#38bdf8'},
+  {id:'selva',       nombre:'Selva',       top:'#052e16',bot:'#4ade80'},
+  {id:'violeta',     nombre:'Violeta',     top:'#1e1037',bot:'#a78bfa'},
+];
+const TEMAS_OSCUROS_IDS=TEMAS_OSCUROS.map(t=>t.id);
+function aplicarTema(id){
+  document.documentElement.setAttribute('data-tema',id);
+  const esDark=TEMAS_OSCUROS_IDS.includes(id);
+  document.documentElement.classList.toggle('dark',esDark);
+  document.body.classList.toggle('dark',esDark);
+  localStorage.setItem('polleria-tema',id);
+}
+
+function SelectorTema({onCerrar}){
+  const [actual,setActual]=useState(()=>document.documentElement.getAttribute('data-tema')||'clasico');
+  const elegir=id=>{aplicarTema(id);setActual(id);};
+  const renderFila=(temas,titulo)=>(
+    <>
+      <div className="sec-title" style={{margin:'14px 0 10px'}}>{titulo}</div>
+      <div className="tema-grid">
+        {temas.map(t=>(
+          <div key={t.id} style={{textAlign:'center'}}>
+            <button onClick={()=>elegir(t.id)} className={`tema-btn${actual===t.id?' activo':''}`}>
+              <div className="tema-swatch">
+                <div className="tema-swatch-top" style={{background:t.top}}/>
+                <div className="tema-swatch-bot" style={{background:t.bot}}/>
+              </div>
+            </button>
+            <div style={{fontSize:10,color:'var(--txt2)',marginTop:5,fontWeight:600}}>{t.nombre}</div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
   return(
-    <header className="header">
-      <div className="header-left">
-        {onBack && <button onClick={onBack} className="btn-back">←</button>}
-        <div>
-          <div className="header-title">🐔 {titulo}</div>
-          <div className="header-sub">{subtitulo||fechaCorta()}</div>
+    <div className="overlay" onClick={onCerrar}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-drag"/>
+        <div style={{fontWeight:700,fontSize:17,color:'var(--txt)',marginBottom:2}}>🎨 Tema de color</div>
+        <div style={{fontSize:12,color:'var(--txt2)'}}>Elegí el estilo que más te guste</div>
+        {renderFila(TEMAS_CLAROS,'☀️ Modo claro')}
+        {renderFila(TEMAS_OSCUROS,'🌙 Modo oscuro')}
+        <div style={{marginTop:16,textAlign:'center'}}>
+          <div className="emma-badge"><span className="emma-badge-logo">💡</span><span className="emma-badge-txt">Emma Soluciones Digitales</span></div>
+        </div>
+        <button onClick={onCerrar} className="btn-full" style={{marginTop:14}}>Cerrar</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── COMPROBANTE (para imprimir) ─── */
+function Comprobante({data,onCerrar}){
+  const fecha=new Date().toLocaleString('es-AR');
+  const items=data.items||[];
+  const imprimir=()=>window.print();
+  return(
+    <div className="overlay" onClick={onCerrar}>
+      <div className="modal" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-drag"/>
+        <div style={{textAlign:'center',marginBottom:14}}>
+          <div style={{fontSize:28}}>🧾</div>
+          <div style={{fontWeight:700,fontSize:16,color:'var(--txt)'}}>Comprobante de Venta</div>
+        </div>
+        {/* Preview */}
+        <div className="comp-preview">
+          <div style={{textAlign:'center',fontWeight:700,fontSize:15,borderBottom:'1px dashed var(--border)',paddingBottom:8,marginBottom:8}}>🐔 POLLERÍA</div>
+          <div style={{textAlign:'center',fontSize:11,color:'var(--txt2)',marginBottom:10}}>{fecha}</div>
+          {items.map((it,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}>
+              <span style={{color:'var(--txt)'}}>{it.nombre} × {it.cantidad} {it.unidad}</span>
+              <span style={{fontWeight:700,color:'var(--txt)'}}>{formatPeso(it.subtotal)}</span>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'space-between',borderTop:'2px solid var(--border)',marginTop:8,paddingTop:8,fontWeight:700,fontSize:15}}>
+            <span style={{color:'var(--txt)'}}>TOTAL</span>
+            <span style={{color:'var(--green)'}}>{formatPeso(data.total)}</span>
+          </div>
+          <div style={{marginTop:8,fontSize:11,color:'var(--txt2)'}}>Forma de pago: <b>{data.formaPago}</b></div>
+          {data.clienteNombre&&data.clienteNombre!=='Venta directa'&&<div style={{fontSize:11,color:'var(--txt2)'}}>Cliente: {data.clienteNombre}</div>}
+          {data.telefono&&<div style={{fontSize:11,color:'var(--txt2)'}}>Tel: {data.telefono}</div>}
+          {data.datosTarjeta&&<div style={{fontSize:11,color:'var(--txt2)'}}>Datos pago: {data.datosTarjeta}</div>}
+          <div style={{textAlign:'center',marginTop:14,fontSize:10,color:'var(--txt3)',borderTop:'1px dashed var(--border)',paddingTop:8}}>Emma Soluciones Digitales</div>
+        </div>
+        {/* DOM oculto solo visible al imprimir */}
+        <div className="comp-print">
+          <div className="comp-print-titulo">🐔 POLLERÍA</div>
+          <div style={{textAlign:'center',fontSize:11,marginBottom:8}}>{fecha}</div>
+          {items.map((it,i)=>(
+            <div key={i} className="comp-print-fila">
+              <span>{it.nombre} × {it.cantidad} {it.unidad}</span>
+              <span>{formatPeso(it.subtotal)}</span>
+            </div>
+          ))}
+          <div className="comp-print-fila comp-print-total"><span>TOTAL</span><span>{formatPeso(data.total)}</span></div>
+          <div className="comp-print-fila" style={{marginTop:6,fontSize:11}}><span>Pago:</span><span>{data.formaPago}</span></div>
+          {data.clienteNombre&&data.clienteNombre!=='Venta directa'&&<div className="comp-print-fila" style={{fontSize:11}}><span>Cliente:</span><span>{data.clienteNombre}</span></div>}
+          {data.telefono&&<div className="comp-print-fila" style={{fontSize:11}}><span>Tel:</span><span>{data.telefono}</span></div>}
+          {data.datosTarjeta&&<div className="comp-print-fila" style={{fontSize:11}}><span>Pago datos:</span><span>{data.datosTarjeta}</span></div>}
+          <div className="comp-print-footer">Emma Soluciones Digitales · Gestión Pollería<br/>{fecha}</div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={imprimir} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>🖨️ Imprimir</button>
+          <button onClick={onCerrar} className="btn-sec" style={{padding:14}}>Cerrar</button>
         </div>
       </div>
-      <div className="header-right">
-        <span style={{fontSize:14,fontWeight:700,color:'var(--txt)',fontVariantNumeric:'tabular-nums'}}>{hora}</span>
-        {onAdd && <button onClick={onAdd} className="btn-pri" style={{fontSize:20,padding:'3px 12px',lineHeight:1}}>+</button>}
-        <button onClick={toggleDark} className="btn-dark">{dark?'☀️':'🌙'}</button>
-        {onLogout && <button onClick={onLogout} className="btn-sec" style={{fontSize:12,padding:'6px 10px'}}>Salir</button>}
-      </div>
-    </header>
+    </div>
+  );
+}
+
+/* ─── HEADER ─── */
+function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
+  const [mostrarTemas,setMostrarTemas]=useState(false);
+  const [hora,setHora]=useState(ahora());
+  useEffect(()=>{const t=setInterval(()=>setHora(ahora()),30000);return()=>clearInterval(t);},[]);
+  return(
+    <>
+      <header className="header">
+        <div className="header-left">
+          {onBack && <button onClick={onBack} className="btn-back">←</button>}
+          <div>
+            <div className="header-title">🐔 {titulo}</div>
+            <div className="header-sub">{subtitulo||fechaCorta()}</div>
+          </div>
+        </div>
+        <div className="header-right">
+          <span style={{fontSize:14,fontWeight:700,color:'var(--txt)',fontVariantNumeric:'tabular-nums'}}>{hora}</span>
+          {onAdd && <button onClick={onAdd} className="btn-pri" style={{fontSize:20,padding:'3px 12px',lineHeight:1}}>+</button>}
+          <button onClick={()=>setMostrarTemas(true)} className="btn-dark" title="Cambiar tema">🎨</button>
+          {onLogout && <button onClick={onLogout} className="btn-sec" style={{fontSize:12,padding:'6px 10px'}}>Salir</button>}
+        </div>
+      </header>
+      {mostrarTemas&&<SelectorTema onCerrar={()=>setMostrarTemas(false)}/>}
+    </>
   );
 }
 
@@ -352,7 +545,11 @@ function Login(){
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',background:'var(--bg3)'}}>
       <div style={{fontSize:60,marginBottom:8}}>🐔</div>
       <div style={{fontSize:22,fontWeight:700,color:'var(--txt)',marginBottom:4}}>Gestión Pollería</div>
-      <p style={{color:'var(--txt2)',marginBottom:32,fontSize:14}}>Tu negocio bajo control</p>
+      <p style={{color:'var(--txt2)',marginBottom:24,fontSize:14}}>Tu negocio bajo control</p>
+      <div className="emma-badge" style={{marginBottom:24}}>
+        <span className="emma-badge-logo">💡</span>
+        <span className="emma-badge-txt">Emma Soluciones Digitales</span>
+      </div>
       <div style={{width:'100%',maxWidth:340,background:'var(--bg)',borderRadius:'var(--radius-lg)',padding:24,border:'1px solid var(--border)'}}>
         {error && <div style={{background:'var(--red-bg)',color:'var(--red)',padding:'10px 14px',borderRadius:'var(--radius)',marginBottom:14,fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
         <Campo label="Email" value={email} onChange={setEmail} placeholder="tu@email.com" tipo="email"/>
@@ -500,6 +697,101 @@ function Toast({msg}){
 }
 
 /* ══════════════════════════════════════
+   CARRITO PANEL (componente compartido)
+══════════════════════════════════════ */
+function CarritoPanel({carrito,onCambiarCantidad,onLimpiar,uid,clientes,onVentaConfirmada}){
+  const [pago,setPago]=useState('efectivo');
+  const [clienteNombre,setClienteNombre]=useState('');
+  const [telefono,setTelefono]=useState('');
+  const [datosPago,setDatosPago]=useState('');
+  const [cargando,setCargando]=useState(false);
+  const total=carrito.reduce((s,i)=>s+(i.prod.precioVenta||0)*i.cantidad,0);
+  const esConDatos=pago==='transferencia'||pago==='debito'||pago==='credito';
+  const confirmar=async()=>{
+    if(!carrito.length)return;
+    setCargando(true);
+    try{
+      const items=carrito.map(i=>({
+        _id:Date.now()+Math.random(),
+        nombre:i.prod.nombre,unidad:i.prod.unidad||'kg',
+        cantidad:i.cantidad,precio:i.prod.precioVenta||0,
+        subtotal:(i.prod.precioVenta||0)*i.cantidad,
+      }));
+      const pedidoData={
+        clienteNombre:clienteNombre||'Venta directa',clienteId:'',
+        tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',
+        formaPago:pago,items,total,fecha:hoy(),
+        telefono:telefono||'',datosTarjeta:datosPago||'',
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
+      onVentaConfirmada({...pedidoData,id:ref.id,items});
+      setClienteNombre('');setTelefono('');setDatosPago('');setPago('efectivo');
+    }catch(e){alert('Error: '+e.message);}
+    setCargando(false);
+  };
+  if(!carrito.length) return(
+    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--txt2)',gap:10,padding:20}}>
+      <div style={{fontSize:52}}>🛒</div>
+      <div style={{fontSize:15,fontWeight:700}}>Carrito vacío</div>
+      <div style={{fontSize:13,textAlign:'center',lineHeight:1.5}}>Tocá un producto del catálogo para agregarlo al carrito</div>
+    </div>
+  );
+  return(
+    <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden',gap:0}}>
+      {/* Lista de items */}
+      <div className="carrito-titulo">
+        <span>🛒 Carrito <span style={{color:'var(--txt2)',fontWeight:400}}>({carrito.length} prod.)</span></span>
+        <button onClick={onLimpiar} style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:12,fontWeight:600}}>🗑️ Limpiar</button>
+      </div>
+      <div style={{flex:1,overflowY:'auto',marginBottom:8}}>
+        {carrito.map(item=>(
+          <div key={item.prod.id} className="carrito-item">
+            <div style={{flex:1,minWidth:0}}>
+              <div className="carrito-item-name">{item.prod.nombre}</div>
+              <div className="carrito-item-sub">{formatPeso(item.prod.precioVenta||0)} / {item.prod.unidad||'kg'}</div>
+            </div>
+            <div className="carrito-qty">
+              <button onClick={()=>onCambiarCantidad(item.prod.id,-getStep(item.prod))} className="carrito-qty-btn">−</button>
+              <span className="carrito-qty-val">{item.cantidad}</span>
+              <button onClick={()=>onCambiarCantidad(item.prod.id,getStep(item.prod))} className="carrito-qty-btn">+</button>
+            </div>
+            <div className="carrito-item-precio">{formatPeso((item.prod.precioVenta||0)*item.cantidad)}</div>
+          </div>
+        ))}
+      </div>
+      {/* Pago, datos, total y confirmar */}
+      <div style={{borderTop:'2px solid var(--border)',paddingTop:10,flexShrink:0}}>
+        <label className="lbl" style={{marginTop:0}}>Forma de pago</label>
+        <div className="pago-grid">
+          {[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transfer.'},{k:'debito',lbl:'💳 Débito'},{k:'credito',lbl:'💳 Crédito'},{k:'fiado',lbl:'📒 Fiado'}].map(m=>(
+            <button key={m.k} onClick={()=>{setPago(m.k);setDatosPago('');}} className={`btn-metodo${pago===m.k?' activo':''}`} style={{fontSize:11,padding:'7px 4px'}}>{m.lbl}</button>
+          ))}
+        </div>
+        <Campo label="Cliente (opcional)" value={clienteNombre} onChange={setClienteNombre} placeholder="Nombre del cliente..."/>
+        {esConDatos&&<>
+          <Campo label="📞 Teléfono de contacto" value={telefono} onChange={setTelefono} placeholder="Ej: 381-123-4567" tipo="tel"/>
+          <Campo
+            label={pago==='transferencia'?'🏦 CBU / Alias':'💳 Titular y últimos 4 dígitos'}
+            value={datosPago} onChange={setDatosPago}
+            placeholder={pago==='transferencia'?'CBU o alias de transferencia':'Ej: Juan García - 4521'}
+          />
+        </>}
+        <div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',margin:'10px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontWeight:700,fontSize:13,color:'var(--green)'}}>TOTAL</span>
+          <span style={{fontWeight:700,fontSize:26,color:'var(--green)'}}>{formatPeso(total)}</span>
+        </div>
+        <button onClick={confirmar} disabled={cargando} className="btn-full" style={{background:'var(--green)'}}>
+          {cargando?'⏳ Procesando...':'✅ Confirmar venta'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function getStep(prod){return ['kg','litro','litros'].includes(prod.unidad||'kg')?0.5:1;}
+
+/* ══════════════════════════════════════
    PANTALLA CATÁLOGO / VENDER  (nueva)
 ══════════════════════════════════════ */
 function PantallaCatalogo({uid}){
@@ -507,7 +799,9 @@ function PantallaCatalogo({uid}){
   const [clientes,setClientes]=useState([]);
   const [buscar,setBuscar]=useState('');
   const [catFiltro,setCatFiltro]=useState('Todos');
-  const [ventaModal,setVentaModal]=useState(null);
+  const [carrito,setCarrito]=useState([]);
+  const [carritoMovil,setCarritoMovil]=useState(false);
+  const [comprobante,setComprobante]=useState(null);
   const [toast,setToast]=useState('');
 
   useEffect(()=>{
@@ -516,82 +810,101 @@ function PantallaCatalogo({uid}){
     return()=>{u1();u2();};
   },[]);
 
-  const mostrarToast = msg => { setToast(msg); setTimeout(()=>setToast(''),2200); };
+  const mostrarToast=msg=>{setToast(msg);setTimeout(()=>setToast(''),2200);};
 
-  const handleCerrarVenta = (guardado) => {
-    setVentaModal(null);
-    if(guardado) mostrarToast('✅ Venta registrada');
+  const agregarAlCarrito=prod=>{
+    const step=getStep(prod);
+    setCarrito(prev=>{
+      const ex=prev.find(i=>i.prod.id===prod.id);
+      if(ex) return prev.map(i=>i.prod.id===prod.id?{...i,cantidad:+(i.cantidad+step).toFixed(1)}:i);
+      return[...prev,{prod,cantidad:step}];
+    });
   };
 
-  const CATS = ['Todos', ...new Set(productos.map(p=>p.categoria||'Otro'))];
-  const filtrados = productos.filter(p=>{
-    const okBuscar = p.nombre.toLowerCase().includes(buscar.toLowerCase());
-    const okCat = catFiltro==='Todos' || (p.categoria||'Otro')===catFiltro;
-    return okBuscar && okCat;
+  const cambiarCantidad=(prodId,delta)=>{
+    setCarrito(prev=>prev.map(i=>i.prod.id===prodId?{...i,cantidad:Math.max(0,+(i.cantidad+delta).toFixed(1))}:i).filter(i=>i.cantidad>0));
+  };
+
+  const limpiarCarrito=()=>{if(carrito.length&&confirm('¿Limpiar el carrito?'))setCarrito([]);};
+
+  const onVentaConfirmada=data=>{
+    setComprobante(data);
+    setCarritoMovil(false);
+    mostrarToast('✅ Venta registrada');
+  };
+
+  const totalCarrito=carrito.reduce((s,i)=>s+(i.prod.precioVenta||0)*i.cantidad,0);
+  const CATS=['Todos',...new Set(productos.map(p=>p.categoria||'Otro'))];
+  const filtrados=productos.filter(p=>{
+    const okB=p.nombre.toLowerCase().includes(buscar.toLowerCase());
+    const okC=catFiltro==='Todos'||(p.categoria||'Otro')===catFiltro;
+    return okB&&okC;
   });
+
+  const carritoPanel=<CarritoPanel carrito={carrito} onCambiarCantidad={cambiarCantidad} onLimpiar={limpiarCarrito} uid={uid} clientes={clientes} onVentaConfirmada={onVentaConfirmada}/>;
 
   return(
     <div>
-      <Header titulo="Catálogo / Vender" onLogout={()=>auth.signOut()} subtitulo="Tocá un producto para vender"/>
-      <div className="app-body">
-        {/* Búsqueda */}
-        <input
-          value={buscar}
-          onChange={e=>setBuscar(e.target.value)}
-          placeholder="🔍 Buscar producto..."
-          className="search"
-          style={{marginBottom:10}}
-        />
-        {/* Filtro categorías */}
-        <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:4}}>
-          {CATS.map(c=>(
-            <button key={c} onClick={()=>setCatFiltro(c)} className={`chip${catFiltro===c?' activo':''}`} style={{flexShrink:0}}>
-              {c==='Todos'?'🐔 Todos':c}
-            </button>
-          ))}
-        </div>
-
-        {/* Grid de productos */}
-        {filtrados.length===0 && (
-          <div className="empty">
-            <div style={{fontSize:48,marginBottom:12}}>🐔</div>
-            No hay productos.<br/>Agregá productos en la sección <b>Precios</b>.
+      <Header titulo="Catálogo / Vender" onLogout={()=>auth.signOut()} subtitulo="Seleccioná productos para vender"/>
+      <div className="split-layout">
+        {/* IZQUIERDA – catálogo */}
+        <div className="split-left">
+          <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar producto..." className="search" style={{marginBottom:10}}/>
+          <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:8,scrollbarWidth:'none'}}>
+            {CATS.map(c=>(
+              <button key={c} onClick={()=>setCatFiltro(c)} className={`chip${catFiltro===c?' activo':''}`} style={{flexShrink:0}}>
+                {c==='Todos'?'🐔 Todos':c}
+              </button>
+            ))}
           </div>
-        )}
-        <div className="catalogo-grid">
-          {filtrados.map(p=>{
-            const cs = catStyle(p.categoria);
-            return(
-              <div key={p.id} className="prod-card" onClick={()=>setVentaModal(p)}>
-                {/* Foto o emoji */}
-                <div className="prod-card-foto" style={{background:cs.bg}}>
-                  {p.foto
-                    ? <img src={p.foto} alt={p.nombre}/>
-                    : <span>{cs.emoji}</span>
-                  }
+          {filtrados.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🐔</div>No hay productos.<br/>Agregá productos en <b>Precios</b>.</div>}
+          <div className="catalogo-grid">
+            {filtrados.map(p=>{
+              const cs=catStyle(p.categoria);
+              const enC=carrito.find(i=>i.prod.id===p.id);
+              return(
+                <div key={p.id} className="prod-card" onClick={()=>agregarAlCarrito(p)}>
+                  <div className="prod-card-foto" style={{background:cs.bg}}>
+                    {p.foto?<img src={p.foto} alt={p.nombre}/>:<span>{cs.emoji}</span>}
+                    {enC&&<div className="prod-badge">{enC.cantidad}</div>}
+                  </div>
+                  <div className="prod-card-info">
+                    <div className="prod-card-nombre">{p.nombre}</div>
+                    <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
+                    <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
+                    <button className="prod-card-btn" style={{background:enC?'var(--green)':'var(--txt)'}}>
+                      {enC?`🛒 ${enC.cantidad} ${p.unidad||'kg'}`:'+  Agregar'}
+                    </button>
+                  </div>
                 </div>
-                {/* Info */}
-                <div className="prod-card-info">
-                  <div className="prod-card-nombre">{p.nombre}</div>
-                  <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
-                  <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
-                  <button className="prod-card-btn">+ Vender</button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+        {/* DERECHA – carrito solo en PC */}
+        <div className="split-right">
+          {carritoPanel}
         </div>
       </div>
 
-      {/* Modal venta */}
-      {ventaModal && (
-        <ModalVentaRapida
-          producto={ventaModal}
-          clientes={clientes}
-          uid={uid}
-          onCerrar={handleCerrarVenta}
-        />
+      {/* Botón flotante carrito (solo móvil) */}
+      {carrito.length>0&&(
+        <button onClick={()=>setCarritoMovil(true)} className="carrito-fab">
+          🛒 {carrito.length} prod. · {formatPeso(totalCarrito)}
+        </button>
       )}
+
+      {/* Carrito como bottom sheet en móvil */}
+      {carritoMovil&&(
+        <div className="overlay" onClick={()=>setCarritoMovil(false)}>
+          <div className="modal" style={{height:'88vh',display:'flex',flexDirection:'column',padding:'1rem'}} onClick={e=>e.stopPropagation()}>
+            <div className="modal-drag"/>
+            {carritoPanel}
+          </div>
+        </div>
+      )}
+
+      {comprobante&&<Comprobante data={comprobante} onCerrar={()=>setComprobante(null)}/>}
       <Toast msg={toast}/>
     </div>
   );
@@ -660,6 +973,13 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
   const UNIDADES=['kg','g','unidad','docena','litro','atado','bandeja'];
   const [d,setD]=useState({nombre:'',categoria:'🐔 Pollo',descripcion:'',precioCosto:'',precioVenta:'',unidad:'kg',foto:'',...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const setCategoria=cat=>{
+    setD(p=>{
+      // Huevos y lácteos → unidad; todo lo demás → kg (si no estaba ya personalizado)
+      const nuevaUnidad=cat==='🥚 Huevos y lácteos'?'unidad':'kg';
+      return{...p,categoria:cat,unidad:nuevaUnidad};
+    });
+  };
   const m=d.precioCosto>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):0;
   const cs=catStyle(d.categoria);
 
@@ -697,7 +1017,7 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
 
         <label className="lbl">Categoría</label>
         <div className="chip-group">
-          {categorias.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}
+          {categorias.map(c=><button key={c} onClick={()=>setCategoria(c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}
         </div>
 
         <label className="lbl">Unidad de venta</label>
@@ -1430,7 +1750,12 @@ function FormMovimiento({inicial,onGuardar,onCancelar}){
 function App(){
   const [user,setUser]=useState(undefined);
   const [tab,setTab]=useState('catalogo');
-  useEffect(()=>auth.onAuthStateChanged(u=>setUser(u)),[]);
+  useEffect(()=>{
+    auth.onAuthStateChanged(u=>setUser(u));
+    // Cargar tema guardado
+    const tema=localStorage.getItem('polleria-tema')||'clasico';
+    aplicarTema(tema);
+  },[]);
   if(user===undefined) return(
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg3)'}}>
       <div style={{fontSize:56}}>🐔</div>
