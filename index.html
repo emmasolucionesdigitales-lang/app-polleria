@@ -538,6 +538,10 @@ function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
   );
 }
 
+/* ─── MODO PC / CELULAR ─── */
+function getModo(){try{return localStorage.getItem('polleria-modo')||'movil';}catch{return 'movil';}}
+function guardarModo(m){try{localStorage.setItem('polleria-modo',m);}catch{}}
+
 /* ─── NAV BAR ─── */
 const TABS=[
   {id:'catalogo', icon:'🛒', label:'Vender'},
@@ -545,6 +549,7 @@ const TABS=[
   {id:'precios',  icon:'💰', label:'Precios'},
   {id:'stock',    icon:'📦', label:'Stock'},
   {id:'caja',     icon:'🧾', label:'Caja'},
+  {id:'config',   icon:'⚙️', label:'Config'},
 ];
 function NavBar({activo,onChange}){
   return(
@@ -553,6 +558,29 @@ function NavBar({activo,onChange}){
         <button key={t.id} onClick={()=>onChange(t.id)} className={`nav-btn${activo===t.id?' activo':''}`}>
           <span className="nav-icon">{t.icon}</span>
           <span className="nav-label">{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+function NavSidebar({activo,onChange}){
+  return(
+    <nav style={{width:180,flexShrink:0,position:'sticky',top:0,height:'100vh',background:'var(--bg)',borderRight:'1px solid var(--border)',display:'flex',flexDirection:'column',padding:'16px 8px',gap:3,zIndex:40}}>
+      <div style={{padding:'8px 12px 14px',borderBottom:'1px solid var(--border)',marginBottom:6}}>
+        <div style={{fontSize:20}}>🐔</div>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--txt)',marginTop:2}}>Pollería</div>
+        <div style={{fontSize:9,color:'var(--txt3)'}}>Emma SD</div>
+      </div>
+      {TABS.map(t=>(
+        <button key={t.id} onClick={()=>onChange(t.id)} style={{
+          display:'flex',alignItems:'center',gap:10,padding:'10px 14px',
+          borderRadius:'var(--radius)',border:'none',cursor:'pointer',textAlign:'left',width:'100%',
+          background:activo===t.id?'var(--green-bg)':'transparent',
+          color:activo===t.id?'var(--green)':'var(--txt2)',
+          fontWeight:activo===t.id?700:400,fontSize:13,
+        }}>
+          <span style={{fontSize:17}}>{t.icon}</span>
+          <span>{t.label}</span>
         </button>
       ))}
     </nav>
@@ -1771,15 +1799,93 @@ function FormMovimiento({inicial,onGuardar,onCancelar}){
 }
 
 /* ══════════════════════════════════════
+   PANTALLA CONFIGURACIÓN
+══════════════════════════════════════ */
+function ConfigTema(){
+  const [temaActual,setTemaActual]=useState(getTema);
+  const [modoVista,setModoVista]=useState(()=>TEMAS[getTema()]?.modo||'claro');
+  const [guardado,setGuardado]=useState(false);
+  const aplicar=id=>{setTemaActual(id);aplicarTema(id);setGuardado(true);setTimeout(()=>setGuardado(false),2000);};
+  const filtrados=Object.entries(TEMAS).filter(([,t])=>t.modo===modoVista);
+  return(
+    <>
+      <div style={{display:'flex',gap:8,marginBottom:14}}>
+        {[['oscuro','🌙 Oscuro'],['claro','☀️ Claro']].map(([m,l])=>(
+          <button key={m} onClick={()=>setModoVista(m)} style={{flex:1,padding:'8px',fontSize:13,fontWeight:600,borderRadius:'var(--radius)',cursor:'pointer',border:`1px solid ${modoVista===m?'transparent':'var(--border)'}`,background:modoVista===m?'var(--green)':'var(--bg2)',color:modoVista===m?'#fff':'var(--txt2)'}}>{l}</button>
+        ))}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+        {filtrados.map(([id,tema])=>(
+          <button key={id} onClick={()=>aplicar(id)} style={{padding:'12px 8px',borderRadius:'var(--radius-lg)',cursor:'pointer',textAlign:'center',border:`2px solid ${temaActual===id?'var(--green)':'var(--border)'}`,background:temaActual===id?'var(--green-bg)':'var(--bg2)'}}>
+            <div style={{fontSize:22,marginBottom:4}}>{tema.emoji}</div>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--txt)',marginBottom:6}}>{tema.nombre}</div>
+            <div style={{display:'flex',gap:4,justifyContent:'center'}}>
+              {[tema.vars['--bg'],tema.vars['--green'],tema.vars['--blue'],tema.vars['--orange']].map((c,i)=>(
+                <div key={i} style={{width:12,height:12,borderRadius:'50%',background:c,border:'1px solid rgba(128,128,128,0.25)'}}/>
+              ))}
+            </div>
+            {temaActual===id&&<div style={{fontSize:10,color:'var(--green)',marginTop:4,fontWeight:700}}>✓ Activo</div>}
+          </button>
+        ))}
+      </div>
+      {guardado&&<div style={{fontSize:13,color:'var(--green)',textAlign:'center',marginTop:10,fontWeight:600}}>✓ Tema aplicado</div>}
+    </>
+  );
+}
+
+function PantallaConfig({onModoChange}){
+  const [modo,setModoLocal]=useState(getModo);
+  const cambiarModo=m=>{setModoLocal(m);guardarModo(m);onModoChange(m);};
+  return(
+    <div>
+      <Header titulo="Configuración"/>
+      <div className="app-body">
+        {/* ── Modo pantalla ── */}
+        <div className="panel">
+          <div className="ptitle">🖥️ Modo de pantalla</div>
+          <p style={{fontSize:12,color:'var(--txt2)',marginBottom:14,lineHeight:1.5}}>
+            Elegí cómo querés ver la app. El modo PC muestra el menú en la barra lateral izquierda.
+          </p>
+          <div style={{display:'flex',gap:10}}>
+            {[{id:'movil',icon:'📱',label:'Celular',sub:'Menú abajo'},{id:'pc',icon:'🖥️',label:'PC / Tablet',sub:'Menú lateral'}].map(m=>(
+              <button key={m.id} onClick={()=>cambiarModo(m.id)} style={{flex:1,padding:'16px 8px',borderRadius:'var(--radius-lg)',border:`2px solid ${modo===m.id?'var(--green)':'var(--border)'}`,background:modo===m.id?'var(--green-bg)':'var(--bg2)',cursor:'pointer',textAlign:'center'}}>
+                <div style={{fontSize:32,marginBottom:6}}>{m.icon}</div>
+                <div style={{fontSize:14,fontWeight:700,color:modo===m.id?'var(--green)':'var(--txt)'}}>{m.label}</div>
+                <div style={{fontSize:11,color:'var(--txt2)',marginTop:3}}>{m.sub}</div>
+                {modo===m.id&&<div style={{fontSize:11,color:'var(--green)',marginTop:6,fontWeight:700}}>✓ Activo</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* ── Tema de colores ── */}
+        <div className="panel">
+          <div className="ptitle">🎨 Tema de colores</div>
+          <ConfigTema/>
+        </div>
+        {/* ── Sesión ── */}
+        <div className="panel">
+          <div className="ptitle">👤 Sesión</div>
+          <button onClick={()=>auth.signOut()} className="btn-full" style={{background:'var(--red)',color:'#fff'}}>
+            🚪 Cerrar sesión
+          </button>
+        </div>
+        <div style={{textAlign:'center',padding:'16px 0 8px',fontSize:11,color:'var(--txt3)'}}>
+          Emma Soluciones Digitales
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
    APP PRINCIPAL
 ══════════════════════════════════════ */
 function App(){
   const [user,setUser]=useState(undefined);
   const [tab,setTab]=useState('catalogo');
+  const [modo,setModoState]=useState(getModo);
   useEffect(()=>{
     auth.onAuthStateChanged(u=>setUser(u));
-    // El IIFE ya aplicó el tema antes de renderizar. Esto es solo por si
-    // se montó sin el tema (navegadores muy lentos):
     aplicarTema(getTema());
   },[]);
   if(user===undefined) return(
@@ -1795,10 +1901,22 @@ function App(){
     precios: <PantallaPrecios  uid={user.uid}/>,
     stock:   <PantallaStock    uid={user.uid}/>,
     caja:    <PantallaCaja     uid={user.uid}/>,
+    config:  <PantallaConfig   onModoChange={m=>{setModoState(m);}}/>,
   };
+  const contenido=pantallas[tab]||pantallas.catalogo;
+  /* ── MODO PC: sidebar izquierdo ── */
+  if(modo==='pc') return(
+    <div style={{display:'flex',maxWidth:1280,margin:'0 auto',minHeight:'100vh',background:'var(--bg3)'}}>
+      <NavSidebar activo={tab} onChange={setTab}/>
+      <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
+        {contenido}
+      </div>
+    </div>
+  );
+  /* ── MODO CELULAR: nav abajo ── */
   return(
     <div style={{paddingBottom:72}}>
-      {pantallas[tab]||pantallas.catalogo}
+      {contenido}
       <NavBar activo={tab} onChange={setTab}/>
     </div>
   );
