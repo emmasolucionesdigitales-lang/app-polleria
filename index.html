@@ -170,6 +170,60 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-thumb{background:var(--bg2);border-radius:4px;}
+
+/* ── HOVER STATES (solo PC con mouse) ── */
+@media(hover:hover){
+  .btn-pri:hover{opacity:.82;}
+  .btn-sec:hover{border-color:var(--border2);color:var(--txt);}
+  .btn-full:not(:disabled):hover{opacity:.86;}
+  .btn-ic:hover{background:var(--bg2);color:var(--txt);}
+  .chip:hover:not(.activo){border-color:var(--border2);color:var(--txt);}
+  .nav-btn:hover .nav-label{color:var(--txt);}
+  .prod-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.13);}
+  .tab-btn:hover:not(.activo){background:rgba(0,0,0,.05);color:var(--txt);}
+}
+
+/* ── LAYOUT PC (pantalla grande) ── */
+@media(min-width:640px){
+  .app-body{padding:1.25rem 1.5rem 90px;}
+  .panel{padding:16px 20px;}
+  .card-body{padding:14px 18px;}
+}
+
+/* ── TAB BAR: ocultar scrollbar pero mantener scroll ── */
+.tab-bar{scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.tab-bar::-webkit-scrollbar{display:none;}
+
+/* ── TOAST FLOTANTE ── */
+.toast-float{
+  position:fixed;bottom:72px;left:50%;transform:translateX(-50%);
+  background:var(--txt);color:var(--bg);
+  padding:10px 22px;border-radius:99px;
+  font-size:14px;font-weight:700;
+  box-shadow:0 4px 20px rgba(0,0,0,.25);
+  z-index:300;pointer-events:none;
+  white-space:nowrap;
+  animation:toastIn .18s ease;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
+/* ── CALCULADORA: inputs en pantallas muy chicas (< 360px) ── */
+.calc-row-3{display:flex;gap:10px;margin-bottom:12px;}
+@media(max-width:359px){
+  .calc-row-3{flex-wrap:wrap;}
+  .calc-row-3>div{flex:0 0 calc(50% - 5px);}
+  .calc-row-3>div:last-child{flex:0 0 100%;}
+}
+
+/* ── SUMA-BAND en PC: más espacio ── */
+@media(min-width:640px){.suma-band{padding:12px 18px;}}
+
+/* ── INPUTS: touch target mínimo 44px en móvil ── */
+@media(max-width:639px){
+  .inp{padding:11px 11px;min-height:44px;}
+  .btn-full{padding:15px;}
+  .btn-ic{padding:8px 14px;min-height:38px;}
+}
 </style>
 </head>
 <body>
@@ -442,7 +496,7 @@ function ModalVentaRapida({producto, clientes, uid, onCerrar}){
    TOAST
 ══════════════════════════════════════ */
 function Toast({msg}){
-  return msg ? <div className="toast">{msg}</div> : null;
+  return msg ? <div className="toast-float">{msg}</div> : null;
 }
 
 /* ══════════════════════════════════════
@@ -759,7 +813,7 @@ function CalculadoraCajon({uid}){
     <div>
       <div className="panel">
         <div className="ptitle">🧮 Calculadora de Cajón</div>
-        <div style={{display:'flex',gap:10,marginBottom:12}}>
+        <div className="calc-row-3">
           {[{lbl:'Cajones',v:cajones,set:v=>setCajones(Math.max(1,v))},{lbl:'Pollos/cajón',v:ppc,set:v=>setPpc(Math.max(1,v))},{lbl:'Kg prom.',v:kg,set:v=>setKg(Math.max(0.5,v)),step:0.1}].map(f=>(
             <div key={f.lbl} style={{flex:1}}>
               <label className="lbl" style={{marginTop:0}}>{f.lbl}</label>
@@ -832,8 +886,8 @@ function CalculadoraCajon({uid}){
           style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Agregar al Inventario y Catálogo'}
         </button>
-        {toastMsg&&<div style={{textAlign:'center',color:'var(--green)',fontWeight:700,marginTop:10,fontSize:14}}>{toastMsg}</div>}
       </div>
+      <Toast msg={toastMsg}/>
     </div>
   );
 }
@@ -915,8 +969,8 @@ function CalculadoraCongelados({uid}){
           style={{background:'var(--blue)',opacity:(!precioCaja||Number(precioCaja)<=0||!nombre.trim())?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Agregar al Inventario'}
         </button>
-        {toastMsg&&<div style={{textAlign:'center',color:'var(--green)',fontWeight:700,marginTop:10,fontSize:14}}>{toastMsg}</div>}
       </div>
+      <Toast msg={toastMsg}/>
     </div>
   );
 }
