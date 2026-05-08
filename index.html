@@ -3,10 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#3B6D11">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Gestión Pollería</title>
+<meta name="apple-mobile-web-app-title" content="Emma SD · Pollería">
+<meta name="application-name" content="Emma SD · Pollería">
+<meta name="description" content="Gestión Pollería — Emma Soluciones Digitales">
+<title>Emma SD · Gestión Pollería</title>
+<!-- Favicon SVG con el logo de Emma (💡 emoji) -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%233B6D11'/><text y='72' x='50' text-anchor='middle' font-size='62'>💡</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%233B6D11'/><text y='72' x='50' text-anchor='middle' font-size='62'>💡</text></svg>">
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -15,27 +21,31 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
+/* Variables base (fallback si no hay tema) */
 :root{
+  --radius:8px;--radius-lg:14px;
   --bg:#fff;--bg2:#f5f5f4;--bg3:#fafaf9;
   --txt:#1c1917;--txt2:#78716c;--txt3:#a8a29e;
   --border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.25);
-  --radius:8px;--radius-lg:14px;
   --green:#3B6D11;--green-bg:#EAF3DE;
   --orange:#854F0B;--orange-bg:#FAEEDA;
   --red:#A32D2D;--red-bg:#FCEBEB;
   --blue:#185FA5;--blue-bg:#E6F1FB;
   --shadow:0 2px 8px rgba(0,0,0,.08);
 }
-.dark{
-  --bg:#1c1917;--bg2:#292524;--bg3:#0c0a09;
-  --txt:#fafaf9;--txt2:#a8a29e;--txt3:#78716c;
-  --border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);
-  --green:#6aad2e;--green-bg:#1a2e0a;
-  --orange:#d97706;--orange-bg:#2a1a00;
-  --red:#e05555;--red-bg:#2a0a0a;
-  --blue:#4b9fe0;--blue-bg:#0a1a2a;
-  --shadow:0 2px 8px rgba(0,0,0,.3);
-}
+/* ═══════════════════════════════════════
+   8 TEMAS — html[data-tema] tiene
+   especificidad (0,1,1) > :root (0,1,0)
+   y gana siempre. Sin clase .dark en body.
+═══════════════════════════════════════ */
+html[data-tema="clasico"]{--bg:#fff;--bg2:#f5f5f4;--bg3:#fafaf9;--txt:#1c1917;--txt2:#78716c;--txt3:#a8a29e;--border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.25);--green:#3B6D11;--green-bg:#EAF3DE;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--shadow:0 2px 8px rgba(0,0,0,.08);}
+html[data-tema="oceano"]{--bg:#fff;--bg2:#f0f9ff;--bg3:#e0f2fe;--txt:#0c2340;--txt2:#0369a1;--txt3:#7dd3fc;--border:rgba(3,105,161,.14);--border2:rgba(3,105,161,.35);--green:#0369a1;--green-bg:#bae6fd;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#0284c7;--blue-bg:#e0f2fe;--shadow:0 2px 8px rgba(3,105,161,.1);}
+html[data-tema="bosque"]{--bg:#fff;--bg2:#f0fdf4;--bg3:#dcfce7;--txt:#052e16;--txt2:#166534;--txt3:#86efac;--border:rgba(22,101,52,.14);--border2:rgba(22,101,52,.35);--green:#166534;--green-bg:#bbf7d0;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--shadow:0 2px 8px rgba(22,101,52,.1);}
+html[data-tema="lavanda"]{--bg:#fff;--bg2:#faf5ff;--bg3:#f3e8ff;--txt:#1e1037;--txt2:#7c3aed;--txt3:#c4b5fd;--border:rgba(124,58,237,.14);--border2:rgba(124,58,237,.35);--green:#7c3aed;--green-bg:#ede9fe;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#7c3aed;--blue-bg:#ede9fe;--shadow:0 2px 8px rgba(124,58,237,.1);}
+html[data-tema="oscuro"]{--bg:#1c1917;--bg2:#292524;--bg3:#0c0a09;--txt:#fafaf9;--txt2:#a8a29e;--txt3:#78716c;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);--green:#6aad2e;--green-bg:#1a2e0a;--orange:#d97706;--orange-bg:#2a1a00;--red:#e05555;--red-bg:#2a0a0a;--blue:#4b9fe0;--blue-bg:#0a1a2a;--shadow:0 2px 8px rgba(0,0,0,.35);}
+html[data-tema="medianoche"]{--bg:#0f172a;--bg2:#1e293b;--bg3:#020617;--txt:#e2e8f0;--txt2:#94a3b8;--txt3:#64748b;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.18);--green:#38bdf8;--green-bg:#0c2a40;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#818cf8;--blue-bg:#1e1b4b;--shadow:0 2px 8px rgba(0,0,0,.4);}
+html[data-tema="selva"]{--bg:#052e16;--bg2:#14532d;--bg3:#020f09;--txt:#dcfce7;--txt2:#86efac;--txt3:#4ade80;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.22);--green:#4ade80;--green-bg:#14532d;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#60a5fa;--blue-bg:#1e3a5f;--shadow:0 2px 8px rgba(0,0,0,.4);}
+html[data-tema="violeta"]{--bg:#1e1037;--bg2:#2d1b69;--bg3:#0d0521;--txt:#f3e8ff;--txt2:#c4b5fd;--txt3:#a78bfa;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.22);--green:#a78bfa;--green-bg:#2d1b69;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#818cf8;--blue-bg:#1e1b4b;--shadow:0 2px 8px rgba(0,0,0,.4);}
 html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--txt);}
 #root{max-width:900px;margin:0 auto;min-height:100vh;background:var(--bg3);}
 
@@ -225,18 +235,6 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
   .btn-ic{padding:8px 14px;min-height:38px;}
 }
 
-/* ══════════════════════════════
-   8 TEMAS DE COLOR
-══════════════════════════════ */
-[data-tema="clasico"]{--bg:#fff;--bg2:#f5f5f4;--bg3:#fafaf9;--txt:#1c1917;--txt2:#78716c;--txt3:#a8a29e;--border:rgba(0,0,0,.12);--border2:rgba(0,0,0,.25);--green:#3B6D11;--green-bg:#EAF3DE;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--shadow:0 2px 8px rgba(0,0,0,.08);}
-[data-tema="oceano"]{--bg:#fff;--bg2:#f0f9ff;--bg3:#e0f2fe;--txt:#0c2340;--txt2:#0369a1;--txt3:#7dd3fc;--border:rgba(3,105,161,.14);--border2:rgba(3,105,161,.35);--green:#0369a1;--green-bg:#bae6fd;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#0284c7;--blue-bg:#e0f2fe;--shadow:0 2px 8px rgba(3,105,161,.1);}
-[data-tema="bosque"]{--bg:#fff;--bg2:#f0fdf4;--bg3:#dcfce7;--txt:#052e16;--txt2:#166534;--txt3:#86efac;--border:rgba(22,101,52,.14);--border2:rgba(22,101,52,.35);--green:#166534;--green-bg:#bbf7d0;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--shadow:0 2px 8px rgba(22,101,52,.1);}
-[data-tema="lavanda"]{--bg:#fff;--bg2:#faf5ff;--bg3:#f3e8ff;--txt:#1e1037;--txt2:#7c3aed;--txt3:#c4b5fd;--border:rgba(124,58,237,.14);--border2:rgba(124,58,237,.35);--green:#7c3aed;--green-bg:#ede9fe;--orange:#854F0B;--orange-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#7c3aed;--blue-bg:#ede9fe;--shadow:0 2px 8px rgba(124,58,237,.1);}
-[data-tema="oscuro"]{--bg:#1c1917;--bg2:#292524;--bg3:#0c0a09;--txt:#fafaf9;--txt2:#a8a29e;--txt3:#78716c;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.2);--green:#6aad2e;--green-bg:#1a2e0a;--orange:#d97706;--orange-bg:#2a1a00;--red:#e05555;--red-bg:#2a0a0a;--blue:#4b9fe0;--blue-bg:#0a1a2a;--shadow:0 2px 8px rgba(0,0,0,.35);}
-[data-tema="medianoche"]{--bg:#0f172a;--bg2:#1e293b;--bg3:#020617;--txt:#e2e8f0;--txt2:#94a3b8;--txt3:#64748b;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.18);--green:#38bdf8;--green-bg:#0c2a40;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#818cf8;--blue-bg:#1e1b4b;--shadow:0 2px 8px rgba(0,0,0,.4);}
-[data-tema="selva"]{--bg:#052e16;--bg2:#14532d;--bg3:#020f09;--txt:#dcfce7;--txt2:#86efac;--txt3:#4ade80;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.22);--green:#4ade80;--green-bg:#14532d;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#60a5fa;--blue-bg:#1e3a5f;--shadow:0 2px 8px rgba(0,0,0,.4);}
-[data-tema="violeta"]{--bg:#1e1037;--bg2:#2d1b69;--bg3:#0d0521;--txt:#f3e8ff;--txt2:#c4b5fd;--txt3:#a78bfa;--border:rgba(255,255,255,.1);--border2:rgba(255,255,255,.22);--green:#a78bfa;--green-bg:#2d1b69;--orange:#fb923c;--orange-bg:#2a1200;--red:#f87171;--red-bg:#2a0a0a;--blue:#818cf8;--blue-bg:#1e1b4b;--shadow:0 2px 8px rgba(0,0,0,.4);}
-
 /* ── SELECTOR DE TEMA ── */
 .tema-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px;}
 .tema-btn{border:2px solid transparent;border-radius:var(--radius-lg);padding:0;cursor:pointer;overflow:hidden;aspect-ratio:1;transition:border-color .15s,transform .1s;}
@@ -291,11 +289,37 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 }
 
 /* ══════════════════════════════
-   EMMA BRANDING
+   EMMA LOGO / BRANDING EN HEADER
 ══════════════════════════════ */
-.emma-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:var(--bg2);border:1px solid var(--border);}
-.emma-badge-logo{font-size:14px;}
-.emma-badge-txt{font-size:10px;font-weight:700;color:var(--txt2);letter-spacing:.04em;white-space:nowrap;}
+.emma-logo-header{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 10px 4px 6px;
+  border-radius:var(--radius);
+  background:var(--green-bg);
+  border:1px solid var(--green);
+  flex-shrink:0;
+}
+.emma-logo-icon{
+  width:26px;height:26px;border-radius:6px;
+  background:var(--green);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+.emma-logo-texto{display:flex;flex-direction:column;line-height:1.1;}
+.emma-logo-nombre{font-size:10px;font-weight:800;color:var(--green);letter-spacing:.02em;text-transform:uppercase;}
+.emma-logo-sub{font-size:8px;font-weight:600;color:var(--txt2);letter-spacing:.04em;text-transform:uppercase;}
+@media(max-width:400px){.emma-logo-texto{display:none;}.emma-logo-header{padding:4px 6px;}}
+
+/* Login pantalla */
+.emma-login-logo{
+  width:72px;height:72px;border-radius:20px;
+  background:var(--green);
+  display:flex;align-items:center;justify-content:center;
+  font-size:38px;margin:0 auto 12px;
+  box-shadow:0 8px 24px rgba(59,109,17,.3);
+}
+.emma-login-nombre{font-size:20px;font-weight:800;color:var(--green);letter-spacing:.02em;}
+.emma-login-sub{font-size:12px;color:var(--txt2);font-weight:500;margin-bottom:6px;}
 </style>
 </head>
 <body>
@@ -380,10 +404,12 @@ const TEMAS_OSCUROS=[
 ];
 const TEMAS_OSCUROS_IDS=TEMAS_OSCUROS.map(t=>t.id);
 function aplicarTema(id){
+  // Solo setear el atributo en html — los selectores html[data-tema] tienen
+  // especificidad (0,1,1) y ganan sobre :root (0,1,0) sin conflictos.
   document.documentElement.setAttribute('data-tema',id);
-  const esDark=TEMAS_OSCUROS_IDS.includes(id);
-  document.documentElement.classList.toggle('dark',esDark);
-  document.body.classList.toggle('dark',esDark);
+  // Limpiar clase .dark vieja si existiera (migración)
+  document.documentElement.classList.remove('dark');
+  document.body.classList.remove('dark');
   localStorage.setItem('polleria-tema',id);
 }
 
@@ -494,6 +520,16 @@ function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
       <header className="header">
         <div className="header-left">
           {onBack && <button onClick={onBack} className="btn-back">←</button>}
+          {/* Logo Emma SD */}
+          {!onBack && (
+            <div className="emma-logo-header">
+              <div className="emma-logo-icon">💡</div>
+              <div className="emma-logo-texto">
+                <span className="emma-logo-nombre">Emma SD</span>
+                <span className="emma-logo-sub">Soluciones Digitales</span>
+              </div>
+            </div>
+          )}
           <div>
             <div className="header-title">🐔 {titulo}</div>
             <div className="header-sub">{subtitulo||fechaCorta()}</div>
@@ -543,20 +579,23 @@ function Login(){
   };
   return(
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',background:'var(--bg3)'}}>
-      <div style={{fontSize:60,marginBottom:8}}>🐔</div>
-      <div style={{fontSize:22,fontWeight:700,color:'var(--txt)',marginBottom:4}}>Gestión Pollería</div>
-      <p style={{color:'var(--txt2)',marginBottom:24,fontSize:14}}>Tu negocio bajo control</p>
-      <div className="emma-badge" style={{marginBottom:24}}>
-        <span className="emma-badge-logo">💡</span>
-        <span className="emma-badge-txt">Emma Soluciones Digitales</span>
+      <div className="emma-login-logo">💡</div>
+      <div className="emma-login-nombre">Emma Soluciones Digitales</div>
+      <div className="emma-login-sub">Soluciones digitales para tu negocio</div>
+      <div style={{display:'flex',alignItems:'center',gap:8,margin:'16px 0 20px'}}>
+        <span style={{fontSize:28}}>🐔</span>
+        <span style={{fontSize:18,fontWeight:700,color:'var(--txt)'}}>Gestión Pollería</span>
       </div>
-      <div style={{width:'100%',maxWidth:340,background:'var(--bg)',borderRadius:'var(--radius-lg)',padding:24,border:'1px solid var(--border)'}}>
+      <div style={{width:'100%',maxWidth:340,background:'var(--bg)',borderRadius:'var(--radius-lg)',padding:24,border:'1px solid var(--border)',boxShadow:'var(--shadow)'}}>
         {error && <div style={{background:'var(--red-bg)',color:'var(--red)',padding:'10px 14px',borderRadius:'var(--radius)',marginBottom:14,fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
         <Campo label="Email" value={email} onChange={setEmail} placeholder="tu@email.com" tipo="email"/>
         <Campo label="Contraseña" value={pass} onChange={setPass} placeholder="••••••••" tipo="password"/>
-        <button onClick={ingresar} disabled={carg} className="btn-full" style={{marginTop:18,opacity:carg?0.7:1}}>
+        <button onClick={ingresar} disabled={carg} className="btn-full" style={{marginTop:18,background:'var(--green)',opacity:carg?0.7:1}}>
           {carg ? 'Ingresando...' : '🐔 Ingresar'}
         </button>
+      </div>
+      <div style={{marginTop:24,fontSize:10,color:'var(--txt3)',textAlign:'center',lineHeight:1.8}}>
+        © 2025 Emma Soluciones Digitales<br/>Todos los derechos reservados
       </div>
     </div>
   );
