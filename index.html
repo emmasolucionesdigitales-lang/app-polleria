@@ -1264,25 +1264,28 @@ function CalculadoraCajon({uid}){
       const prodCol=db.collection(`polleria/${uid}/productos`);
       const piezasVendibles=M.piezas.filter(p=>!p.solo_display);
       for(const p of piezasVendibles){
-        // ID determinístico por nombre de pieza para poder hacer upsert
         const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
-        const pVenta=+(precioPieza(p)||0).toFixed(2);
-        const pCosto=+(costoPieza(p)||0).toFixed(2);
-        // STOCK: sumar a la cantidad existente
+        // STOCK: guarda la cantidad en sus unidades originales (piezas o kg)
+        const pVentaPieza=+(precioPieza(p)||0).toFixed(2);
+        const pCostoPieza=+(costoPieza(p)||0).toFixed(2);
         const stockRef=stockCol.doc(docId);
         const snap=await stockRef.get();
         const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
         await stockRef.set({
           nombre:p.n,categoria:'Pollo',tipo:'cajon',
           cantidad:+(cantActual+Number(p.c)).toFixed(2),
-          unidad:p.u,precioCosto:pCosto,precioVenta:pVenta,
+          unidad:p.u,precioCosto:pCostoPieza,precioVenta:pVentaPieza,
           porcGanancia:Number(porcGanancia),stockMinimo:0,
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         });
-        // PRODUCTOS (catálogo): upsert precio, sin pisar foto u otros datos
+        // CATÁLOGO: SIEMPRE por kg con precio por kg
+        // En pollería todo se pesa en la balanza antes de vender
         await prodCol.doc(docId).set({
-          nombre:p.n,categoria:'🐔 Pollo',unidad:p.u,
-          precioCosto:pCosto,precioVenta:pVenta,
+          nombre:p.n,
+          categoria:'🐔 Pollo',
+          unidad:'kg',                          // ← siempre kg
+          precioCosto:+costoPorKg.toFixed(2),   // ← precio por kg
+          precioVenta:+precioVentaKg.toFixed(2),// ← precio por kg
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         },{merge:true});
       }
@@ -1367,6 +1370,19 @@ function CalculadoraCajon({uid}){
         <button onClick={agregarAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full"
           style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Agregar al Inventario y Catálogo'}
+        </button>
+        {/* Botón para corregir productos existentes que quedaron en 'unidad' */}
+        <button onClick={async()=>{
+          if(!confirm('¿Actualizar todos los productos de Pollo del catálogo a "por kg"?\nEsto corrige los productos que quedaron en "por unidad".'))return;
+          try{
+            const snap=await db.collection(`polleria/${uid}/productos`).where('categoria','==','🐔 Pollo').get();
+            const batch=db.batch();
+            snap.docs.forEach(d=>batch.update(d.ref,{unidad:'kg'}));
+            await batch.commit();
+            mostrarToast(`✅ ${snap.size} productos actualizados a kg`);
+          }catch(e){alert('Error: '+e.message);}
+        }} className="btn-full" style={{background:'var(--orange)',marginTop:6,fontSize:13}}>
+          🔧 Corregir productos existentes → kg
         </button>
       </div>
       <Toast msg={toastMsg}/>
