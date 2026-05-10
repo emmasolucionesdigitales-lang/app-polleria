@@ -314,6 +314,73 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
+/* ══════════════════════════════════════
+   GALERÍA DE IMÁGENES PREDEFINIDAS
+══════════════════════════════════════ */
+const GALERIA_PRESETS={
+  // 🐔 Pollería
+  'pollo-entero':    {emoji:'🐔',bg:'#fef3c7',label:'Pollo Entero'},
+  'pechugas':        {emoji:'🍗',bg:'#fff7ed',label:'Pechugas'},
+  'suprema':         {emoji:'🍗',bg:'#fef3c7',label:'Suprema'},
+  'pata-muslo':      {emoji:'🍖',bg:'#fef9c3',label:'Pata-Muslo'},
+  'muslos':          {emoji:'🦵',bg:'#fef3c7',label:'Muslos'},
+  'alas':            {emoji:'🪶',bg:'#fff7ed',label:'Alitas'},
+  'carcasas':        {emoji:'🦴',bg:'#f0fdf4',label:'Carcasas'},
+  'filet':           {emoji:'🥩',bg:'#fff1f2',label:'Filet'},
+  'milanesas-pollo': {emoji:'🍳',bg:'#fef9c3',label:'Milanesas'},
+  'trozado':         {emoji:'🔪',bg:'#fff7ed',label:'Trozado'},
+  'menudos':         {emoji:'♨️', bg:'#f0f9ff',label:'Menudos'},
+  'pollo-granja':    {emoji:'🐓',bg:'#fef3c7',label:'Granja'},
+  // ❄️ Congelados
+  'medallones':      {emoji:'🥩',bg:'#eff6ff',label:'Medallones'},
+  'nuggets':         {emoji:'🍗',bg:'#fef9c3',label:'Nuggets'},
+  'hamburguesas':    {emoji:'🍔',bg:'#fff7ed',label:'Hamburguesas'},
+  'bastones':        {emoji:'🟡',bg:'#fef9c3',label:'Bastones'},
+  'croquetas':       {emoji:'🟠',bg:'#fff7ed',label:'Croquetas'},
+  'deditos':         {emoji:'🍟',bg:'#fef9c3',label:'Deditos'},
+  'milanesas-cong':  {emoji:'🧊',bg:'#eff6ff',label:'Milanesas Cong.'},
+  'empanadas':       {emoji:'🥟',bg:'#fff7ed',label:'Empanadas'},
+  'pizzas-cong':     {emoji:'🍕',bg:'#fff1f2',label:'Pizza Cong.'},
+  // 🥦 Verdulería
+  'papas':           {emoji:'🥔',bg:'#fef9c3',label:'Papas'},
+  'tomates':         {emoji:'🍅',bg:'#fff1f2',label:'Tomates'},
+  'cebollas':        {emoji:'🧅',bg:'#fef9c3',label:'Cebollas'},
+  'lechuga':         {emoji:'🥬',bg:'#f0fdf4',label:'Lechuga'},
+  'zanahoria':       {emoji:'🥕',bg:'#fff7ed',label:'Zanahoria'},
+  'zapallo':         {emoji:'🎃',bg:'#fff7ed',label:'Zapallo'},
+  'morron':          {emoji:'🫑',bg:'#f0fdf4',label:'Morrón'},
+  'choclo':          {emoji:'🌽',bg:'#fef9c3',label:'Choclo'},
+  'ajo':             {emoji:'🧄',bg:'#fef9c3',label:'Ajo'},
+  'batata':          {emoji:'🍠',bg:'#fff7ed',label:'Batata'},
+  'berenjena':       {emoji:'🍆',bg:'#fdf4ff',label:'Berenjena'},
+  'espinaca':        {emoji:'🥬',bg:'#f0fdf4',label:'Espinaca'},
+  'pepino':          {emoji:'🥒',bg:'#f0fdf4',label:'Pepino'},
+  'limon':           {emoji:'🍋',bg:'#fef9c3',label:'Limón'},
+  'naranja':         {emoji:'🍊',bg:'#fff7ed',label:'Naranja'},
+  // 🥚 Lácteos y Huevos
+  'huevos':          {emoji:'🥚',bg:'#fef9c3',label:'Huevos'},
+  'leche':           {emoji:'🥛',bg:'#f8fafc',label:'Leche'},
+  'queso':           {emoji:'🧀',bg:'#fef9c3',label:'Queso'},
+  'yogur':           {emoji:'🫙',bg:'#f0f9ff',label:'Yogur'},
+};
+const GALERIA_GRUPOS=[
+  {titulo:'🐔 Pollería',   ids:['pollo-entero','suprema','pechugas','pata-muslo','muslos','alas','carcasas','filet','milanesas-pollo','trozado','menudos','pollo-granja']},
+  {titulo:'❄️ Congelados', ids:['medallones','nuggets','hamburguesas','bastones','croquetas','deditos','milanesas-cong','empanadas','pizzas-cong']},
+  {titulo:'🥦 Verdulería', ids:['papas','tomates','cebollas','lechuga','zanahoria','zapallo','morron','choclo','ajo','batata','berenjena','espinaca','pepino','limon','naranja']},
+  {titulo:'🥚 Huevos y Lácteos', ids:['huevos','leche','queso','yogur']},
+];
+
+/* Renderiza la foto de un producto (preset, url o emoji de categoría) */
+function renderFotoProducto(foto, catStyle, sizeEm=2.4){
+  if(foto?.startsWith('preset:')){
+    const p=GALERIA_PRESETS[foto.slice(7)];
+    if(p) return {bg:p.bg, content:<span style={{fontSize:`${sizeEm}em`}}>{p.emoji}</span>};
+  }
+  if(foto&&(foto.startsWith('http')||foto.startsWith('data:')))
+    return {bg:catStyle.bg, content:<img src={foto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>};
+  return {bg:catStyle.bg, content:<span style={{fontSize:`${sizeEm}em`}}>{catStyle.emoji}</span>};
+}
+
 const firebaseConfig = {
   apiKey:"AIzaSyDl2QhPwVToc4t6UQEGlCydRLzdE4oAx8A",
   authDomain:"app-polleria-f349b.firebaseapp.com",
@@ -1014,10 +1081,11 @@ function PantallaCatalogo({uid}){
               const cs=catStyle(p.categoria);
               const enC=carrito.find(i=>i.prod.id===p.id);
               const esPeso=esPorPeso(p.unidad);
+              const fotoData=renderFotoProducto(p.foto,cs,2.2);
               return(
                 <div key={p.id} className="prod-card" onClick={()=>handleTarjeta(p)}>
-                  <div className="prod-card-foto" style={{background:cs.bg}}>
-                    {p.foto?<img src={p.foto} alt={p.nombre}/>:<span>{cs.emoji}</span>}
+                  <div className="prod-card-foto" style={{background:fotoData.bg}}>
+                    {fotoData.content}
                     {enC&&<div className="prod-badge">{enC.cantidad}{esPeso?p.unidad||'kg':''}</div>}
                   </div>
                   <div className="prod-card-info">
@@ -1145,11 +1213,15 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
   const m=d.precioCosto>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):0;
   const cs=catStyle(d.categoria);
 
+  const [mostrarGaleria,setMostrarGaleria]=useState(false);
+  const [tabGaleria,setTabGaleria]=useState(0);
+
   const handleFoto=async e=>{
     const file=e.target.files[0];
     if(!file)return;
     const base64=await comprimirImagen(file,300,0.75);
     set('foto',base64);
+    setMostrarGaleria(false);
   };
 
   const guardar=()=>{
@@ -1157,23 +1229,67 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
     onGuardar({...d,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});
   };
 
+  const fotoActual=renderFotoProducto(d.foto,cs,2.2);
+
   return(
     <div>
       <Header titulo={d.id?'Editar Producto':'Nuevo Producto'} onBack={onCancelar}/>
       <div className="app-body">
-        {/* Foto ilustrativa */}
-        <label className="lbl">Foto del producto (opcional)</label>
-        <div className="foto-upload-area">
-          {d.foto
-            ? <img src={d.foto} alt="foto"/>
-            : <>
-                <span>{cs.emoji}</span>
-                <p>Tocá para subir una foto<br/>(se comprime automáticamente)</p>
-              </>
-          }
-          <input type="file" accept="image/*" onChange={handleFoto}/>
+
+        {/* ── Imagen del producto ── */}
+        <label className="lbl">📷 Imagen del producto</label>
+        <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:10}}>
+          {/* Preview */}
+          <div style={{width:72,height:72,borderRadius:'var(--radius-lg)',background:fotoActual.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,overflow:'hidden',border:'2px solid var(--border)'}}>
+            {fotoActual.content}
+          </div>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+            <button onClick={()=>setMostrarGaleria(v=>!v)} className="btn-sec" style={{fontSize:13,padding:'8px 12px'}}>
+              🖼️ {mostrarGaleria?'Cerrar galería':'Elegir de la galería'}
+            </button>
+            <label style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',cursor:'pointer',fontSize:13,color:'var(--txt2)'}}>
+              📁 Subir foto propia
+              <input type="file" accept="image/*" onChange={handleFoto} style={{display:'none'}}/>
+            </label>
+          </div>
         </div>
-        {d.foto && <button onClick={()=>set('foto','')} className="btn-ic" style={{marginTop:6,fontSize:12,color:'var(--red)'}}>🗑️ Quitar foto</button>}
+        {d.foto&&<button onClick={()=>set('foto','')} className="btn-ic" style={{fontSize:12,color:'var(--red)',marginBottom:8}}>🗑️ Quitar imagen</button>}
+
+        {/* ── Galería de presets ── */}
+        {mostrarGaleria&&(
+          <div style={{background:'var(--bg2)',borderRadius:'var(--radius-lg)',padding:12,marginBottom:14}}>
+            {/* Tabs de categoría */}
+            <div style={{display:'flex',gap:4,marginBottom:10,overflowX:'auto',scrollbarWidth:'none'}}>
+              {GALERIA_GRUPOS.map((g,i)=>(
+                <button key={i} onClick={()=>setTabGaleria(i)}
+                  style={{padding:'5px 10px',borderRadius:'var(--radius)',border:'none',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,fontSize:12,fontWeight:600,
+                    background:tabGaleria===i?'var(--green)':'var(--bg)',
+                    color:tabGaleria===i?'#fff':'var(--txt2)'}}>
+                  {g.titulo}
+                </button>
+              ))}
+            </div>
+            {/* Grid de imágenes */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
+              {GALERIA_GRUPOS[tabGaleria].ids.map(id=>{
+                const p=GALERIA_PRESETS[id]; if(!p) return null;
+                const activo=d.foto===`preset:${id}`;
+                return(
+                  <button key={id} onClick={()=>{set('foto',`preset:${id}`);setMostrarGaleria(false);}}
+                    style={{padding:4,borderRadius:'var(--radius)',border:`2px solid ${activo?'var(--green)':'transparent'}`,
+                      background:activo?'var(--green-bg)':'transparent',cursor:'pointer',
+                      display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                    <div style={{width:46,height:46,background:p.bg,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24}}>
+                      {p.emoji}
+                    </div>
+                    <div style={{fontSize:9,color:'var(--txt2)',textAlign:'center',lineHeight:1.2,maxWidth:50}}>{p.label}</div>
+                    {activo&&<div style={{fontSize:8,color:'var(--green)',fontWeight:700}}>✓</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
 
