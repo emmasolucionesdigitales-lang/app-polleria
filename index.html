@@ -1210,49 +1210,47 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
    STOCK
 ══════════════════════════════════════ */
 function CalculadoraCajon({uid}){
-  const [cajones,setCajones]=useState(1);const [ppc,setPpc]=useState(9);const [kg,setKg]=useState(2.2);const [modo,setModo]=useState('completo');
-  const [precioCajon,setPrecioCajon]=useState('');const [porcGanancia,setPorcGanancia]=useState(30);
-  const [guardando,setGuardando]=useState(false);const [toastMsg,setToastMsg]=useState('');
-  const tot=cajones*ppc;const totKg=tot*kg;
+  const [cajones,setCajones]=useState(1);
+  const [kgCajon,setKgCajon]=useState(20);
+  const [nPollos,setNPollos]=useState("");
+  const [modo,setModo]=useState("completo");
+  const [precioCajon,setPrecioCajon]=useState("");
+  const [porcGanancia,setPorcGanancia]=useState(30);
+  const [guardando,setGuardando]=useState(false);
+  const [toastMsg,setToastMsg]=useState("");
+
+  const totKg=+(cajones*kgCajon).toFixed(2);
+  const tot=parseInt(nPollos)||0;
+  const kgPromedio=tot>0?+(totKg/tot).toFixed(2):null;
   const precioTotalPagado=Number(precioCajon)*cajones||0;
   const costoPorKg=totKg>0&&precioTotalPagado>0?precioTotalPagado/totKg:0;
   const precioVentaKg=costoPorKg>0?costoPorKg*(1+porcGanancia/100):0;
   const gananciaTotal=(precioVentaKg-costoPorKg)*totKg;
 
-  // pesoU = peso estimado por unidad en kg (para calcular precio por pieza)
-  // solo_display = no se agrega al inventario, es informativo
+  // Todas las cantidades en KG — los pollos/piezas son solo referencia
+  // kgEst = kilogramos estimados de esa parte del cajón
+  // ref   = cantidad de piezas (solo informativo)
   const MODOS={
-    completo:{label:'🐔 Entero',piezas:[
-      {n:'Pollo entero',c:tot,u:'unidad',pesoU:kg,nota:''},
-      {n:'Peso total',c:+totKg.toFixed(1),u:'kg',solo_display:true},
+    completo:{label:'🐔 Entero', piezas:[
+      {n:'Pollo entero', kgEst:totKg, ref:tot>0?`${tot} pollos`:'', u:'kg'},
     ]},
-    piezas:{label:'🍗 Trozado',piezas:[
-      {n:'Pechugas',      c:tot,    u:'unidad',pesoU:0.55,nota:'(1 c/u)'},
-      {n:'Pata-muslo',    c:tot*2,  u:'unidad',pesoU:0.40,nota:'(2 c/u)'},
-      {n:'Alas',          c:tot*2,  u:'unidad',pesoU:0.20,nota:'(2 c/u)'},
-      {n:'Muslos',        c:tot*2,  u:'unidad',pesoU:0.20,nota:'(2 c/u)'},
-      {n:'Carcasas',      c:tot,    u:'unidad',pesoU:0.30,nota:''},
+    piezas:{label:'🍗 Trozado', piezas:[
+      {n:'Pechugas',   kgEst:+(totKg*0.25).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
+      {n:'Pata-muslo', kgEst:+(totKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
+      {n:'Alas',       kgEst:+(totKg*0.18).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
+      {n:'Muslos',     kgEst:+(totKg*0.14).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
+      {n:'Carcasas',   kgEst:+(totKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
     ]},
-    filet:{label:'🥩 Filet',piezas:[
-      {n:'Filet pechuga', c:+(tot*0.55).toFixed(1),u:'kg',   pesoU:null,nota:'(≈550g c/u)'},
-      {n:'Milanesas',     c:tot*4,  u:'unidad',pesoU:0.15,nota:'(≈4 c/u)'},
-      {n:'Pata-muslo',    c:tot*2,  u:'unidad',pesoU:0.40,nota:''},
-      {n:'Carcasas caldo',c:tot,    u:'unidad',pesoU:0.30,nota:''},
+    filet:{label:'🥩 Filet', piezas:[
+      {n:'Filet pechuga',  kgEst:+(totKg*0.25).toFixed(2), ref:tot>0?`${tot} filetes`:'',   u:'kg'},
+      {n:'Milanesas',      kgEst:+(totKg*0.22).toFixed(2), ref:tot>0?`${tot*4} piezas`:'',  u:'kg'},
+      {n:'Pata-muslo',     kgEst:+(totKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'',  u:'kg'},
+      {n:'Carcasas caldo', kgEst:+(totKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',    u:'kg'},
     ]},
   };
   const M=MODOS[modo];
-
-  // Calcula precio de venta estimado por pieza
-  const precioPieza=(p)=>{
-    if(!precioVentaKg) return null;
-    if(p.u==='kg') return precioVentaKg;
-    return precioVentaKg*(p.pesoU||1);
-  };
-  const costoPieza=(p)=>{
-    if(!costoPorKg) return null;
-    if(p.u==='kg') return costoPorKg;
-    return costoPorKg*(p.pesoU||1);
-  };
+  // ref solo muestra piezas si el usuario ingresó la cantidad de pollos
+  const conRef=tot>0;
 
   const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
 
@@ -1262,34 +1260,32 @@ function CalculadoraCajon({uid}){
     try{
       const stockCol=db.collection(`polleria/${uid}/stock`);
       const prodCol=db.collection(`polleria/${uid}/productos`);
-      const piezasVendibles=M.piezas.filter(p=>!p.solo_display);
-      for(const p of piezasVendibles){
+      for(const p of M.piezas){
         const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
-        // STOCK: guarda la cantidad en sus unidades originales (piezas o kg)
-        const pVentaPieza=+(precioPieza(p)||0).toFixed(2);
-        const pCostoPieza=+(costoPieza(p)||0).toFixed(2);
+        // ── STOCK: sumar kg al existente ──
         const stockRef=stockCol.doc(docId);
         const snap=await stockRef.get();
         const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
         await stockRef.set({
-          nombre:p.n,categoria:'Pollo',tipo:'cajon',
-          cantidad:+(cantActual+Number(p.c)).toFixed(2),
-          unidad:p.u,precioCosto:pCostoPieza,precioVenta:pVentaPieza,
-          porcGanancia:Number(porcGanancia),stockMinimo:0,
+          nombre:p.n, categoria:'Pollo', tipo:'cajon',
+          cantidad:+(cantActual+p.kgEst).toFixed(2),
+          unidad:'kg',                              // siempre kg
+          precioCosto:+costoPorKg.toFixed(2),
+          precioVenta:+precioVentaKg.toFixed(2),
+          porcGanancia:Number(porcGanancia),
+          stockMinimo:0,
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         });
-        // CATÁLOGO: SIEMPRE por kg con precio por kg
-        // En pollería todo se pesa en la balanza antes de vender
+        // ── CATÁLOGO: siempre kg, precio por kg ──
         await prodCol.doc(docId).set({
-          nombre:p.n,
-          categoria:'🐔 Pollo',
-          unidad:'kg',                          // ← siempre kg
-          precioCosto:+costoPorKg.toFixed(2),   // ← precio por kg
-          precioVenta:+precioVentaKg.toFixed(2),// ← precio por kg
+          nombre:p.n, categoria:'🐔 Pollo',
+          unidad:'kg',
+          precioCosto:+costoPorKg.toFixed(2),
+          precioVenta:+precioVentaKg.toFixed(2),
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         },{merge:true});
       }
-      mostrarToast(`✅ ${piezasVendibles.length} productos en inventario y catálogo`);
+      mostrarToast(`✅ ${M.piezas.length} cortes en inventario y catálogo (por kg)`);
     }catch(e){alert('Error al guardar: '+e.message);}
     setGuardando(false);
   };
@@ -1298,67 +1294,110 @@ function CalculadoraCajon({uid}){
     <div>
       <div className="panel">
         <div className="ptitle">🧮 Calculadora de Cajón</div>
-        <div className="calc-row-3">
-          {[{lbl:'Cajones',v:cajones,set:v=>setCajones(Math.max(1,v))},{lbl:'Pollos/cajón',v:ppc,set:v=>setPpc(Math.max(1,v))},{lbl:'Kg prom.',v:kg,set:v=>setKg(Math.max(0.5,v)),step:0.1}].map(f=>(
-            <div key={f.lbl} style={{flex:1}}>
-              <label className="lbl" style={{marginTop:0}}>{f.lbl}</label>
-              <input type="number" step={f.step||1} value={f.v} onChange={e=>f.set(Number(e.target.value))} className="inp" style={{textAlign:'center',fontWeight:700,fontSize:18,marginTop:4}}/>
-            </div>
-          ))}
+
+        {/* Fila 1: cajones + kg por cajón */}
+        <div style={{display:'flex',gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>Cajones</label>
+            <input type="number" min={1} value={cajones}
+              onChange={e=>setCajones(Math.max(1,Number(e.target.value)))}
+              className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+          </div>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>Kg por cajón</label>
+            <input type="number" min={1} step={0.5} value={kgCajon}
+              onChange={e=>setKgCajon(Math.max(1,Number(e.target.value)))}
+              className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+          </div>
         </div>
-        <div className="suma-band">
-          <span style={{fontSize:13,color:'var(--txt2)'}}>Total pollos: <b style={{color:'var(--txt)'}}>{tot}</b></span>
-          <span style={{fontSize:13,color:'var(--txt2)'}}>Total kg: <b style={{color:'var(--txt)'}}>{totKg.toFixed(1)}</b></span>
+
+        {/* Total destacado */}
+        <div className="suma-band" style={{marginBottom:10}}>
+          <span style={{fontSize:13,color:'var(--txt2)'}}>
+            {cajones} cajón{cajones>1?'es':''} × {kgCajon} kg
+          </span>
+          <span style={{fontSize:20,fontWeight:700,color:'var(--txt)'}}>= {totKg} kg</span>
         </div>
+
+        {/* Pollos (opcional, solo referencia para contar piezas) */}
+        <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
+          <label className="lbl" style={{marginTop:0,fontSize:11}}>
+            ¿Cuántos pollos venían? <span style={{color:'var(--txt3)',fontWeight:400}}>(opcional · para ver piezas estimadas)</span>
+          </label>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginTop:6}}>
+            <input type="number" min={1} max={30} value={nPollos}
+              onChange={e=>setNPollos(e.target.value)}
+              placeholder="6 a 12"
+              className="inp" style={{width:90,textAlign:'center',fontWeight:700,fontSize:20}}/>
+            {kgPromedio?(
+              <span style={{fontSize:13,color:'var(--txt2)'}}>
+                → <b style={{color:'var(--txt)'}}>{kgPromedio} kg</b> prom. por pollo
+              </span>
+            ):(
+              <span style={{fontSize:12,color:'var(--txt3)'}}>promedio por pollo</span>
+            )}
+          </div>
+        </div>
+
         <label className="lbl">Tipo de corte</label>
         <div className="chip-group" style={{marginBottom:12}}>
-          {Object.entries(MODOS).map(([k,v])=><button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>)}
+          {Object.entries(MODOS).map(([k,v])=>(
+            <button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>
+          ))}
         </div>
-        {/* Detalle de piezas con precio estimado por pieza */}
+
+        {/* Tabla de cortes en kg */}
         <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12}}>
-          {M.piezas.map((p,i)=>{
-            const pv=precioPieza(p);
-            return(
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-                <div>
-                  <span style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</span>
-                  {p.nota&&<span style={{fontSize:11,color:'var(--txt2)',marginLeft:6}}>{p.nota}</span>}
-                  {!p.solo_display&&pv&&(
-                    <div style={{fontSize:11,color:'var(--blue)',marginTop:2}}>
-                      💲 {formatPeso(pv)} / {p.u}
-                    </div>
-                  )}
-                </div>
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontWeight:700,fontSize:18,color:p.solo_display?'var(--txt2)':'var(--green)'}}>
-                    {p.c} <span style={{fontSize:11,fontWeight:400,color:'var(--txt2)'}}>{p.u}</span>
-                  </div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,fontWeight:700,color:'var(--txt3)',padding:'0 0 6px',borderBottom:'1px solid var(--border)',marginBottom:4}}>
+            <span>CORTE</span>
+            <span>KG ESTIMADO</span>
+          </div>
+          {M.piezas.map((p,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:'var(--txt)'}}>{p.n}</div>
+                <div style={{fontSize:11,color:'var(--txt2)',marginTop:1}}>
+                  {p.ref&&<span>{p.ref}</span>}
+                  {precioVentaKg>0&&<span style={{color:'var(--blue)',marginLeft:p.ref?6:0}}>
+                    {p.ref&&'· '}{formatPeso(precioVentaKg)}/kg
+                  </span>}
                 </div>
               </div>
-            );
-          })}
+              <div style={{textAlign:'right'}}>
+                <div style={{fontWeight:700,fontSize:20,color:'var(--green)'}}>{p.kgEst}</div>
+                <div style={{fontSize:11,color:'var(--txt2)'}}>kg</div>
+              </div>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:8,marginTop:4}}>
+            <span style={{fontSize:12,color:'var(--txt2)',fontWeight:600}}>Total cajón</span>
+            <span style={{fontSize:16,fontWeight:700,color:'var(--txt)'}}>{totKg} kg</span>
+          </div>
         </div>
       </div>
 
+      {/* Panel precio y ganancia */}
       <div className="panel">
         <div className="ptitle">💰 Precio y Ganancia</div>
         <div style={{display:'flex',gap:10,marginBottom:10}}>
           <div style={{flex:1}}>
             <label className="lbl" style={{marginTop:0}}>Precio pagado por cajón ($)</label>
-            <input type="number" value={precioCajon} onChange={e=>setPrecioCajon(e.target.value)} className="inp" placeholder="0" style={{fontWeight:700,fontSize:18}}/>
+            <input type="number" value={precioCajon} onChange={e=>setPrecioCajon(e.target.value)}
+              className="inp" placeholder="0" style={{fontWeight:700,fontSize:18}}/>
           </div>
           <div style={{flex:1}}>
             <label className="lbl" style={{marginTop:0}}>% Ganancia</label>
-            <input type="number" value={porcGanancia} onChange={e=>setPorcGanancia(Number(e.target.value))} className="inp" style={{fontWeight:700,fontSize:18}} min={0}/>
+            <input type="number" value={porcGanancia} onChange={e=>setPorcGanancia(Number(e.target.value))}
+              className="inp" style={{fontWeight:700,fontSize:18}} min={0}/>
           </div>
         </div>
         {costoPorKg>0&&(
           <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:12}}>
             {[
-              {lbl:'💸 Total pagado',val:formatPeso(precioTotalPagado),c:'var(--red)'},
-              {lbl:'📦 Costo por kg',val:formatPeso(costoPorKg),c:'var(--txt)'},
-              {lbl:'🏷️ Precio de venta / kg',val:formatPeso(precioVentaKg),c:'var(--blue)'},
-              {lbl:`✨ Ganancia (${porcGanancia}%)`,val:formatPeso(gananciaTotal),c:'var(--green)'},
+              {lbl:'💸 Total pagado',         val:formatPeso(precioTotalPagado), c:'var(--red)'},
+              {lbl:'📦 Costo por kg',          val:formatPeso(costoPorKg),        c:'var(--txt)'},
+              {lbl:'🏷️ Precio de venta / kg',  val:formatPeso(precioVentaKg),     c:'var(--blue)'},
+              {lbl:`✨ Ganancia (${porcGanancia}%)`,val:formatPeso(gananciaTotal), c:'var(--green)'},
             ].map(r=>(
               <div key={r.lbl} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
                 <span style={{fontSize:13,color:'var(--txt2)'}}>{r.lbl}</span>
@@ -1367,19 +1406,20 @@ function CalculadoraCajon({uid}){
             ))}
           </div>
         )}
-        <button onClick={agregarAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full"
+        <button onClick={agregarAlStock}
+          disabled={guardando||!precioCajon||Number(precioCajon)<=0}
+          className="btn-full"
           style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
-          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario y Catálogo'}
+          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario y Catálogo (por kg)'}
         </button>
-        {/* Botón para corregir productos existentes que quedaron en 'unidad' */}
         <button onClick={async()=>{
-          if(!confirm('¿Actualizar todos los productos de Pollo del catálogo a "por kg"?\nEsto corrige los productos que quedaron en "por unidad".'))return;
+          if(!confirm('¿Actualizar todos los productos 🐔 Pollo del catálogo a "por kg"?\nCorrige los que quedaron en "por unidad".'))return;
           try{
             const snap=await db.collection(`polleria/${uid}/productos`).where('categoria','==','🐔 Pollo').get();
             const batch=db.batch();
             snap.docs.forEach(d=>batch.update(d.ref,{unidad:'kg'}));
             await batch.commit();
-            mostrarToast(`✅ ${snap.size} productos actualizados a kg`);
+            mostrarToast(`✅ ${snap.size} productos corregidos → kg`);
           }catch(e){alert('Error: '+e.message);}
         }} className="btn-full" style={{background:'var(--orange)',marginTop:6,fontSize:13}}>
           🔧 Corregir productos existentes → kg
