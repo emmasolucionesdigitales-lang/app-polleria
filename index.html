@@ -37,13 +37,19 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 #root{max-width:900px;margin:0 auto;min-height:100vh;background:var(--bg3);}
 
 /* ── HEADER ── */
-.header{background:var(--bg);border-bottom:1px solid var(--border);padding:10px 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;}
-.header-left{display:flex;align-items:center;gap:8px;}
-.header-title{font-size:16px;font-weight:700;color:var(--txt);}
-.header-sub{font-size:11px;color:var(--txt2);}
-.header-right{display:flex;align-items:center;gap:6px;}
-.btn-dark{background:none;border:1px solid var(--border);border-radius:var(--radius);padding:5px 9px;font-size:16px;cursor:pointer;}
-.btn-back{background:none;border:none;font-size:22px;cursor:pointer;color:var(--txt);padding:0 4px;line-height:1;}
+.header{background:linear-gradient(135deg,#16213e 0%,#0f3460 100%);border-bottom:2px solid #e94560;padding:8px 14px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;position:sticky;top:0;z-index:40;min-height:58px;gap:6px;}
+.header-left{display:flex;align-items:center;gap:8px;justify-content:flex-start;}
+.header-center{text-align:center;}
+.header-nombre{font-size:16px;font-weight:900;color:#fff;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+.header-screen{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px;letter-spacing:.06em;text-transform:uppercase;}
+.header-right{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
+.header-datetime{text-align:right;}
+.header-hora{font-size:17px;font-weight:900;color:#e94560;font-variant-numeric:tabular-nums;line-height:1;}
+.header-fecha{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px;white-space:nowrap;}
+.header-title{font-size:15px;font-weight:700;color:#fff;}
+.header-sub{font-size:11px;color:rgba(255,255,255,.4);}
+.btn-dark{display:none;}
+.btn-back{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:14px;font-weight:700;}
 
 /* ── NAV ── */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:900px;background:var(--bg);border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
@@ -167,6 +173,27 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-thumb{background:var(--bg2);border-radius:4px;}
+
+/* ── POS HEADER ── */
+.pos-header{
+  background:linear-gradient(135deg,#16213e,#0f3460);
+  padding:10px 18px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:2px solid #e94560;min-height:60px;position:sticky;top:0;z-index:40;
+}
+.pos-nombre{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.02em;line-height:1.1;}
+.pos-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:2px;}
+.pos-reloj{font-size:26px;font-weight:900;color:#e94560;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-align:right;}
+.pos-fecha{font-size:11px;color:rgba(255,255,255,.5);text-align:right;margin-top:2px;}
+.pos-btns{display:flex;align-items:center;gap:8px;}
+.pos-btn-tema{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:16px;color:#fff;}
+
+/* ── FOTO REAL DE PRODUCTO ── */
+.prod-foto-real{
+  width:100%;height:110px;
+  background-repeat:no-repeat;
+  background-color:#f5ede8;
+}
+.prod-foto-verdura{background-color:#f0fdf4;}
 
 /* ── HOVER STATES (solo PC con mouse) ── */
 @media(hover:hover){
@@ -522,6 +549,7 @@ function SelectorTema({onCerrar}){
 /* ─── COMPROBANTE (para imprimir) ─── */
 function Comprobante({data,onCerrar}){
   const fecha=new Date().toLocaleString('es-AR');
+  const nombreNegocio=getNombreLocal();
   const items=data.items||[];
   const imprimir=()=>window.print();
   return(
@@ -534,7 +562,7 @@ function Comprobante({data,onCerrar}){
         </div>
         {/* Preview */}
         <div className="comp-preview">
-          <div style={{textAlign:'center',fontWeight:700,fontSize:15,borderBottom:'1px dashed var(--border)',paddingBottom:8,marginBottom:8}}>🐔 POLLERÍA</div>
+          <div style={{textAlign:'center',fontWeight:700,fontSize:15,borderBottom:'1px dashed var(--border)',paddingBottom:8,marginBottom:8}}>🐔 {nombreNegocio.toUpperCase()}</div>
           <div style={{textAlign:'center',fontSize:11,color:'var(--txt2)',marginBottom:10}}>{fecha}</div>
           {items.map((it,i)=>(
             <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}>
@@ -554,7 +582,7 @@ function Comprobante({data,onCerrar}){
         </div>
         {/* DOM oculto solo visible al imprimir */}
         <div className="comp-print">
-          <div className="comp-print-titulo">🐔 POLLERÍA</div>
+          <div className="comp-print-titulo">🐔 {nombreNegocio.toUpperCase()}</div>
           <div style={{textAlign:'center',fontSize:11,marginBottom:8}}>{fecha}</div>
           {items.map((it,i)=>(
             <div key={i} className="comp-print-fila">
@@ -579,29 +607,40 @@ function Comprobante({data,onCerrar}){
 }
 
 /* ─── HEADER ─── */
-function Header({titulo,onBack,onAdd,onLogout,subtitulo}){
-  const [mostrarTemas,setMostrarTemas]=useState(false);
+function Header({titulo,onBack,onAdd,onLogout,subtitulo,esCatalogo}){
   const [hora,setHora]=useState(ahora());
-  useEffect(()=>{const t=setInterval(()=>setHora(ahora()),30000);return()=>clearInterval(t);},[]);
+  const [fecha,setFecha]=useState(fechaCorta());
+  const nombreLocal=getNombreLocal();
+  useEffect(()=>{
+    const t=setInterval(()=>{setHora(ahora());setFecha(fechaCorta());},10000);
+    return()=>clearInterval(t);
+  },[]);
   return(
-    <>
-      <header className="header">
-        <div className="header-left">
-          {onBack && <button onClick={onBack} className="btn-back">←</button>}
-          <div>
-            <div className="header-title">🐔 {titulo}</div>
-            <div className="header-sub">{subtitulo||fechaCorta()}</div>
-          </div>
+    <header className="header">
+      {/* IZQUIERDA: botón back o logo */}
+      <div className="header-left">
+        {onBack
+          ? <button onClick={onBack} className="btn-back">← Volver</button>
+          : <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:22}}>🐔</span>
+              {onAdd&&<button onClick={onAdd} className="btn-pri" style={{fontSize:18,padding:'4px 12px',lineHeight:1,background:'#e94560',border:'none'}}>+</button>}
+            </div>
+        }
+      </div>
+      {/* CENTRO: nombre de la pollería */}
+      <div className="header-center">
+        <div className="header-nombre">{nombreLocal}</div>
+        <div className="header-screen">{subtitulo||titulo||'Gestión Pollería'}</div>
+      </div>
+      {/* DERECHA: fecha + hora siempre visible */}
+      <div className="header-right">
+        <div className="header-datetime">
+          <div className="header-hora">{hora}</div>
+          <div className="header-fecha">{fecha}</div>
         </div>
-        <div className="header-right">
-          <span style={{fontSize:14,fontWeight:700,color:'var(--txt)',fontVariantNumeric:'tabular-nums'}}>{hora}</span>
-          {onAdd && <button onClick={onAdd} className="btn-pri" style={{fontSize:20,padding:'3px 12px',lineHeight:1}}>+</button>}
-          <button onClick={()=>setMostrarTemas(true)} className="btn-dark" title="Cambiar tema">🎨</button>
-          {onLogout && <button onClick={onLogout} className="btn-sec" style={{fontSize:12,padding:'6px 10px'}}>Salir</button>}
-        </div>
-      </header>
-      {mostrarTemas&&<SelectorTema onCerrar={()=>setMostrarTemas(false)}/>}
-    </>
+        {onLogout&&<button onClick={onLogout} style={{background:'rgba(233,69,96,.2)',border:'1px solid #e94560',borderRadius:8,padding:'5px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#e94560'}}>Salir</button>}
+      </div>
+    </header>
   );
 }
 
@@ -613,7 +652,6 @@ function guardarModo(m){try{localStorage.setItem('polleria-modo',m);}catch{}}
 const TABS=[
   {id:'catalogo', icon:'🛒', label:'Vender'},
   {id:'pedidos',  icon:'📋', label:'Pedidos'},
-  {id:'precios',  icon:'💰', label:'Precios'},
   {id:'stock',    icon:'📦', label:'Stock'},
   {id:'caja',     icon:'🧾', label:'Caja'},
   {id:'config',   icon:'⚙️', label:'Config'},
@@ -825,11 +863,14 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
   const [clienteNombre,setClienteNombre]=useState('');
   const [telefono,setTelefono]=useState('');
   const [datosPago,setDatosPago]=useState('');
+  const [esEnvio,setEsEnvio]=useState(false);
+  const [direccion,setDireccion]=useState('');
   const [cargando,setCargando]=useState(false);
   const total=carrito.reduce((s,i)=>s+(i.prod.precioVenta||0)*i.cantidad,0);
   const esConDatos=pago==='transferencia'||pago==='debito'||pago==='credito';
   const confirmar=async()=>{
     if(!carrito.length)return;
+    if(esEnvio&&!direccion.trim())return alert('Ingresá la dirección de entrega');
     setCargando(true);
     try{
       const items=carrito.map(i=>({
@@ -840,14 +881,18 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
       }));
       const pedidoData={
         clienteNombre:clienteNombre||'Venta directa',clienteId:'',
-        tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',
+        tipo:esEnvio?'envio':'mostrador',
+        estado:esEnvio?'pendiente':'entregado',
+        pagado:pago!=='fiado',
         formaPago:pago,items,total,fecha:hoy(),
         telefono:telefono||'',datosTarjeta:datosPago||'',
+        esEnvio,direccion:esEnvio?direccion.trim():'',
         createdAt:firebase.firestore.FieldValue.serverTimestamp(),
       };
       const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
       onVentaConfirmada({...pedidoData,id:ref.id,items});
       setClienteNombre('');setTelefono('');setDatosPago('');setPago('efectivo');
+      setEsEnvio(false);setDireccion('');
     }catch(e){alert('Error: '+e.message);}
     setCargando(false);
   };
@@ -917,12 +962,27 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
             placeholder={pago==='transferencia'?'CBU o alias de transferencia':'Ej: Juan García - 4521'}
           />
         </>}
+        {/* ── OPCIÓN DE ENVÍO ── */}
+        <div style={{margin:'10px 0',padding:'10px 12px',borderRadius:'var(--radius)',border:`2px solid ${esEnvio?'#e94560':'var(--border)'}`,background:esEnvio?'rgba(233,69,96,.06)':'var(--bg2)'}}>
+          <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+            <input type="checkbox" checked={esEnvio} onChange={e=>setEsEnvio(e.target.checked)}
+              style={{width:18,height:18,accentColor:'#e94560',cursor:'pointer'}}/>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:'var(--txt)'}}>🛵 Es para envío a domicilio</div>
+              <div style={{fontSize:11,color:'var(--txt2)'}}>Se registra como pedido pendiente</div>
+            </div>
+          </label>
+          {esEnvio&&<>
+            <Campo label="📍 Dirección de entrega *" value={direccion} onChange={setDireccion} placeholder="Calle, número, piso, depto..."/>
+            {!telefono&&<Campo label="📞 Teléfono del cliente *" value={telefono} onChange={setTelefono} placeholder="381-123-4567" tipo="tel"/>}
+          </>}
+        </div>
         <div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',margin:'10px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontWeight:700,fontSize:13,color:'var(--green)'}}>TOTAL</span>
           <span style={{fontWeight:700,fontSize:26,color:'var(--green)'}}>{formatPeso(total)}</span>
         </div>
-        <button onClick={confirmar} disabled={cargando} className="btn-full" style={{background:'var(--green)'}}>
-          {cargando?'⏳ Procesando...':'✅ Confirmar venta'}
+        <button onClick={confirmar} disabled={cargando} className="btn-full" style={{background:esEnvio?'#e94560':'var(--green)'}}>
+          {cargando?'⏳ Procesando...':(esEnvio?'🛵 Confirmar envío':'✅ Confirmar venta')}
         </button>
       </div>
     </div>
@@ -930,6 +990,27 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
 }
 
 const esPorPeso=u=>['kg','litro','litros'].includes(u||'kg');
+
+/* Mapeo nombre de producto → preset para mostrar foto real automáticamente */
+const NOMBRE_A_FOTO={
+  'Pechugas':'preset:pechugas','Suprema':'preset:suprema','Pata-Muslo':'preset:pata-muslo',
+  'Pata-muslo':'preset:pata-muslo','Muslos':'preset:muslos','Alas':'preset:alas',
+  'Alitas':'preset:alas','Carcasas':'preset:carcasas','Carcasas caldo':'preset:carcasas',
+  'Filet pechuga':'preset:filet','Filet de Pechuga':'preset:filet',
+  'Milanesas de Pollo':'preset:milanesas-pollo','Milanesas':'preset:milanesas-pollo',
+  'Pollo entero':'preset:pollo-entero','Pollo Entero':'preset:pollo-entero',
+  'Menudos / Vísceras':'preset:menudos','Papas':'preset:papas',
+  'Tomates':'preset:tomates','Cebollas':'preset:cebollas','Zanahoria':'preset:zanahoria',
+  'Morrón':'preset:morron','Choclo':'preset:choclo','Ajo':'preset:ajo',
+  'Zapallo':'preset:zapallo','Pepino':'preset:pepino','Berenjena':'preset:berenjena',
+  'Lechuga':'preset:lechuga','Batata':'preset:batata',
+};
+function getProductFoto(prod){
+  const r=getRealFoto(prod.foto); if(r) return r;
+  const preset=NOMBRE_A_FOTO[prod.nombre];
+  if(preset) return getRealFoto(preset);
+  return null;
+}
 
 /* ── Modal ingreso de peso para productos por kg/litro ── */
 function ModalPeso({prod,cantActual,onAgregar,onCerrar}){
@@ -1063,7 +1144,7 @@ function PantallaCatalogo({uid}){
 
   return(
     <div>
-      <Header titulo="Catálogo / Vender" subtitulo="Seleccioná productos para vender"/>
+      <Header titulo="Catálogo / Vender" subtitulo="Punto de venta"/>
       <div className="split-layout">
         {/* IZQUIERDA – catálogo */}
         <div className="split-left">
@@ -1082,10 +1163,14 @@ function PantallaCatalogo({uid}){
               const enC=carrito.find(i=>i.prod.id===p.id);
               const esPeso=esPorPeso(p.unidad);
               const fotoData=renderFotoProducto(p.foto,cs,2.2);
+              const fotoReal=getProductFoto(p);
               return(
                 <div key={p.id} className="prod-card" onClick={()=>handleTarjeta(p)}>
-                  <div className="prod-card-foto" style={{background:fotoData.bg}}>
-                    {fotoData.content}
+                  <div className="prod-card-foto" style={{background:fotoReal?(fotoReal.uri===FOTO_VERDURA?'#f0fdf4':'#fef3e8'):fotoData.bg,padding:0,overflow:'hidden'}}>
+                    {fotoReal?(
+                      <div className={`prod-foto-real${fotoReal.uri===FOTO_VERDURA?' prod-foto-verdura':''}`}
+                        style={{backgroundImage:`url(${fotoReal.uri})`,backgroundSize:fotoReal.sz,backgroundPosition:`${fotoReal.bx} ${fotoReal.by}`}}/>
+                    ):fotoData.content}
                     {enC&&<div className="prod-badge">{enC.cantidad}{esPeso?p.unidad||'kg':''}</div>}
                   </div>
                   <div className="prod-card-info">
@@ -1143,7 +1228,7 @@ function PantallaCatalogo({uid}){
 /* ══════════════════════════════════════
    PRECIOS  (con upload de foto)
 ══════════════════════════════════════ */
-function PantallaPrecios({uid}){
+function PantallaPrecios({uid, sinHeader=false}){
   const [productos,setProductos]=useState([]);const [form,setForm]=useState(null);const [buscar,setBuscar]=useState('');
   const CATS=['🐔 Pollo','🥩 Carne','🥦 Verduras','🍋 Frutas','🥚 Huevos y lácteos','🧀 Fiambres','🛒 Almacén','Otro'];
   const col=db.collection(`polleria/${uid}/productos`);
@@ -1155,9 +1240,12 @@ function PantallaPrecios({uid}){
   const porCat={};filtrados.forEach(p=>{const c=p.categoria||'Otro';if(!porCat[c])porCat[c]=[];porCat[c].push(p);});
   return(
     <div>
-      <Header titulo="Lista de Precios" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()}/>
+      {!sinHeader&&<Header titulo="Lista de Precios" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()}/>}
       <div className="app-body">
-        <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{marginBottom:12}}/>
+        <div style={{display:'flex',gap:8,marginBottom:10}}>
+          <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{flex:1}}/>
+          {sinHeader&&<button onClick={()=>setForm({})} className="btn-pri" style={{padding:'0 16px',fontSize:20,flexShrink:0}}>+</button>}
+        </div>
         {productos.length===0 && <div className="empty"><div style={{fontSize:48,marginBottom:12}}>🐔</div>No hay productos<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
         {Object.entries(porCat).map(([cat,prods])=>(
           <div key={cat} style={{marginBottom:16}}>
@@ -1766,7 +1854,7 @@ function PantallaStock({uid}){
       <Header titulo="Stock / Inventario" onAdd={headerAdd}/>
       <div className="app-body">
         <div className="tab-bar" style={{overflowX:'auto'}}>
-          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'}].map(s=>(
+          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
             <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`} style={{flexShrink:0,whiteSpace:'nowrap'}}>{s.lbl}</button>
           ))}
         </div>
@@ -1810,6 +1898,7 @@ function PantallaStock({uid}){
         {sec==='cajon'&&<CalculadoraCajon uid={uid}/>}
         {sec==='congelados'&&<CalculadoraCongelados uid={uid}/>}
         {sec==='verduleria'&&<SeccionVerduleria items={items.filter(i=>i.tipo==='verduleria')} onAgregar={()=>setVerduForm({})} onEditar={item=>setVerduForm(item)} onEliminar={eliminar} onAjustar={ajustar}/>}
+        {sec==='precios'&&<PantallaPrecios uid={uid} sinHeader={true}/>}
       </div>
     </div>
   );
@@ -2148,11 +2237,42 @@ function ConfigTema(){
 
 function PantallaConfig({onModoChange}){
   const [modo,setModoLocal]=useState(getModo);
+  const [nombre,setNombre]=useState(getNombreLocal);
+  const [nombreGuardado,setNombreGuardado]=useState(false);
   const cambiarModo=m=>{setModoLocal(m);guardarModo(m);onModoChange(m);};
+  const guardarNombre=()=>{
+    const n=nombre.trim()||'Mi Pollería';
+    guardarNombreLocal(n);
+    setNombre(n);
+    setNombreGuardado(true);
+    setTimeout(()=>setNombreGuardado(false),2500);
+    // Forzar re-render del header actualizando el storage
+    window.dispatchEvent(new Event('storage'));
+  };
   return(
     <div>
-      <Header titulo="Configuración"/>
+      <Header titulo="Configuración" subtitulo="Ajustes de la app"/>
       <div className="app-body">
+        {/* ── Nombre del negocio ── */}
+        <div className="panel">
+          <div className="ptitle">🏪 Nombre de tu Pollería</div>
+          <p style={{fontSize:12,color:'var(--txt2)',marginBottom:12,lineHeight:1.5}}>
+            Aparece centrado en la barra superior de toda la app y en los comprobantes.
+          </p>
+          <label className="lbl" style={{marginTop:0}}>Nombre del negocio</label>
+          <input
+            className="inp"
+            value={nombre}
+            onChange={e=>setNombre(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&guardarNombre()}
+            placeholder="Ej: Pollería La Catalina"
+            style={{fontSize:17,fontWeight:600,marginBottom:10}}
+          />
+          <button onClick={guardarNombre} className="btn-full" style={{background:'var(--green)'}}>
+            💾 Guardar nombre
+          </button>
+          {nombreGuardado&&<div style={{textAlign:'center',color:'var(--green)',fontWeight:700,marginTop:8,fontSize:13}}>✅ Nombre actualizado — recargá para ver el cambio</div>}
+        </div>
         {/* ── Modo pantalla ── */}
         <div className="panel">
           <div className="ptitle">🖥️ Modo de pantalla</div>
@@ -2174,8 +2294,7 @@ function PantallaConfig({onModoChange}){
         <div className="panel">
           <div className="ptitle">🎨 Tema de colores</div>
           <ConfigTema/>
-        </div>
-        {/* ── Sesión ── */}
+        </div>        {/* ── Sesión ── */}
         <div className="panel">
           <div className="ptitle">👤 Sesión</div>
           <button onClick={()=>auth.signOut()} className="btn-full" style={{background:'var(--red)',color:'#fff'}}>
