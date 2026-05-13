@@ -1331,55 +1331,128 @@ function PantallaCatalogo({uid}){
 }
 
 /* ══════════════════════════════════════
-   PRECIOS  (con upload de foto)
+   PRECIOS  (todos los productos + imágenes)
 ══════════════════════════════════════ */
 function PantallaPrecios({uid, sinHeader=false}){
-  const [productos,setProductos]=useState([]);const [form,setForm]=useState(null);const [buscar,setBuscar]=useState('');
-  const CATS=['🐔 Pollo','🥩 Carne','🥦 Verduras','🍋 Frutas','🥚 Huevos y lácteos','🧀 Fiambres','🛒 Almacén','Otro'];
-  const col=db.collection(`polleria/${uid}/productos`);
-  useEffect(()=>col.orderBy('nombre','asc').onSnapshot(snap=>setProductos(snap.docs.map(d=>({id:d.id,...d.data()})))),[]);
-  const guardar=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add(r);setForm(null);};
-  const eliminar=async id=>{if(!confirm('¿Eliminar producto?'))return;await col.doc(id).delete();};
+  const [productos,setProductos]=useState([]);
+  const [stockItems,setStockItems]=useState([]);
+  const [form,setForm]=useState(null);
+  const [buscar,setBuscar]=useState('');
+  const CATS=['🐔 Pollo','❄️ Congelados','🥦 Verdulería','🥚 Huevos y Lácteos','🥩 Carne','🍋 Frutas','🧀 Fiambres','🛒 Almacén','Otro'];
+
+  useEffect(()=>{
+    const u1=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc')
+      .onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data(),_col:'productos'}))));
+    const u2=db.collection(`polleria/${uid}/stock`).orderBy('nombre','asc')
+      .onSnapshot(s=>setStockItems(s.docs.map(d=>({id:d.id,...d.data(),_col:'stock'}))));
+    return()=>{u1();u2();};
+  },[]);
+
+  const guardar=async d=>{
+    const{id,_col,_src,...r}=d;
+    // Siempre guardar en productos para que quede en el catálogo
+    const col=db.collection(`polleria/${uid}/productos`);
+    const data={...r,precioCosto:Number(r.precioCosto)||0,precioVenta:Number(r.precioVenta)||0};
+    if(id&&_col==='productos') await col.doc(id).update(data);
+    else if(id&&_col==='stock'){
+      // Crear/actualizar en productos usando el mismo id
+      await col.doc(id).set({
+        nombre:r.nombre,categoria:r.categoria||'❄️ Congelados',
+        unidad:r.unidad||'kg',precioCosto:data.precioCosto,
+        precioVenta:data.precioVenta,foto:r.foto||'',
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      },{merge:true});
+      // También actualizar el precio en stock
+      await db.collection(`polleria/${uid}/stock`).doc(id)
+        .update({precioVenta:data.precioVenta,precioCosto:data.precioCosto});
+    } else {
+      await col.add(data);
+    }
+    setForm(null);
+  };
+
+  const eliminar=async p=>{
+    if(!confirm('¿Eliminar producto?'))return;
+    if(p._col==='productos') await db.collection(`polleria/${uid}/productos`).doc(p.id).delete();
+    else if(p._col==='stock') await db.collection(`polleria/${uid}/stock`).doc(p.id).delete();
+  };
+
+  // Combinar sin duplicar
+  const catMap={'Pollo':'🐔 Pollo','Congelados':'❄️ Congelados',
+    'Verdulería':'🥦 Verdulería','Verduleria':'🥦 Verdulería',
+    'Huevos y Lácteos':'🥚 Huevos y Lácteos','Huevos':'🥚 Huevos y Lácteos'};
+  const todosProductos=React.useMemo(()=>{
+    const nombresEnProd=new Set(productos.map(p=>(p.nombre||'').toLowerCase().trim()));
+    const stockVisibles=stockItems.filter(s=>
+      (s.precioVenta||0)>0 && !nombresEnProd.has((s.nombre||'').toLowerCase().trim())
+    );
+    const norm=p=>({...p,categoria:catMap[p.categoria]||p.categoria||'📦 Otros'});
+    return [...productos.map(norm),...stockVisibles.map(norm)]
+      .sort((a,b)=>(a.categoria||'').localeCompare(b.categoria||'')||(a.nombre||'').localeCompare(b.nombre||''));
+  },[productos,stockItems]);
+
   if(form!==null) return <FormProducto inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)} categorias={CATS}/>;
-  const filtrados=productos.filter(p=>p.nombre.toLowerCase().includes(buscar.toLowerCase())||(p.categoria||'').toLowerCase().includes(buscar.toLowerCase()));
-  const porCat={};filtrados.forEach(p=>{const c=p.categoria||'Otro';if(!porCat[c])porCat[c]=[];porCat[c].push(p);});
+
+  const filtrados=todosProductos.filter(p=>
+    p.nombre.toLowerCase().includes(buscar.toLowerCase())||
+    (p.categoria||'').toLowerCase().includes(buscar.toLowerCase())
+  );
+  const porCat={};
+  filtrados.forEach(p=>{const c=p.categoria||'Otro';if(!porCat[c])porCat[c]=[];porCat[c].push(p);});
+
   return(
     <div>
       {!sinHeader&&<Header titulo="Lista de Precios" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()}/>}
       <div className="app-body">
         <div style={{display:'flex',gap:8,marginBottom:10}}>
-          <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{flex:1}}/>
-          {sinHeader&&<button onClick={()=>setForm({})} className="btn-pri" style={{padding:'0 16px',fontSize:20,flexShrink:0}}>+</button>}
+          <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar producto..." className="search" style={{flex:1}}/>
+          <button onClick={()=>setForm({})} className="btn-pri" style={{padding:'0 16px',fontSize:20,flexShrink:0}}>+</button>
         </div>
-        {productos.length===0 && <div className="empty"><div style={{fontSize:48,marginBottom:12}}>🐔</div>No hay productos<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
+
+        {todosProductos.length===0 &&
+          <div className="empty">
+            <div style={{fontSize:48,marginBottom:12}}>📋</div>
+            No hay productos<br/>
+            <button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button>
+          </div>
+        }
+
         {Object.entries(porCat).map(([cat,prods])=>(
           <div key={cat} style={{marginBottom:16}}>
             <div className="sec-title">{cat} <span style={{fontWeight:400}}>({prods.length})</span></div>
             {prods.map(p=>{
               const m=p.precioCosto>0?Math.round(((Number(p.precioVenta)-Number(p.precioCosto))/Number(p.precioCosto))*100):null;
               const cs=catStyle(p.categoria);
+              const fotoReal=getProductFoto(p);
               return(
                 <div key={p.id} className="card">
                   <div className="card-body">
                     <div className="card-head">
-                      {/* Miniatura */}
-                      <div style={{width:48,height:48,borderRadius:'var(--radius)',background:cs.bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,overflow:'hidden',flexShrink:0,marginRight:10}}>
-                        {p.foto ? <img src={p.foto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : cs.emoji}
+                      {/* Imagen del producto */}
+                      <div style={{width:56,height:56,borderRadius:10,background:fotoReal?.esVerdura?'#f0fdf4':'#fef3e8',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',flexShrink:0,marginRight:10}}>
+                        {fotoReal?.tipo==='foto'?(
+                          <img src={fotoReal.uri} alt="" style={{width:'100%',height:'100%',objectFit:'contain',padding:2}}/>
+                        ):fotoReal?.tipo==='sprite'||fotoReal?.tipo==='crop'?(
+                          <div style={{width:'100%',height:'100%',backgroundImage:`url(${fotoReal.uri})`,backgroundSize:fotoReal.sz,backgroundPosition:`${fotoReal.bx} ${fotoReal.by}`,backgroundRepeat:'no-repeat'}}/>
+                        ):p.foto?(
+                          <img src={p.foto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                        ):(
+                          <span style={{fontSize:26}}>{cs.emoji}</span>
+                        )}
                       </div>
                       <div style={{flex:1}}>
                         <div className="card-name">{p.nombre}</div>
-                        {p.descripcion && <div className="card-sub">{p.descripcion}</div>}
-                        <div className="card-sub">por {p.unidad||'kg'}</div>
+                        <div className="card-sub">por {p.unidad||'kg'} {p._col==='stock'&&<span style={{color:'var(--blue)',fontSize:10}}> · stock</span>}</div>
                       </div>
                       <div style={{textAlign:'right',flexShrink:0,marginLeft:10}}>
-                        {p.precioCosto>0 && <div style={{fontSize:11,color:'var(--txt2)',textDecoration:'line-through'}}>{formatPeso(p.precioCosto)}</div>}
+                        {p.precioCosto>0&&<div style={{fontSize:11,color:'var(--txt2)',textDecoration:'line-through'}}>{formatPeso(p.precioCosto)}</div>}
                         <div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{formatPeso(p.precioVenta||0)}</div>
-                        {m!==null && <span className={m>=30?'pill pill-green':m>=10?'pill pill-orange':'pill pill-red'}>{m}%</span>}
+                        {m!==null&&<span className={m>=30?'pill pill-green':m>=10?'pill pill-orange':'pill pill-red'}>{m}%</span>}
                       </div>
                     </div>
                     <div className="card-actions">
-                      <button onClick={()=>setForm(p)} className="btn-ic">✏️ Editar</button>
-                      <button onClick={()=>eliminar(p.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+                      <button onClick={()=>setForm({...p})} className="btn-ic">✏️ Editar precio</button>
+                      <button onClick={()=>eliminar(p)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
                     </div>
                   </div>
                 </div>
