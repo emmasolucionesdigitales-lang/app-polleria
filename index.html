@@ -1149,20 +1149,39 @@ function ModalPeso({prod,cantActual,onAgregar,onCerrar}){
 ══════════════════════════════════════ */
 function PantallaCatalogo({uid}){
   const [productos,setProductos]=useState([]);
+  const [stockItems,setStockItems]=useState([]);
   const [clientes,setClientes]=useState([]);
   const [buscar,setBuscar]=useState('');
   const [catFiltro,setCatFiltro]=useState('Todos');
   const [carrito,setCarrito]=useState([]);
   const [carritoMovil,setCarritoMovil]=useState(false);
-  const [modalPeso,setModalPeso]=useState(null); // producto seleccionado para ingresar peso
+  const [modalPeso,setModalPeso]=useState(null);
   const [comprobante,setComprobante]=useState(null);
   const [toast,setToast]=useState('');
 
   useEffect(()=>{
-    const u1=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data()}))));
-    const u2=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
-    return()=>{u1();u2();};
+    const u1=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc')
+      .onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2=db.collection(`polleria/${uid}/stock`).orderBy('nombre','asc')
+      .onSnapshot(s=>setStockItems(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u3=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc')
+      .onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
+    return()=>{u1();u2();u3();};
   },[]);
+
+  // Combinar productos + stock sin duplicar
+  const catMap={'Pollo':'🐔 Pollo','Congelados':'❄️ Congelados',
+    'Verdulería':'🥦 Verdulería','Verduleria':'🥦 Verdulería',
+    'Huevos y Lácteos':'🥚 Huevos y Lácteos','Huevos':'🥚 Huevos y Lácteos'};
+  const todosProductos=React.useMemo(()=>{
+    const nombresEnProd=new Set(productos.map(p=>(p.nombre||'').toLowerCase().trim()));
+    const stockVisibles=stockItems.filter(s=>
+      (s.precioVenta||0)>0 && !nombresEnProd.has((s.nombre||'').toLowerCase().trim())
+    );
+    const norm=p=>({...p, categoria:catMap[p.categoria]||p.categoria||'📦 Otros'});
+    return [...productos.map(norm),...stockVisibles.map(norm)]
+      .sort((a,b)=>(a.categoria||'').localeCompare(b.categoria||'')||(a.nombre||'').localeCompare(b.nombre||''));
+  },[productos,stockItems]);
 
   const mostrarToast=msg=>{setToast(msg);setTimeout(()=>setToast(''),2200);};
 
@@ -1209,8 +1228,8 @@ function PantallaCatalogo({uid}){
   };
 
   const totalCarrito=carrito.reduce((s,i)=>s+(i.prod.precioVenta||0)*i.cantidad,0);
-  const CATS=['Todos',...new Set(productos.map(p=>p.categoria||'Otro'))];
-  const filtrados=productos.filter(p=>{
+  const CATS=['Todos',...new Set(todosProductos.map(p=>p.categoria||'Otro'))];
+  const filtrados=todosProductos.filter(p=>{
     const okB=p.nombre.toLowerCase().includes(buscar.toLowerCase());
     const okC=catFiltro==='Todos'||(p.categoria||'Otro')===catFiltro;
     return okB&&okC;
@@ -1239,7 +1258,7 @@ function PantallaCatalogo({uid}){
               </button>
             ))}
           </div>
-          {filtrados.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🐔</div>No hay productos.<br/>Agregá productos en <b>Precios</b>.</div>}
+          {filtrados.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🛒</div>No hay productos.<br/>Agregá productos en <b>Stock → Precios</b> o en los calculadores de cajones y congelados.</div>}
           <div className="catalogo-grid">
             {filtrados.map(p=>{
               const cs=catStyle(p.categoria);
@@ -1769,14 +1788,26 @@ function CalculadoraCongelados({uid}){
     if(!precioCaja||Number(precioCaja)<=0)return alert('Ingresá el precio pagado por caja');
     setGuardando(true);
     try{
-      await db.collection(`polleria/${uid}/stock`).add({
-        nombre:nombre.trim(),categoria:'Congelados',tipo:'congelado',
-        cantidad:+totKg.toFixed(2),unidad:'kg',cajas,kgPorCaja:kgCaja,
-        precioCaja:Number(precioCaja),precioCosto:+costoPorKg.toFixed(2),precioVenta:+precioVentaKg.toFixed(2),
-        porcGanancia:Number(porcGanancia),stockMinimo:0,fecha:hoy(),
-        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      const nombreLimpio=nombre.trim();
+      const docId='cong-'+nombreLimpio.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+      // Guardar en stock
+      const stockRef=db.collection(`polleria/${uid}/stock`).doc(docId);
+      const snap=await stockRef.get();
+      const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
+      await stockRef.set({
+        nombre:nombreLimpio,categoria:'Congelados',tipo:'congelado',
+        cantidad:+(cantActual+totKg).toFixed(2),unidad:'kg',cajas,kgPorCaja:kgCaja,
+        precioCaja:Number(precioCaja),precioCosto:+costoPorKg.toFixed(2),
+        precioVenta:+precioVentaKg.toFixed(2),porcGanancia:Number(porcGanancia),
+        stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
       });
-      mostrarToast('✅ Congelado agregado al inventario');
+      // Guardar también en productos (para que aparezca en el catálogo de ventas)
+      await db.collection(`polleria/${uid}/productos`).doc(docId).set({
+        nombre:nombreLimpio,categoria:'❄️ Congelados',unidad:'kg',
+        precioCosto:+costoPorKg.toFixed(2),precioVenta:+precioVentaKg.toFixed(2),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      },{merge:true});
+      mostrarToast('✅ Congelado agregado al inventario y catálogo');
       setNombre('');setPrecioCaja('');
     }catch(e){alert('Error al guardar: '+e.message);}
     setGuardando(false);
