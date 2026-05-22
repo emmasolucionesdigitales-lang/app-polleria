@@ -523,12 +523,20 @@ const firebaseConfig = {
 };
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-// ── MODO OFFLINE: Firestore guarda datos localmente ───────────────────
-db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-  if (err.code === 'failed-precondition') console.warn('Offline: múltiples pestañas abiertas');
-  else if (err.code === 'unimplemented') console.warn('Offline: navegador no compatible');
-});
 const auth = firebase.auth();
+// Auth anónima para reglas Firestore
+auth.signInAnonymously().catch(function(){});
+// Licencias — app-control-de-apps
+var pollLicApp = firebase.apps.find(function(a){return a.name==='licencias';}) ||
+  firebase.initializeApp({
+    apiKey:"AIzaSyAFQ4ybqIoVV3rWe1FMjMVUZ-qzLNZbdBk",
+    authDomain:"app-control-de-apps.firebaseapp.com",
+    projectId:"app-control-de-apps",
+    storageBucket:"app-control-de-apps.firebasestorage.app",
+    messagingSenderId:"761424199819",
+    appId:"1:761424199819:web:513eeaf0e54f4e1401d48e"
+  },"licencias");
+window.dbLicencias = firebase.firestore(pollLicApp);
 
 /* ─── UTILS ─── */
 const hoy = () => new Date().toISOString().split('T')[0];
@@ -816,356 +824,109 @@ function BtnEscala(){
   </button>;
 }
 
-function Login(){
-  const [email,setEmail]=useState('');const [pass,setPass]=useState('');const [error,setError]=useState('');const [carg,setCarg]=useState(false);
-  const ingresar=async()=>{
-    if(!email||!pass) return setError('Completá los dos campos');
-    setCarg(true);setError('');
-    try{ await auth.signInWithEmailAndPassword(email,pass); }
-    catch{ setError('Email o contraseña incorrectos');setCarg(false); }
-  };
-  return(
-    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px',background:'var(--bg3)'}}>
-      <div style={{fontSize:64,marginBottom:8}}>🐔</div>
-      <div style={{fontSize:22,fontWeight:700,color:'var(--txt)',marginBottom:4}}>Gestión Pollería</div>
-      <p style={{color:'var(--txt2)',marginBottom:28,fontSize:14}}>Tu negocio bajo control</p>
-      <div style={{width:'100%',maxWidth:340,background:'var(--bg)',borderRadius:'var(--radius-lg)',padding:24,border:'1px solid var(--border)',boxShadow:'var(--shadow)'}}>
-        {error && <div style={{background:'var(--red-bg)',color:'var(--red)',padding:'10px 14px',borderRadius:'var(--radius)',marginBottom:14,fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
-        <Campo label="Email" value={email} onChange={setEmail} placeholder="tu@email.com" tipo="email"/>
-        <Campo label="Contraseña" value={pass} onChange={setPass} placeholder="••••••••" tipo="password"/>
-        <button onClick={ingresar} disabled={carg} className="btn-full" style={{marginTop:18,background:'var(--green)',opacity:carg?0.7:1}}>
-          {carg ? 'Ingresando...' : '🐔 Ingresar'}
-        </button>
-      </div>
-      <div style={{marginTop:24,fontSize:10,color:'var(--txt3)',textAlign:'center',lineHeight:1.8}}>
-        Emma Soluciones Digitales
-      </div>
-    </div>
-  );
-}
+// ── Helpers licencia Pollería ──────────────────────────────────────
+function getDeviceIdPoll(){let id=localStorage.getItem('poll_device_id');if(!id){id='dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('poll_device_id',id);}return id;}
+function getLicenciaPoll(){try{return JSON.parse(localStorage.getItem('poll_licencia')||'null');}catch{return null;}}
 
-/* ══════════════════════════════════════
-   MODAL VENTA RÁPIDA
-══════════════════════════════════════ */
-function ModalVentaRapida({producto, clientes, uid, onCerrar}){
-  const [cant,setCant]=useState('1');
-  const [pago,setPago]=useState('efectivo');
-  const [clienteId,setClienteId]=useState('');
-  const [cargando,setCargando]=useState(false);
-  const cs = catStyle(producto.categoria);
-  const precio = Number(producto.precioVenta)||0;
-  const cantidad = parseFloat(cant)||0;
-  const total = precio * cantidad;
+function PantallaActivacionPoll({onActivado}){
+  const[codigo,setCodigo]=React.useState('');
+  const[celular,setCelular]=React.useState('');
+  const[email,setEmail]=React.useState('');
+  const[negocio,setNegocio]=React.useState('');
+  const[paso,setPaso]=React.useState(1);
+  const[err,setErr]=React.useState('');
+  const[carg,setCarg]=React.useState(false);
 
-  const ajustarCant = delta => {
-    const paso = ['kg','litro','litros'].includes(producto.unidad||'') ? 0.5 : 1;
-    setCant(v => Math.max(0, (parseFloat(v)||0)+delta*paso).toString());
-  };
-
-  const confirmar = async () => {
-    if(!cantidad||cantidad<=0) return alert('Ingresá una cantidad válida');
-    setCargando(true);
-    try {
-      const cliente = clientes.find(c=>c.id===clienteId);
-      const ts = firebase.firestore.FieldValue.serverTimestamp();
-      // Guardar como venta directa en pedidos
-      await db.collection(`polleria/${uid}/pedidos`).add({
-        clienteNombre: cliente ? cliente.nombre : 'Venta directa',
-        clienteId: clienteId||'',
-        tipo:'mostrador',
-        estado:'entregado',
-        pagado: pago !== 'fiado',
-        formaPago: pago,
-        items:[{
-          _id: Date.now(),
-          nombre: producto.nombre,
-          unidad: producto.unidad||'kg',
-          cantidad,
-          precio,
-          subtotal: total,
-        }],
-        total,
-        fecha: hoy(),
-        createdAt: ts,
-      });
-      // Si es fiado, actualizar saldo del cliente
-      if(pago==='fiado' && clienteId){
-        const ref = db.collection(`polleria/${uid}/clientes`).doc(clienteId);
-        const snap = await ref.get();
-        if(snap.exists){
-          await ref.update({ saldoFiado: (Number(snap.data().saldoFiado)||0)+total });
-        }
-      }
-      onCerrar(true);
-    } catch(e){ alert('Error al guardar: '+e.message); }
-    setCargando(false);
-  };
-
-  return(
-    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onCerrar(false)}>
-      <div className="modal">
-        <div className="modal-drag"/>
-        {/* Cabecera producto */}
-        <div className="venta-prod-header">
-          <div className="venta-prod-foto" style={{background:cs.bg}}>
-            {producto.foto
-              ? <img src={producto.foto} alt={producto.nombre}/>
-              : <span>{cs.emoji}</span>
-            }
-          </div>
-          <div>
-            <div style={{fontWeight:700,fontSize:17,color:'var(--txt)'}}>{producto.nombre}</div>
-            <div style={{fontSize:13,color:'var(--txt2)'}}>{formatPeso(precio)} / {producto.unidad||'kg'}</div>
-            {producto.descripcion && <div style={{fontSize:12,color:'var(--txt3)',marginTop:2}}>{producto.descripcion}</div>}
-          </div>
-        </div>
-
-        {/* Cantidad */}
-        <label className="lbl">Cantidad ({producto.unidad||'kg'})</label>
-        <div className="qty-row">
-          <button className="qty-btn" onClick={()=>ajustarCant(-1)}>−</button>
-          <input
-            type="number"
-            value={cant}
-            onChange={e=>setCant(e.target.value)}
-            className="qty-input"
-            step={['kg','litro','litros'].includes(producto.unidad||'')?'0.5':'1'}
-            min="0"
-          />
-          <button className="qty-btn" onClick={()=>ajustarCant(1)}>+</button>
-        </div>
-
-        {/* Total */}
-        <div className="total-grande">{formatPeso(total)}</div>
-
-        {/* Forma de pago */}
-        <label className="lbl">Forma de pago</label>
-        <div className="venta-metodos">
-          {[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transf.'},{k:'fiado',lbl:'📒 Fiado'},{k:'tarjeta',lbl:'💳 Tarjeta'}].map(m=>(
-            <button key={m.k} onClick={()=>setPago(m.k)} className={`btn-metodo${pago===m.k?' activo':''}`}>{m.lbl}</button>
-          ))}
-        </div>
-
-        {/* Cliente (opcional, requerido si es fiado) */}
-        <label className="lbl">Cliente {pago==='fiado'?'*':'(opcional)'}</label>
-        <select value={clienteId} onChange={e=>setClienteId(e.target.value)} className="inp" style={{marginBottom:16}}>
-          <option value="">— Sin cliente / Venta directa —</option>
-          {clientes.map(c=>(
-            <option key={c.id} value={c.id}>
-              {c.nombre}{Number(c.saldoFiado)>0?` (fiado: ${formatPeso(c.saldoFiado)})`:''}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={confirmar}
-          disabled={cargando||!cantidad}
-          className="btn-full"
-          style={{background:'var(--green)',marginBottom:8}}
-        >
-          {cargando ? 'Guardando...' : `✓ Confirmar venta — ${formatPeso(total)}`}
-        </button>
-        <button onClick={()=>onCerrar(false)} className="btn-full" style={{background:'none',border:'1px solid var(--border)',color:'var(--txt2)',padding:10,fontSize:14}}>Cancelar</button>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════
-   TOAST
-══════════════════════════════════════ */
-function Toast({msg}){
-  return msg ? <div className="toast-float">{msg}</div> : null;
-}
-
-/* ══════════════════════════════════════
-   CARRITO PANEL (componente compartido)
-══════════════════════════════════════ */
-function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLimpiar,uid,clientes,onVentaConfirmada}){
-  const [pago,setPago]=useState('efectivo');
-  const [clienteNombre,setClienteNombre]=useState('');
-  const [telefono,setTelefono]=useState('');
-  const [datosPago,setDatosPago]=useState('');
-  const [esEnvio,setEsEnvio]=useState(false);
-  const [direccion,setDireccion]=useState('');
-  const [cargando,setCargando]=useState(false);
-  const total=carrito.reduce((s,i)=>s+(i.prod.precioVenta||0)*i.cantidad,0);
-  const esConDatos=pago==='transferencia'||pago==='debito'||pago==='credito';
-  const confirmar=async()=>{
-    if(!carrito.length)return;
-    if(esEnvio&&!direccion.trim())return alert('Ingresá la dirección de entrega');
-    setCargando(true);
+  const verificar=async()=>{
+    const cod=codigo.trim().toUpperCase();
+    if(!cod){setErr('Ingresá el código de activación');return;}
+    setCarg(true);setErr('');
     try{
-      const items=carrito.map(i=>({
-        _id:Date.now()+Math.random(),
-        nombre:i.prod.nombre,unidad:i.prod.unidad||'kg',
-        cantidad:i.cantidad,precio:i.prod.precioVenta||0,
-        subtotal:(i.prod.precioVenta||0)*i.cantidad,
-      }));
-      const pedidoData={
-        clienteNombre:clienteNombre||'Venta directa',clienteId:'',
-        tipo:esEnvio?'envio':'mostrador',
-        estado:esEnvio?'pendiente':'entregado',
-        pagado:pago!=='fiado',
-        formaPago:pago,items,total,fecha:hoy(),
-        telefono:telefono||'',datosTarjeta:datosPago||'',
-        esEnvio,direccion:esEnvio?direccion.trim():'',
-        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
-      };
-      const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
-      onVentaConfirmada({...pedidoData,id:ref.id,items});
-      setClienteNombre('');setTelefono('');setDatosPago('');setPago('efectivo');
-      setEsEnvio(false);setDireccion('');
-    }catch(e){alert('Error: '+e.message);}
-    setCargando(false);
+      const doc=await window.dbLicencias.collection('licencias').doc(cod).get();
+      if(!doc.exists){setErr('Código inválido. Verificá con Emma Soluciones.');setCarg(false);return;}
+      const d=doc.data();
+      if(d.app&&d.app!=='polleria'){setErr('Este código no es para Gestión Pollería.');setCarg(false);return;}
+      if(d.estado==='inactivo'){setErr('Licencia desactivada. Contactá al soporte.');setCarg(false);return;}
+      if(d.estado==='usado'&&d.deviceId&&d.deviceId!==getDeviceIdPoll()){setErr('Código ya usado en otro dispositivo.');setCarg(false);return;}
+      setPaso(2);
+    }catch(e){setErr('Error de conexión.');}
+    setCarg(false);
   };
-  if(!carrito.length) return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--txt2)',gap:10,padding:20}}>
-      <div style={{fontSize:52}}>🛒</div>
-      <div style={{fontSize:15,fontWeight:700}}>Carrito vacío</div>
-      <div style={{fontSize:13,textAlign:'center',lineHeight:1.5}}>Tocá un producto del catálogo para agregarlo al carrito</div>
-    </div>
-  );
-  return(
-    <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden',gap:0}}>
-      {/* Lista de items */}
-      <div className="carrito-titulo">
-        <span>🛒 Carrito <span style={{color:'var(--txt2)',fontWeight:400}}>({carrito.length} prod.)</span></span>
-        <button onClick={onLimpiar} style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:12,fontWeight:600}}>🗑️ Limpiar</button>
-      </div>
-      <div style={{flex:1,overflowY:'auto',marginBottom:8}}>
-        {carrito.map(item=>{
-          const esPeso=esPorPeso(item.prod.unidad);
-          return(
-            <div key={item.prod.id} className="carrito-item">
-              <div style={{flex:1,minWidth:0}}>
-                <div className="carrito-item-name">{item.prod.nombre}</div>
-                <div className="carrito-item-sub">{formatPeso(item.prod.precioVenta||0)} / {item.prod.unidad||'kg'}</div>
-              </div>
-              {/* Peso: input editable con botón para abrir modal */}
-              {esPeso?(
-                <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-                  <input type="number" step="0.001" min="0"
-                    value={item.cantidad}
-                    onChange={e=>{const v=parseFloat(e.target.value);if(!isNaN(v))onSetCantidad(item.prod.id,v);}}
-                    style={{width:68,textAlign:'center',padding:'4px 6px',border:'1px solid var(--border)',borderRadius:'var(--radius)',background:'var(--bg2)',color:'var(--txt)',fontSize:15,fontWeight:700,outline:'none'}}
-                  />
-                  <span style={{fontSize:11,color:'var(--txt2)',flexShrink:0}}>{item.prod.unidad||'kg'}</span>
-                  <button onClick={()=>onEditarPeso&&onEditarPeso(item.prod)}
-                    style={{width:26,height:26,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',cursor:'pointer',fontSize:13,color:'var(--txt2)',flexShrink:0}}
-                    title="Cambiar peso">⚖️</button>
-                </div>
-              ):(
-                /* Unidades: +/- */
-                <div className="carrito-qty">
-                  <button onClick={()=>onCambiarCantidad(item.prod.id,-1)} className="carrito-qty-btn">−</button>
-                  <span className="carrito-qty-val">{item.cantidad}</span>
-                  <button onClick={()=>onCambiarCantidad(item.prod.id,1)} className="carrito-qty-btn">+</button>
-                </div>
-              )}
-              <div className="carrito-item-precio">{formatPeso((item.prod.precioVenta||0)*item.cantidad)}</div>
-            </div>
-          );
-        })}
-      </div>
-      {/* Pago, datos, total y confirmar */}
-      <div style={{borderTop:'2px solid var(--border)',paddingTop:10,flexShrink:0}}>
-        <label className="lbl" style={{marginTop:0}}>Forma de pago</label>
-        <div className="pago-grid">
-          {[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transfer.'},{k:'debito',lbl:'💳 Débito'},{k:'credito',lbl:'💳 Crédito'},{k:'fiado',lbl:'📒 Fiado'}].map(m=>(
-            <button key={m.k} onClick={()=>{setPago(m.k);setDatosPago('');}} className={`btn-metodo${pago===m.k?' activo':''}`} style={{fontSize:11,padding:'7px 4px'}}>{m.lbl}</button>
-          ))}
-        </div>
-        <Campo label="Cliente (opcional)" value={clienteNombre} onChange={setClienteNombre} placeholder="Nombre del cliente..."/>
-        {esConDatos&&<>
-          <Campo label="📞 Teléfono de contacto" value={telefono} onChange={setTelefono} placeholder="Ej: 381-123-4567" tipo="tel"/>
-          <Campo
-            label={pago==='transferencia'?'🏦 CBU / Alias':'💳 Titular y últimos 4 dígitos'}
-            value={datosPago} onChange={setDatosPago}
-            placeholder={pago==='transferencia'?'CBU o alias de transferencia':'Ej: Juan García - 4521'}
-          />
-        </>}
-        {/* ── OPCIÓN DE ENVÍO ── */}
-        <div style={{margin:'10px 0',padding:'10px 12px',borderRadius:'var(--radius)',border:`2px solid ${esEnvio?'#e94560':'var(--border)'}`,background:esEnvio?'rgba(233,69,96,.06)':'var(--bg2)'}}>
-          <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
-            <input type="checkbox" checked={esEnvio} onChange={e=>setEsEnvio(e.target.checked)}
-              style={{width:18,height:18,accentColor:'#e94560',cursor:'pointer'}}/>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:'var(--txt)'}}>🛵 Es para envío a domicilio</div>
-              <div style={{fontSize:11,color:'var(--txt2)'}}>Se registra como pedido pendiente</div>
-            </div>
-          </label>
-          {esEnvio&&<>
-            <Campo label="📍 Dirección de entrega *" value={direccion} onChange={setDireccion} placeholder="Calle, número, piso, depto..."/>
-            {!telefono&&<Campo label="📞 Teléfono del cliente *" value={telefono} onChange={setTelefono} placeholder="381-123-4567" tipo="tel"/>}
-          </>}
-        </div>
-        <div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',margin:'10px 0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontWeight:700,fontSize:13,color:'var(--green)'}}>TOTAL</span>
-          <span style={{fontWeight:700,fontSize:26,color:'var(--green)'}}>{formatPeso(total)}</span>
-        </div>
-        <button onClick={confirmar} disabled={cargando} className="btn-full" style={{background:esEnvio?'#e94560':'var(--green)'}}>
-          {cargando?'⏳ Procesando...':(esEnvio?'🛵 Confirmar envío':'✅ Confirmar venta')}
-        </button>
-      </div>
-    </div>
+
+  const activar=async()=>{
+    if(!negocio.trim()||!celular.trim()||!email.trim()){setErr('Completá todos los campos');return;}
+    setCarg(true);setErr('');
+    try{
+      const cod=codigo.trim().toUpperCase();
+      const deviceId=getDeviceIdPoll();
+      const snap=await window.dbLicencias.collection('licencias').doc(cod).get();
+      const lic=snap.data();
+      await window.dbLicencias.collection('licencias').doc(cod).update({estado:'usado',deviceId,celular:celular.trim(),email:email.trim(),negocio:negocio.trim(),activadoEn:new Date().toISOString()});
+      localStorage.setItem('poll_licencia',JSON.stringify({codigo:cod,pin:lic.pin,email:email.trim(),celular:celular.trim(),negocio:negocio.trim(),negocioId:lic.negocioId||cod,deviceId,activado:true}));
+      onActivado(lic.pin);
+    }catch(e){setErr('Error al activar.');}
+    setCarg(false);
+  };
+
+  const stInp={width:'100%',padding:'10px 12px',border:'1px solid rgba(255,255,255,0.15)',borderRadius:8,fontSize:14,background:'rgba(255,255,255,0.08)',color:'#fff',outline:'none',boxSizing:'border-box',marginBottom:8};
+  const stBtn={width:'100%',padding:'12px',border:'none',borderRadius:8,background:'#f97316',color:'#fff',fontSize:15,fontWeight:700,cursor:'pointer',opacity:carg?0.6:1};
+
+  return React.createElement('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,background:'#1a0a00',gap:14}},
+    React.createElement('div',{style:{fontSize:56}},'🍗'),
+    React.createElement('h1',{style:{fontSize:22,fontWeight:700,color:'#fff',margin:0,textAlign:'center'}},'Gestión Pollería'),
+    paso===1&&React.createElement(React.Fragment,null,
+      React.createElement('p',{style:{fontSize:14,color:'rgba(255,255,255,0.6)',textAlign:'center',maxWidth:280,margin:0}},'Ingresá el código de activación que recibiste.'),
+      React.createElement('input',{style:{...stInp,textAlign:'center',fontSize:18,letterSpacing:3,textTransform:'uppercase',maxWidth:300},placeholder:'POLL-XXXX',value:codigo,onChange:e=>setCodigo(e.target.value.toUpperCase()),onKeyDown:e=>e.key==='Enter'&&verificar()}),
+      err&&React.createElement('p',{style:{color:'#fca5a5',fontSize:13,margin:0}},err),
+      React.createElement('button',{style:{...stBtn,maxWidth:200},disabled:carg,onClick:verificar},carg?'Verificando...':'Continuar →')
+    ),
+    paso===2&&React.createElement(React.Fragment,null,
+      React.createElement('p',{style:{fontSize:14,color:'#86efac',textAlign:'center',maxWidth:280,margin:0}},'✓ Código válido. Completá tus datos.'),
+      React.createElement('div',{style:{width:'100%',maxWidth:320,display:'flex',flexDirection:'column',gap:4}},
+        React.createElement('label',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'Nombre del negocio *'),
+        React.createElement('input',{style:stInp,placeholder:'Ej: Pollería El Gallo',value:negocio,onChange:e=>setNegocio(e.target.value)}),
+        React.createElement('label',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'Celular *'),
+        React.createElement('input',{style:stInp,type:'tel',placeholder:'3816559001',value:celular,onChange:e=>setCelular(e.target.value)}),
+        React.createElement('label',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'Email *'),
+        React.createElement('input',{style:stInp,type:'email',placeholder:'tu@email.com',value:email,onChange:e=>setEmail(e.target.value)})
+      ),
+      err&&React.createElement('p',{style:{color:'#fca5a5',fontSize:13,margin:0}},err),
+      React.createElement('button',{style:{...stBtn,maxWidth:200},disabled:carg,onClick:activar},carg?'Activando...':'Activar →')
+    )
   );
 }
 
-const esPorPeso=u=>['kg','litro','litros'].includes(u||'kg');
-
-/* ── Modal ingreso de peso para productos por kg/litro ── */
-function ModalPeso({prod,cantActual,onAgregar,onCerrar}){
-  const [val,setVal]=useState(cantActual>0?String(cantActual):'');
-  const num=parseFloat(val)||0;
-  const total=num*(prod.precioVenta||0);
-  const confirmar=()=>{if(num>0){onAgregar(num);onCerrar();}};
-  return(
-    <div className="overlay" onClick={onCerrar}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="modal-drag"/>
-        <div style={{fontWeight:700,fontSize:16,color:'var(--txt)',marginBottom:2}}>{prod.nombre}</div>
-        <div style={{fontSize:13,color:'var(--txt2)',marginBottom:14}}>{formatPeso(prod.precioVenta||0)} / {prod.unidad||'kg'}</div>
-        <label className="lbl">Ingresá el peso ({prod.unidad||'kg'})</label>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-          <input type="number" step="0.001" min="0" autoFocus
-            value={val} onChange={e=>setVal(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&confirmar()}
-            className="inp" style={{flex:1,fontSize:28,textAlign:'center',fontWeight:700,padding:'10px'}}
-            placeholder="0.000"/>
-          <span style={{fontSize:16,fontWeight:700,color:'var(--txt2)',minWidth:28}}>{prod.unidad||'kg'}</span>
-        </div>
-        {/* Pesos rápidos */}
-        <div style={{display:'flex',gap:5,marginBottom:14,flexWrap:'wrap'}}>
-          {[0.25,0.5,1,1.5,2,3,5].map(v=>(
-            <button key={v} onClick={()=>setVal(String(v))}
-              style={{flex:'1 0 auto',minWidth:40,padding:'7px 4px',borderRadius:'var(--radius)',
-                border:`1px solid ${parseFloat(val)===v?'var(--green)':'var(--border)'}`,
-                background:parseFloat(val)===v?'var(--green-bg)':'var(--bg2)',
-                color:parseFloat(val)===v?'var(--green)':'var(--txt)',
-                fontSize:13,fontWeight:700,cursor:'pointer'}}>
-              {v}
-            </button>
-          ))}
-        </div>
-        {num>0&&(
-          <div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:13,color:'var(--green)',fontWeight:600}}>Total</span>
-            <span style={{fontSize:22,fontWeight:700,color:'var(--green)'}}>{formatPeso(total)}</span>
-          </div>
-        )}
-        <button onClick={confirmar} disabled={num<=0} className="btn-full"
-          style={{background:'var(--green)',opacity:num<=0?0.4:1}}>
-          {cantActual>0?'🔄 Actualizar en carrito':'🛒 Agregar al carrito'}
-        </button>
-      </div>
-    </div>
+function PantallaPinPoll({pin,onOk}){
+  const[intento,setIntento]=React.useState('');
+  const[err,setErr]=React.useState('');
+  const[intentos,setIntentos]=React.useState(0);
+  const[bloq,setBloq]=React.useState(false);
+  const lic=getLicenciaPoll();
+  const teclas=[1,2,3,4,5,6,7,8,9,'','0','⌫'];
+  return React.createElement('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:20,background:'#1a0a00'}},
+    React.createElement('div',{style:{fontSize:48}},'🍗'),
+    React.createElement('h2',{style:{color:'#fff',margin:0}},(lic?.negocio||'Gestión Pollería')),
+    React.createElement('p',{style:{color:'rgba(255,255,255,0.6)',fontSize:14,margin:0}},'Ingresá tu PIN de acceso'),
+    React.createElement('div',{style:{display:'flex',gap:14}},
+      [0,1,2,3].map(i=>React.createElement('div',{key:i,style:{width:16,height:16,borderRadius:'50%',background:intento.length>i?'#f97316':'transparent',border:'2px solid #f97316'}}))
+    ),
+    err&&React.createElement('p',{style:{color:'#fca5a5',fontSize:13,margin:0}},err),
+    !bloq&&React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,72px)',gap:10}},
+      teclas.map((t,i)=>React.createElement('button',{key:i,style:{height:60,fontSize:t==='⌫'?18:20,fontWeight:500,borderRadius:12,background:t===''?'transparent':'rgba(255,255,255,0.08)',border:t===''?'none':'1px solid rgba(255,255,255,0.15)',color:'#fff',cursor:t===''?'default':'pointer',opacity:t===''?0:1},onClick:()=>{
+        if(t==='')return;
+        if(t==='⌫'){setIntento(v=>v.slice(0,-1));return;}
+        if(intento.length>=4)return;
+        const nv=intento+t;setIntento(nv);
+        if(nv.length===4)setTimeout(()=>{
+          if(nv===String(pin)){setErr('');onOk();}
+          else{setIntento('');setIntentos(prev=>{const n2=prev+1;if(n2>=5){setBloq(true);setErr('Demasiados intentos.');}else setErr('PIN incorrecto ('+String(5-n2)+' restante'+String(5-n2!==1?'s':'')+')');return n2;});}
+        },200);
+      }},t))
+    )
   );
 }
 
-/* ══════════════════════════════════════
-   PANTALLA CATÁLOGO / VENDER  (nueva)
-══════════════════════════════════════ */
+function Login(){return null;}
 function PantallaCatalogo({uid}){
   const [productos,setProductos]=useState([]);
   const [stockItems,setStockItems]=useState([]);
@@ -2521,27 +2282,30 @@ function PantallaConfig({onModoChange}){
 /* ══════════════════════════════════════
    APP PRINCIPAL
 ══════════════════════════════════════ */
+function AppWrapper(){
+  const lic=getLicenciaPoll();
+  const[fase,setFase]=React.useState(()=>{
+    if(!lic||!lic.activado)return 'activacion';
+    return 'pin';
+  });
+  if(fase==='activacion')return React.createElement(PantallaActivacionPoll,{onActivado:p=>{setFase('pin');}});
+  if(fase==='pin')return React.createElement(PantallaPinPoll,{pin:lic?.pin,onOk:()=>setFase('app')});
+  return React.createElement(App);
+}
+
 function App(){
-  const [user,setUser]=useState(undefined);
+  const uid=getLicenciaPoll()?.deviceId||'default';
   const [tab,setTab]=useState('catalogo');
   const [modo,setModoState]=useState(getModo);
   useEffect(()=>{
-    auth.onAuthStateChanged(u=>setUser(u));
     aplicarTema(getTema());
   },[]);
-  if(user===undefined) return(
-    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg3)'}}>
-      <div style={{fontSize:56}}>🐔</div>
-      <p style={{color:'var(--txt2)',fontSize:15}}>Cargando...</p>
-    </div>
-  );
-  if(!user) return <Login/>;
   const pantallas={
-    catalogo:<PantallaCatalogo uid={user.uid}/>,
-    pedidos: <PantallaPedidos  uid={user.uid}/>,
-    precios: <PantallaPrecios  uid={user.uid}/>,
-    stock:   <PantallaStock    uid={user.uid}/>,
-    caja:    <PantallaCaja     uid={user.uid}/>,
+    catalogo:<PantallaCatalogo uid={uid}/>,
+    pedidos: <PantallaPedidos  uid={uid}/>,
+    precios: <PantallaPrecios  uid={uid}/>,
+    stock:   <PantallaStock    uid={uid}/>,
+    caja:    <PantallaCaja     uid={uid}/>,
     config:  <PantallaConfig   onModoChange={m=>{setModoState(m);}}/>,
   };
   const contenido=pantallas[tab]||pantallas.catalogo;
@@ -2563,7 +2327,7 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<AppWrapper/>);
 </script>
 
   <script>
