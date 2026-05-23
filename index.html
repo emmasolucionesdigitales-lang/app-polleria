@@ -862,6 +862,8 @@ function PantallaActivacionPoll({onActivado}){
       const deviceId=getDeviceIdPoll();
       const snap=await window.dbLicencias.collection('licencias').doc(cod).get();
       const lic=snap.data();
+      if(lic.email&&lic.email.trim().toLowerCase()!==email.trim().toLowerCase()){setErr('El email no coincide con el registrado. Contactá al administrador.');setCarg(false);return;}
+      if(lic.celular&&lic.celular.trim()!==celular.trim()){setErr('El celular no coincide con el registrado. Contactá al administrador.');setCarg(false);return;}
       await window.dbLicencias.collection('licencias').doc(cod).update({estado:'usado',deviceId,celular:celular.trim(),email:email.trim(),negocio:negocio.trim(),activadoEn:new Date().toISOString()});
       localStorage.setItem('poll_licencia',JSON.stringify({codigo:cod,pin:lic.pin,email:email.trim(),celular:celular.trim(),negocio:negocio.trim(),negocioId:lic.negocioId||cod,deviceId,activado:true}));
       onActivado(lic.pin);
