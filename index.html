@@ -834,6 +834,8 @@ function PantallaActivacionPoll({onActivado}){
   const[celular,setCelular]=React.useState('');
   const[email,setEmail]=React.useState('');
   const[negocio,setNegocio]=React.useState('');
+  const[pinIngresado,setPinIngresado]=React.useState('');
+  const[terminos,setTerminos]=React.useState(false);
   const[paso,setPaso]=React.useState(1);
   const[err,setErr]=React.useState('');
   const[carg,setCarg]=React.useState(false);
@@ -855,7 +857,8 @@ function PantallaActivacionPoll({onActivado}){
   };
 
   const activar=async()=>{
-    if(!negocio.trim()||!celular.trim()||!email.trim()){setErr('Completá todos los campos');return;}
+    if(!negocio.trim()||!celular.trim()||!email.trim()||!pinIngresado.trim()){setErr('Completá todos los campos');return;}
+    if(!terminos){setErr('Debés aceptar los Términos y Condiciones para continuar');return;}
     setCarg(true);setErr('');
     try{
       const cod=codigo.trim().toUpperCase();
@@ -864,7 +867,8 @@ function PantallaActivacionPoll({onActivado}){
       const lic=snap.data();
       if(lic.email&&lic.email.trim().toLowerCase()!==email.trim().toLowerCase()){setErr('El email no coincide con el registrado. Contactá al administrador.');setCarg(false);return;}
       if(lic.celular&&lic.celular.trim()!==celular.trim()){setErr('El celular no coincide con el registrado. Contactá al administrador.');setCarg(false);return;}
-      await window.dbLicencias.collection('licencias').doc(cod).update({estado:'usado',deviceId,celular:celular.trim(),email:email.trim(),negocio:negocio.trim(),activadoEn:new Date().toISOString()});
+      if(String(lic.pin)!==pinIngresado.trim()){setErr('El PIN no es correcto. Revisá el que te enviaron.');setCarg(false);return;}
+      await window.dbLicencias.collection('licencias').doc(cod).update({estado:'usado',deviceId,celular:celular.trim(),email:email.trim(),negocio:negocio.trim(),aceptoTerminos:true,fechaAceptoTerminos:new Date().toISOString(),activadoEn:new Date().toISOString()});
       localStorage.setItem('poll_licencia',JSON.stringify({codigo:cod,pin:lic.pin,email:email.trim(),celular:celular.trim(),negocio:negocio.trim(),negocioId:lic.negocioId||cod,deviceId,activado:true}));
       onActivado(lic.pin);
     }catch(e){setErr('Error al activar.');}
@@ -879,7 +883,7 @@ function PantallaActivacionPoll({onActivado}){
     React.createElement('h1',{style:{fontSize:22,fontWeight:700,color:'#fff',margin:0,textAlign:'center'}},'Gestión Pollería'),
     paso===1&&React.createElement(React.Fragment,null,
       React.createElement('p',{style:{fontSize:14,color:'rgba(255,255,255,0.6)',textAlign:'center',maxWidth:280,margin:0}},'Ingresá el código de activación que recibiste.'),
-      React.createElement('input',{style:{...stInp,textAlign:'center',fontSize:18,letterSpacing:3,textTransform:'uppercase',maxWidth:300},placeholder:'POLL-XXXX',value:codigo,onChange:e=>setCodigo(e.target.value.toUpperCase()),onKeyDown:e=>e.key==='Enter'&&verificar()}),
+      React.createElement('input',{style:{...stInp,textAlign:'center',fontSize:18,letterSpacing:3,textTransform:'uppercase',maxWidth:300},placeholder:'PO-XXXXXX',value:codigo,onChange:e=>setCodigo(e.target.value.toUpperCase()),onKeyDown:e=>e.key==='Enter'&&verificar()}),
       err&&React.createElement('p',{style:{color:'#fca5a5',fontSize:13,margin:0}},err),
       React.createElement('button',{style:{...stBtn,maxWidth:200},disabled:carg,onClick:verificar},carg?'Verificando...':'Continuar →')
     ),
@@ -891,7 +895,13 @@ function PantallaActivacionPoll({onActivado}){
         React.createElement('label',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'Celular *'),
         React.createElement('input',{style:stInp,type:'tel',placeholder:'3816559001',value:celular,onChange:e=>setCelular(e.target.value)}),
         React.createElement('label',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'Email *'),
-        React.createElement('input',{style:stInp,type:'email',placeholder:'tu@email.com',value:email,onChange:e=>setEmail(e.target.value)})
+        React.createElement('input',{style:stInp,type:'email',placeholder:'tu@email.com',value:email,onChange:e=>setEmail(e.target.value)}),
+        React.createElement('label',{style:{fontSize:11,color:'rgba(255,255,255,0.5)'}},'PIN de activación *'),
+        React.createElement('input',{style:stInp,type:'number',placeholder:'PIN que recibiste con el código',value:pinIngresado,onChange:e=>setPinIngresado(e.target.value)})
+      ),
+      React.createElement('label',{style:{display:'flex',alignItems:'flex-start',gap:10,maxWidth:320,cursor:'pointer'}},
+        React.createElement('input',{type:'checkbox',checked:terminos,onChange:e=>setTerminos(e.target.checked),style:{marginTop:3,width:18,height:18,flexShrink:0}}),
+        React.createElement('span',{style:{fontSize:12,color:'rgba(255,255,255,0.6)',lineHeight:1.5}},'Acepto los ',React.createElement('span',{style:{color:'#f97316',fontWeight:600}},'Términos y Condiciones'),' del servicio. La app se contrata mensualmente. El acceso se suspende si el pago no se realiza antes del día 11 de cada mes.')
       ),
       err&&React.createElement('p',{style:{color:'#fca5a5',fontSize:13,margin:0}},err),
       React.createElement('button',{style:{...stBtn,maxWidth:200},disabled:carg,onClick:activar},carg?'Activando...':'Activar →')
