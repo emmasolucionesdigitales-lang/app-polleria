@@ -2303,12 +2303,12 @@ function PantallaCaja({uid}){
             <div style={{display:'flex',justifyContent:'space-between',marginTop:6}}><span style={{fontWeight:700}}>📊 Total facturado</span><span style={{fontWeight:700,fontSize:22,color:'var(--txt)'}}>{formatPeso(totalVentas+vFiado)}</span></div>
           </div>
           <div className="suma-band"><span style={{fontSize:13,color:'var(--txt2)'}}>{pedidos.filter(p=>p.estado!=='cancelado').length} pedidos · {pedidos.filter(p=>p.estado==='cancelado').length} cancelados</span></div>
-        </>}
-      </div>
-    </div>
           <button onClick={enviarResumenEmail} style={{width:'100%',padding:'12px',marginTop:'12px',background:'#dc2626',color:'#fff',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:'700',cursor:'pointer'}}>
             📧 Enviar resumen del día por email
           </button>
+        </>}
+      </div>
+    </div>
   );
 }
 
