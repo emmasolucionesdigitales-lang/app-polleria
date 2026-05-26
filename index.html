@@ -827,6 +827,53 @@ function BtnEscala(){
 
 // ── Helpers licencia Pollería ──────────────────────────────────────
 function getDeviceIdPoll(){let id=localStorage.getItem('poll_device_id');if(!id){id='dev_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('poll_device_id',id);}return id;}
+
+  // ── Brevo email ─────────────────────────────────────────────────
+  var BREVO_KEY_APP = "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";
+  // ── Resumen diario ────────────────────────────────────────────────
+  window.enviarResumenDiario_poll_licencia = async function(resumen) {
+    // resumen: { fecha, totalIngresos, totalGastos, ganancia, detalle:[] }
+    const lic = (()=>{ try{ return JSON.parse(localStorage.getItem('poll_licencia')||'{}'); }catch{return{};} })();
+    if(!lic.email) return false;
+    const fmt = n => '$' + Math.round(Number(n)||0).toLocaleString('es-AR');
+    const fila = (l,v,c) => `<tr><td style="padding:7px 0;color:#555;border-bottom:1px solid #eee">${l}</td><td style="text-align:right;font-weight:600;color:${c||'#222'};border-bottom:1px solid #eee">${v}</td></tr>`;
+    const det = (resumen.detalle||[]).map(d=>fila(d.label, fmt(d.monto), d.color)).join('');
+    const html = `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;background:#f9fafb">
+        <div style="background:#dc2626;border-radius:12px 12px 0 0;padding:20px 24px">
+          <h2 style="color:#fff;margin:0;font-size:18px">📊 Resumen · Gestión Pollería</h2>
+          <p style="color:rgba(255,255,255,.7);margin:4px 0 0;font-size:13px">${lic.negocio||''} · ${resumen.fecha||''}</p>
+        </div>
+        <div style="background:#fff;border-radius:0 0 12px 12px;padding:20px 24px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+          <div style="background:#f0f7ff;border-radius:10px;padding:16px;margin-bottom:20px;text-align:center">
+            <div style="font-size:32px;font-weight:800;color:#dc2626">${fmt(resumen.totalIngresos||0)}</div>
+            <div style="color:#666;font-size:13px">Total del día</div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            ${det}
+            ${resumen.ganancia!==undefined ? fila('<b>💰 Ganancia neta</b>','<b>'+fmt(resumen.ganancia)+'</b>', resumen.ganancia>=0?'#0a7c3e':'#e05c5c') : ''}
+          </table>
+        </div>
+        <p style="color:#aaa;font-size:11px;text-align:center;margin-top:16px">Emma Soluciones Digitales</p>
+      </div>`;
+    return (async ({to, toName, subject, htmlContent})=>{
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","api-key":BREVO_KEY_APP},
+        body:JSON.stringify({sender:{name:"Emma Soluciones Digitales",email:"carabajalponce1980@gmail.com"},to:[{email:to,name:toName||to}],subject,htmlContent})
+      });
+      return res.ok;
+    } catch(e){ console.error("Brevo:",e); return false; }
+  })({
+      to: lic.email,
+      toName: lic.negocio||'',
+      subject: `📊 Gestión Pollería · ${resumen.fecha||''} · ${fmt(resumen.totalIngresos||0)}`,
+      htmlContent: html
+    });
+  };
+
+
 function getLicenciaPoll(){try{return JSON.parse(localStorage.getItem('poll_licencia')||'null');}catch{return null;}}
 
 function PantallaActivacionPoll({onActivado}){
@@ -2160,6 +2207,24 @@ function PantallaCaja({uid}){
   const ingrExt=movimientos.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+(Number(m.monto)||0),0);
   const egresoExt=movimientos.filter(m=>m.tipo==='egreso').reduce((s,m)=>s+(Number(m.monto)||0),0);
   const cajaFinal=vEfec+ingrExt-egresoExt;
+  const enviarResumenEmail=()=>{
+    if(!window.enviarResumenDiario_poll_licencia){alert('Email no disponible');return;}
+    const gastosDet=movimientos.filter(m=>m.tipo==='egreso').map(m=>({label:m.descripcion||m.concepto||'Gasto',monto:-(Number(m.monto)||0),color:'#e05c5c'}));
+    window.enviarResumenDiario_poll_licencia({
+      fecha: fechaCaja,
+      totalIngresos: totalVentas,
+      ganancia: cajaFinal,
+      detalle:[
+        {label:'💵 Efectivo',monto:vEfec,color:'#16a34a'},
+        {label:'📲 Transferencia',monto:vTransf,color:'#2563eb'},
+        {label:'💳 Tarjeta',monto:vTarj,color:'#9333ea'},
+        vFiado>0&&{label:'📒 Fiado (pendiente)',monto:vFiado,color:'#f59e0b'},
+        ingrExt>0&&{label:'➕ Ingresos extra',monto:ingrExt,color:'#16a34a'},
+        egresoExt>0&&{label:'➖ Egresos extra',monto:-egresoExt,color:'#e05c5c'},
+        ...gastosDet
+      ].filter(Boolean)
+    }).then(ok=>alert(ok?'✅ Resumen enviado por email':'❌ No se pudo enviar'));
+  };
   return(
     <div>
       <Header titulo="Caja del Día"/>
@@ -2241,6 +2306,9 @@ function PantallaCaja({uid}){
         </>}
       </div>
     </div>
+          <button onClick={enviarResumenEmail} style={{width:'100%',padding:'12px',marginTop:'12px',background:'#dc2626',color:'#fff',border:'none',borderRadius:'8px',fontSize:'14px',fontWeight:'700',cursor:'pointer'}}>
+            📧 Enviar resumen del día por email
+          </button>
   );
 }
 
