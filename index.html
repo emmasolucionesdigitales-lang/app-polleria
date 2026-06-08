@@ -524,6 +524,7 @@ const firebaseConfig = {
 };
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+try{db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
 const auth = firebase.auth();
 // Auth anónima para reglas Firestore
 auth.signInAnonymously().catch(function(){});
@@ -875,6 +876,61 @@ function getDeviceIdPoll(){let id=localStorage.getItem('poll_device_id');if(!id)
 
 
 function getLicenciaPoll(){try{return JSON.parse(localStorage.getItem('poll_licencia')||'null');}catch{return null;}}
+function _uidPoll(){try{return (JSON.parse(localStorage.getItem('poll_licencia')||'null')||{}).deviceId||'default';}catch{return 'default';}}
+function _limpiarTS(o){
+  if(o&&typeof o==='object'){
+    if(typeof o.toDate==='function'){try{return o.toDate().toISOString();}catch{return null;}}
+    if(Array.isArray(o))return o.map(_limpiarTS);
+    const r={};for(const k in o)r[k]=_limpiarTS(o[k]);return r;
+  }
+  return o;
+}
+async function exportarRespaldoPoll(){
+  try{
+    const uid=_uidPoll();
+    const cols=['productos','stock','clientes','pedidos','movimientos'];
+    const data={};
+    for(const c of cols){
+      const snap=await db.collection('polleria/'+uid+'/'+c).get();
+      data[c]=snap.docs.map(d=>_limpiarTS(Object.assign({_id:d.id},d.data())));
+    }
+    const local={};['polleria-nombre','polleria-tema','polleria-modo','pl_escala'].forEach(k=>{const v=localStorage.getItem(k);if(v!=null)local[k]=v;});
+    const payload={app:'Gestion Polleria',fecha:new Date().toISOString(),uid,data,local};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='respaldo-polleria-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){alert('No se pudo exportar: '+(e&&e.message||e));}
+}
+async function restaurarRespaldoPoll(file){
+  let obj;
+  try{obj=JSON.parse(await file.text());}catch(e){alert('El archivo no es un .json válido.');return;}
+  const data=(obj&&obj.data)?obj.data:null;
+  if(!data){alert('El archivo no es un respaldo de Polleria válido.');return;}
+  const cols=['productos','stock','clientes','pedidos','movimientos'];
+  const total=cols.reduce((a,c)=>a+((data[c]||[]).length),0);
+  if(!confirm('Esto va a SUBIR a la nube '+total+' registros del respaldo (reemplaza los que tengan el mismo código). ¿Continuar?'))return;
+  try{
+    const uid=_uidPoll();
+    for(const c of cols){
+      const arr=data[c]||[];
+      for(let i=0;i<arr.length;i+=400){
+        const batch=db.batch();
+        arr.slice(i,i+400).forEach(item=>{
+          const rest=Object.assign({},item);delete rest._id;
+          const ref=item._id?db.collection('polleria/'+uid+'/'+c).doc(item._id):db.collection('polleria/'+uid+'/'+c).doc();
+          batch.set(ref,rest);
+        });
+        await batch.commit();
+      }
+    }
+    if(obj.local){Object.keys(obj.local).forEach(k=>localStorage.setItem(k,obj.local[k]));}
+    alert('✅ Respaldo restaurado en la nube. La app se va a recargar.');
+    location.reload();
+  }catch(e){alert('Error al restaurar: '+(e&&e.message||e));}
+}
 
 function PantallaActivacionPoll({onActivado}){
   const[codigo,setCodigo]=React.useState('');
@@ -1056,7 +1112,7 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
     setCargando(true);
     try{
       const items=carrito.map(i=>({_id:Date.now()+Math.random(),nombre:i.prod.nombre,unidad:i.prod.unidad||'kg',cantidad:i.cantidad,precio:i.prod.precioVenta||0,subtotal:(i.prod.precioVenta||0)*i.cantidad}));
-      const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'envio':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'delivery':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),horaCreacion:esEnvio?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'',telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
       const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
       onVentaConfirmada({...pedidoData,id:ref.id,items});
       setClienteNombre('');setTelefono('');setDatosPago('');setPago('efectivo');setEsEnvio(false);setDireccion('');
@@ -1559,29 +1615,31 @@ function CalculadoraCajon({uid}){
   const [preciosVenta,setPreciosVenta]=useState({});
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
+  const [rendimientoPct,setRendimientoPct]=useState(70);
 
   const totKg=+(cajones*kgCajon).toFixed(2);
+  const rendimientoKg=+(totKg*rendimientoPct/100).toFixed(2);
   const tot=parseInt(nPollos)||0;
-  const kgPromedio=tot>0?+(totKg/tot).toFixed(2):null;
+  const kgPromedio=tot>0?+(rendimientoKg/tot).toFixed(2):null;
   const precioTotalPagado=Number(precioCajon)*cajones||0;
-  const costoPorKg=totKg>0&&precioTotalPagado>0?precioTotalPagado/totKg:0;
+  const costoPorKg=rendimientoKg>0&&precioTotalPagado>0?precioTotalPagado/rendimientoKg:0;
 
   const MODOS={
     completo:{label:'🐔 Entero', piezas:[
-      {n:'Pollo entero', kgEst:totKg, ref:tot>0?`${tot} pollos`:'', u:'kg'},
+      {n:'Pollo entero', kgEst:rendimientoKg, ref:tot>0?`${tot} pollos`:'', u:'kg'},
     ]},
     piezas:{label:'🍗 Trozado', piezas:[
-      {n:'Pechugas',   kgEst:+(totKg*0.25).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
-      {n:'Pata-muslo', kgEst:+(totKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
-      {n:'Alas',       kgEst:+(totKg*0.18).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
-      {n:'Muslos',     kgEst:+(totKg*0.14).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
-      {n:'Carcasas',   kgEst:+(totKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
+      {n:'Pechugas',   kgEst:+(rendimientoKg*0.25).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
+      {n:'Pata-muslo', kgEst:+(rendimientoKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
+      {n:'Alas',       kgEst:+(rendimientoKg*0.18).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
+      {n:'Muslos',     kgEst:+(rendimientoKg*0.14).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
+      {n:'Carcasas',   kgEst:+(rendimientoKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
     ]},
     filet:{label:'🥩 Filet', piezas:[
-      {n:'Filet pechuga',  kgEst:+(totKg*0.25).toFixed(2), ref:tot>0?`${tot} filetes`:'',   u:'kg'},
-      {n:'Milanesas',      kgEst:+(totKg*0.22).toFixed(2), ref:tot>0?`${tot*4} piezas`:'',  u:'kg'},
-      {n:'Pata-muslo',     kgEst:+(totKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'',  u:'kg'},
-      {n:'Carcasas caldo', kgEst:+(totKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',    u:'kg'},
+      {n:'Filet pechuga',  kgEst:+(rendimientoKg*0.25).toFixed(2), ref:tot>0?`${tot} filetes`:'',   u:'kg'},
+      {n:'Milanesas',      kgEst:+(rendimientoKg*0.22).toFixed(2), ref:tot>0?`${tot*4} piezas`:'',  u:'kg'},
+      {n:'Pata-muslo',     kgEst:+(rendimientoKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'',  u:'kg'},
+      {n:'Carcasas caldo', kgEst:+(rendimientoKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',    u:'kg'},
     ]},
   };
   const M=MODOS[modo];
@@ -1664,11 +1722,23 @@ function CalculadoraCajon({uid}){
               className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
           </div>
         </div>
-        <div className="suma-band" style={{marginBottom:10}}>
+        <div className="suma-band" style={{marginBottom:6}}>
           <span style={{fontSize:13,color:'var(--txt2)'}}>
-            {cajones} cajón{cajones>1?'es':''} × {kgCajon} kg
+            {cajones} cajón{cajones>1?'es':''} × {kgCajon} kg brutos
           </span>
           <span style={{fontSize:20,fontWeight:700,color:'var(--txt)'}}>= {totKg} kg</span>
+        </div>
+        <div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <label className="lbl" style={{marginTop:0,color:'var(--orange)',fontWeight:700,fontSize:12}}>🐔 Rendimiento del cajón</label>
+            <span style={{fontSize:12,color:'var(--txt2)'}}>Bruto {totKg}kg → <b style={{color:'var(--orange)'}}>{rendimientoKg} kg</b> vendibles</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <input type="range" min={50} max={95} step={1} value={rendimientoPct} onChange={e=>setRendimientoPct(Number(e.target.value))} style={{flex:1,accentColor:'var(--orange)'}}/>
+            <input type="number" min={50} max={95} value={rendimientoPct} onChange={e=>setRendimientoPct(Math.min(95,Math.max(50,Number(e.target.value))))} className="inp" style={{width:60,textAlign:'center',fontWeight:700,padding:'4px 6px'}}/>
+            <span style={{fontSize:13,color:'var(--txt2)',flexShrink:0}}>%</span>
+          </div>
+          <div style={{fontSize:11,color:'var(--txt3)',marginTop:4}}>Típico: 65–75% (descuenta sangre, merma y grasa)</div>
         </div>
         <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
           <label className="lbl" style={{marginTop:0,fontSize:11}}>
@@ -1754,8 +1824,10 @@ function CalculadoraCajon({uid}){
               📊 Resumen del cajón
             </div>
             {[
+              {lbl:'📦 Kg brutos → vendibles', val:`${totKg}kg → ${rendimientoKg}kg (${rendimientoPct}%)`, c:'var(--orange)'},
               {lbl:'💸 Costo total',    val:formatPeso(precioTotalPagado),  c:'var(--red)'},
-              {lbl:'💰 Ingreso total',  val:formatPeso(totalIngreso),        c:'var(--blue)'},
+              {lbl:'📊 Costo/kg vendible', val:formatPeso(costoPorKg)+'/kg', c:'var(--orange)'},
+              {lbl:'💰 Ingreso estimado',  val:formatPeso(totalIngreso),        c:'var(--blue)'},
               {lbl:'✨ Ganancia',       val:`${formatPeso(gananciaTotal)} (${gananciaPct}%)`, c:gananciaTotal>=0?'var(--green)':'var(--red)'},
             ].map(r=>(
               <div key={r.lbl} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(128,128,128,0.2)'}}>
@@ -2067,21 +2139,110 @@ function FormStock({inicial,onGuardar,onCancelar}){
 /* ══════════════════════════════════════
    PEDIDOS
 ══════════════════════════════════════ */
-const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},entregado:{label:'Entregado',pillC:'pill pill-gray'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
+const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},entregado:{label:'Entregado 📦',pillC:'pill pill-gray'},cobrado:{label:'Cobrado ✅',pillC:'pill pill-green'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
+
+function ComandaEnvio({pedido,onCerrar}){
+  const nombreNegocio=getNombreLocal();
+  const est=ESTADOS[pedido.estado]||ESTADOS.pendiente;
+  const horaImp=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  const imprimir=()=>window.print();
+  const PASOS=['pendiente','preparando','listo','entregado','cobrado'];
+  const idxAct=PASOS.indexOf(pedido.estado);
+  return(
+    <div className="overlay" onClick={onCerrar}>
+      <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-drag"/>
+        <div style={{textAlign:'center',marginBottom:12}}>
+          <div style={{fontSize:28}}>🛵</div>
+          <div style={{fontWeight:700,fontSize:16,color:'var(--txt)'}}>Comanda de Envío</div>
+        </div>
+        <div className="comp-preview">
+          <div style={{textAlign:'center',fontWeight:700,fontSize:15,borderBottom:'1px dashed var(--border)',paddingBottom:8,marginBottom:8}}>🐔 {nombreNegocio.toUpperCase()}</div>
+          <div style={{display:'flex',gap:3,justifyContent:'center',marginBottom:10,flexWrap:'wrap'}}>
+            {PASOS.map((e,i)=>{
+              const done=i<idxAct;const active=i===idxAct;
+              return(<span key={e} style={{fontSize:10,fontWeight:active?700:400,color:active?'var(--green)':done?'var(--txt2)':'var(--txt3)',background:active?'var(--green-bg)':'transparent',borderRadius:10,padding:'2px 7px',border:`1px solid ${active?'var(--green)':'var(--border)'}`}}>
+                {done?'✓ ':''}{ESTADOS[e]?.label||e}
+              </span>);
+            })}
+          </div>
+          <div style={{background:'var(--bg2)',borderRadius:8,padding:'10px 12px',marginBottom:10}}>
+            <div style={{fontWeight:700,fontSize:15,color:'var(--txt)',marginBottom:4}}>👤 {pedido.clienteNombre||'Cliente s/n'}</div>
+            {pedido.telefono&&<div style={{fontSize:13,color:'var(--txt2)'}}>📞 {pedido.telefono}</div>}
+            {pedido.direccion&&<div style={{fontSize:13,color:'var(--txt)',fontWeight:700,marginTop:4}}>📍 {pedido.direccion}</div>}
+          </div>
+          <div style={{display:'flex',gap:12,marginBottom:10,fontSize:12,color:'var(--txt2)',flexWrap:'wrap'}}>
+            <span>📅 {formatFecha(pedido.fecha)}</span>
+            {pedido.horaCreacion&&<span>🕐 Ingresó: <b>{pedido.horaCreacion}</b></span>}
+            {pedido.horaEntrega&&<span>⏰ Entrega: <b>{pedido.horaEntrega}</b></span>}
+          </div>
+          <div style={{fontSize:12,fontWeight:700,color:'var(--txt)',marginBottom:5}}>Productos:</div>
+          {(pedido.items||[]).map((it,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:13,borderBottom:'1px solid var(--border)'}}>
+              <span>{it.nombre} × {it.cantidad} {it.unidad}</span>
+              <span style={{fontWeight:700}}>{formatPeso(it.subtotal)}</span>
+            </div>
+          ))}
+          <div style={{display:'flex',justifyContent:'space-between',marginTop:10,paddingTop:8,borderTop:'2px solid var(--border)',fontWeight:700,fontSize:16}}>
+            <span>TOTAL</span>
+            <span style={{color:'var(--green)'}}>{formatPeso(pedido.total)}</span>
+          </div>
+          <div style={{marginTop:8,fontSize:12,color:'var(--txt2)'}}>💳 {pedido.formaPago} · {pedido.pagado?'✅ Cobrado':'⏳ Pendiente de cobro'}</div>
+          {pedido.notas&&<div style={{marginTop:6,fontSize:11,fontStyle:'italic',color:'var(--txt3)'}}>📝 {pedido.notas}</div>}
+          <div style={{textAlign:'center',marginTop:12,fontSize:10,color:'var(--txt3)',borderTop:'1px dashed var(--border)',paddingTop:8}}>Impreso: {horaImp} · Emma Soluciones Digitales</div>
+        </div>
+        <div className="comp-print">
+          <div className="comp-print-titulo">🐔 {nombreNegocio.toUpperCase()}</div>
+          <div style={{textAlign:'center',fontSize:11,marginBottom:6,fontWeight:700}}>🛵 COMANDA DE ENVÍO</div>
+          <div style={{borderBottom:'1px dashed #000',marginBottom:8,paddingBottom:8}}>
+            <div style={{fontSize:13,fontWeight:700}}>{pedido.clienteNombre}</div>
+            {pedido.telefono&&<div style={{fontSize:11}}>Tel: {pedido.telefono}</div>}
+            {pedido.direccion&&<div style={{fontSize:12,fontWeight:700,marginTop:2}}>Dir: {pedido.direccion}</div>}
+          </div>
+          <div style={{fontSize:11,marginBottom:6}}>
+            {pedido.horaCreacion&&`Ingresó: ${pedido.horaCreacion}`}
+            {pedido.horaEntrega&&` | Entrega: ${pedido.horaEntrega}`}
+          </div>
+          {(pedido.items||[]).map((it,i)=>(
+            <div key={i} className="comp-print-fila"><span>{it.nombre} × {it.cantidad} {it.unidad}</span><span>{formatPeso(it.subtotal)}</span></div>
+          ))}
+          <div className="comp-print-fila comp-print-total"><span>TOTAL</span><span>{formatPeso(pedido.total)}</span></div>
+          <div className="comp-print-fila" style={{fontSize:11,marginTop:4}}><span>Pago:</span><span>{pedido.formaPago}{pedido.pagado?' ✅':''}</span></div>
+          {pedido.notas&&<div style={{fontSize:10,marginTop:4}}>Nota: {pedido.notas}</div>}
+          <div className="comp-print-footer">Estado: {ESTADOS[pedido.estado]?.label||pedido.estado}<br/>Emma SD · Gestión Pollería</div>
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:14}}>
+          <button onClick={imprimir} className="btn-pri" style={{flex:1,padding:12,fontSize:14}}>🖨️ Imprimir comanda</button>
+          <button onClick={onCerrar} className="btn-sec" style={{padding:12}}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
   const [abierto,setAbierto]=useState(false);
+  const [comanda,setComanda]=useState(false);
   const est=ESTADOS[pedido.estado]||ESTADOS.pendiente;
+  const esEnvio=(pedido.tipo==='delivery'||pedido.tipo==='envio');
+  const abrirWhatsApp=()=>{
+    const phone=(pedido.telefono||'').replace(/\D/g,'');
+    if(!phone){alert('Este pedido no tiene número de teléfono');return;}
+    const items=(pedido.items||[]).map(i=>`• ${i.nombre} × ${i.cantidad} ${i.unidad}: ${formatPeso(i.subtotal)}`).join('\n');
+    const msg=`🐔 *${getNombreLocal()}*\n🛵 *PEDIDO DE ENVÍO*\n\n👤 ${pedido.clienteNombre}\n📍 ${pedido.direccion||''}\n\n${items}\n\n💰 *TOTAL: ${formatPeso(pedido.total)}*\nPago: ${pedido.formaPago}`;
+    window.open(`https://wa.me/549${phone}?text=${encodeURIComponent(msg)}`,'_blank');
+  };
   return(
-    <div className="card">
+    <div className="card" style={{borderLeft:esEnvio?'4px solid #e94560':''}}>
       <div className="card-body" onClick={()=>setAbierto(!abierto)} style={{cursor:'pointer'}}>
         <div className="card-head">
           <div style={{flex:1}}>
-            <div className="card-name">{pedido.clienteNombre||'Cliente s/n'}</div>
+            <div className="card-name">{pedido.clienteNombre||'Cliente s/n'}{esEnvio&&<span style={{marginLeft:6,fontSize:11,background:'rgba(233,69,96,.12)',color:'#e94560',borderRadius:8,padding:'1px 7px',fontWeight:600}}>🛵 Envío</span>}</div>
             <div className="card-sub">{(pedido.items||[]).map(i=>`${i.cantidad} ${i.unidad} de ${i.nombre}`).join(', ')||'—'}</div>
             <div className="card-sub" style={{marginTop:4}}>
-              📅 {formatFecha(pedido.fecha)}{pedido.horaEntrega?` · ⏰ ${pedido.horaEntrega}`:''}{pedido.tipo==='delivery'?' · 🚴':''}{pedido.pagado?' · ✅':' · 💳'}
+              📅 {formatFecha(pedido.fecha)}{pedido.horaCreacion?` 🕐 ${pedido.horaCreacion}`:''}{pedido.horaEntrega?` · ⏰ ${pedido.horaEntrega}`:''}{pedido.pagado?' · ✅':' · 💳'}
             </div>
+            {esEnvio&&pedido.direccion&&<div className="card-sub" style={{color:'#e94560',marginTop:2}}>📍 {pedido.direccion}</div>}
           </div>
           <div style={{textAlign:'right',flexShrink:0,marginLeft:8}}>
             <span className={est.pillC}>{est.label}</span>
@@ -2091,32 +2252,41 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
       </div>
       {abierto&&<div style={{padding:'0 14px 14px',borderTop:'1px solid var(--border)'}}>
         {pedido.notas&&<p style={{fontSize:13,color:'var(--txt2)',margin:'10px 0 4px',fontStyle:'italic'}}>"{pedido.notas}"</p>}
-        {pedido.tipo==='delivery'&&pedido.direccion&&<p style={{fontSize:13,marginTop:6,color:'var(--txt)'}}>📍 {pedido.direccion}</p>}
-        <div className="card-actions">
+        {esEnvio&&pedido.telefono&&<p style={{fontSize:13,marginTop:4,color:'var(--txt)'}}>📞 {pedido.telefono}</p>}
+        <div className="card-actions" style={{flexWrap:'wrap',gap:6}}>
           <button onClick={onEditar} className="btn-ic">✏️</button>
+          {esEnvio&&<button onClick={()=>setComanda(true)} className="btn-ic">🖨️ Comanda</button>}
+          {esEnvio&&pedido.telefono&&<button onClick={abrirWhatsApp} style={{fontSize:13,padding:'7px 12px',borderRadius:'var(--radius)',border:'1px solid #25D366',background:'transparent',color:'#25D366',cursor:'pointer',fontWeight:600}}>📱 WhatsApp</button>}
           {pedido.estado==='pendiente'&&<button onClick={()=>onEstado(pedido.id,'preparando')} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--blue)'}}>👨‍🍳 Preparando</button>}
           {pedido.estado==='preparando'&&<button onClick={()=>onEstado(pedido.id,'listo')} className="btn-pri" style={{fontSize:13,padding:'7px 12px'}}>✓ Listo</button>}
           {pedido.estado==='listo'&&<button onClick={()=>onEstado(pedido.id,'entregado')} className="btn-ic" style={{fontSize:13}}>📦 Entregado</button>}
+          {pedido.estado==='entregado'&&<button onClick={()=>onEstado(pedido.id,'cobrado')} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--green)'}}>✅ Cobrado</button>}
           {(pedido.estado==='pendiente'||pedido.estado==='preparando')&&<button onClick={()=>onEstado(pedido.id,'cancelado')} className="btn-ic" style={{fontSize:13,color:'var(--red)'}}>✕ Cancelar</button>}
           <button onClick={()=>onEliminar(pedido.id)} className="btn-ic" style={{marginLeft:'auto',color:'var(--red)'}}>🗑️</button>
         </div>
       </div>}
+      {comanda&&<ComandaEnvio pedido={pedido} onCerrar={()=>setComanda(false)}/>}
     </div>
   );
 }
-
 function PantallaPedidos({uid}){
-  const [pedidos,setPedidos]=useState([]);const [clientes,setClientes]=useState([]);const [productos,setProductos]=useState([]);const [form,setForm]=useState(null);const [filtro,setFiltro]=useState('hoy');
+  const [pedidos,setPedidos]=useState([]);const [clientes,setClientes]=useState([]);const [productos,setProductos]=useState([]);const [stockItems,setStockItems]=useState([]);const [form,setForm]=useState(null);const [filtro,setFiltro]=useState('hoy');
   useEffect(()=>{
     const u1=db.collection(`polleria/${uid}/pedidos`).orderBy('createdAt','desc').onSnapshot(s=>setPedidos(s.docs.map(d=>({id:d.id,...d.data()}))));
     const u2=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
     const u3=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data()}))));
-    return()=>{u1();u2();u3();};
+    const u4=db.collection(`polleria/${uid}/stock`).orderBy('nombre','asc').onSnapshot(s=>setStockItems(s.docs.map(d=>({id:d.id,...d.data()}))));
+    return()=>{u1();u2();u3();u4();};
   },[]);
+  const todosProductos=React.useMemo(()=>{
+    const nombresEnProd=new Set(productos.map(p=>(p.nombre||'').toLowerCase().trim()));
+    const stockVisibles=stockItems.filter(s=>(s.precioVenta||0)>0&&!nombresEnProd.has((s.nombre||'').toLowerCase().trim()));
+    return [...productos,...stockVisibles].sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+  },[productos,stockItems]);
   const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente'});setForm(null);};
   const cambiarEstado=async(id,estado)=>await db.collection(`polleria/${uid}/pedidos`).doc(id).update({estado,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
   const eliminar=async id=>{if(!confirm('¿Eliminar pedido?'))return;await db.collection(`polleria/${uid}/pedidos`).doc(id).delete();};
-  if(form!==null) return <FormPedido inicial={form} clientes={clientes} productos={productos} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+  if(form!==null) return <FormPedido inicial={form} clientes={clientes} productos={todosProductos} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
   const hoyF=hoy();
   const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'||p.estado==='preparando'):pedidos;
   const totalHoy=pedidos.filter(p=>p.fecha===hoyF&&p.pagado&&p.estado!=='cancelado').reduce((s,p)=>s+(p.total||0),0);
@@ -2453,6 +2623,19 @@ function PantallaConfig({onModoChange}){
           <div className="ptitle">🎨 Tema de colores</div>
           <ConfigTema/>
         </div>        {/* ── Sesión ── */}
+        <div className="panel">
+          <div className="ptitle">💾 Respaldo de datos</div>
+          <p style={{fontSize:12,color:'var(--txt2)',marginBottom:12,lineHeight:1.5}}>
+            Tus datos están en la nube, pero podés bajar una copia .json para guardarla aparte (mail, Drive). Si algún día pasa algo, la restaurás y volvés a subir todo.
+          </p>
+          <button onClick={exportarRespaldoPoll} className="btn-full" style={{background:'var(--green)',marginBottom:10}}>
+            ⬇️ Descargar respaldo (.json)
+          </button>
+          <label className="btn-full" style={{background:'var(--bg2)',color:'var(--txt)',display:'block',textAlign:'center',cursor:'pointer',border:'1px solid var(--border)'}}>
+            ♻️ Restaurar desde un respaldo
+            <input type="file" accept=".json" style={{display:'none'}} onChange={e=>{if(e.target.files[0])restaurarRespaldoPoll(e.target.files[0]);}}/>
+          </label>
+        </div>
         <div className="panel">
           <div className="ptitle">👤 Sesión</div>
           <button onClick={()=>auth.signOut()} className="btn-full" style={{background:'var(--red)',color:'#fff'}}>
