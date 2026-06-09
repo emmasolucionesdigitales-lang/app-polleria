@@ -550,12 +550,18 @@ const fechaCorta = () => new Date().toLocaleDateString('es-AR',{weekday:'short',
 /* Colores e iconos por categoría */
 const CAT_STYLE = {
   '🐔 Pollo':          { bg:'#FFF8E1', emoji:'🐔' },
+  'Pollo':             { bg:'#FFF8E1', emoji:'🐔' },
   '🥩 Carne':           { bg:'#FDEDEC', emoji:'🥩' },
   '🥦 Verduras':        { bg:'#EAF3DE', emoji:'🥦' },
+  'Verdulería':         { bg:'#EAF3DE', emoji:'🥦' },
+  'Verduleria':         { bg:'#EAF3DE', emoji:'🥦' },
   '🍋 Frutas':          { bg:'#FEFCE8', emoji:'🍋' },
   '🥚 Huevos y lácteos':{ bg:'#FDF2E9', emoji:'🥚' },
+  'Huevos y Lácteos':  { bg:'#FDF2E9', emoji:'🥚' },
   '🧀 Fiambres':        { bg:'#FEF3E2', emoji:'🧀' },
   '🛒 Almacén':         { bg:'#E6F1FB', emoji:'🛒' },
+  'Congelados':         { bg:'#E8F4FE', emoji:'❄️' },
+  '❄️ Congelados':     { bg:'#E8F4FE', emoji:'❄️' },
   'Otro':               { bg:'#F5F5F4', emoji:'📦' },
 };
 const catStyle = cat => CAT_STYLE[cat] || { bg:'#F5F5F4', emoji:'📦' };
@@ -2244,9 +2250,10 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
             </div>
             {esEnvio&&pedido.direccion&&<div className="card-sub" style={{color:'#e94560',marginTop:2}}>📍 {pedido.direccion}</div>}
           </div>
-          <div style={{textAlign:'right',flexShrink:0,marginLeft:8}}>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',flexShrink:0,marginLeft:8,gap:3}}>
             <span className={est.pillC}>{est.label}</span>
-            <div style={{fontWeight:700,fontSize:16,color:'var(--txt)',marginTop:4}}>{formatPeso(pedido.total)}</div>
+            <div style={{fontWeight:700,fontSize:16,color:'var(--txt)'}}>{formatPeso(pedido.total)}</div>
+            {esEnvio&&pedido.telefono&&<button onClick={e=>{e.stopPropagation();abrirWhatsApp();}} style={{background:'#25D366',color:'#fff',border:'none',borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:700,cursor:'pointer',letterSpacing:.3}}>📱 WA</button>}
           </div>
         </div>
       </div>
@@ -2286,7 +2293,17 @@ function PantallaPedidos({uid}){
   const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente',horaCreacion:r.tipo==='delivery'?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''});setForm(null);};
   const cambiarEstado=async(id,estado)=>await db.collection(`polleria/${uid}/pedidos`).doc(id).update({estado,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
   const eliminar=async id=>{if(!confirm('¿Eliminar pedido?'))return;await db.collection(`polleria/${uid}/pedidos`).doc(id).delete();};
-  if(form!==null) return <FormPedido inicial={form} clientes={clientes} productos={todosProductos} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
+  const resumirEnviosWA=()=>{
+    const hoyF2=hoy();
+    const envios=(filtro==='todos'?pedidos:pedidos.filter(p=>p.fecha===hoyF2)).filter(p=>(p.tipo==='delivery'||p.tipo==='envio')&&p.estado!=='cancelado'&&p.estado!=='cobrado');
+    if(!envios.length){alert('No hay envíos pendientes para compartir');return;}
+    const lineas=envios.map((p,i)=>{
+      const prods=(p.items||[]).map(it=>`  • ${it.nombre} × ${it.cantidad} ${it.unidad}`).join('\n');
+      return `*${i+1}. ${p.clienteNombre}* ${p.horaEntrega?'⏰ '+p.horaEntrega:''}\n📍 ${p.direccion||'Sin dirección'}${p.telefono?'\n📞 '+p.telefono:''}\n${prods}\n💰 ${formatPeso(p.total)} (${p.formaPago})`;
+    }).join('\n─────────\n');
+    const msg=`🐔 *${getNombreLocal()}*\n🛵 *ENVÍOS DEL DÍA — ${new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}*\n═══════════\n${lineas}\n═══════════\n*${envios.length} envío${envios.length>1?'s':''} pendiente${envios.length>1?'s':''} · Total: ${formatPeso(envios.reduce((s,p)=>s+(p.total||0),0))}*`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
+  };
   const hoyF=hoy();
   const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'||p.estado==='preparando'):pedidos;
   const totalHoy=pedidos.filter(p=>p.fecha===hoyF&&p.pagado&&p.estado!=='cancelado').reduce((s,p)=>s+(p.total||0),0);
@@ -2294,23 +2311,38 @@ function PantallaPedidos({uid}){
     <div>
       <Header titulo="Pedidos" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()} subtitulo="Gestión Pollería"/>
       <div className="app-body">
+        <button onClick={()=>window.open('https://web.whatsapp.com','wawin','width=430,height=720,top=0,left=0,resizable=yes,scrollbars=yes')} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'#25D366',color:'#fff',border:'none',borderRadius:10,padding:'10px 14px',fontSize:13,cursor:'pointer',marginBottom:10,textAlign:'left'}}>
+          <span style={{fontSize:24,lineHeight:1}}>📱</span>
+          <div><div style={{fontWeight:700,fontSize:13}}>Abrir WhatsApp Web</div><div style={{fontSize:10,opacity:.85,marginTop:1}}>Se abre al lado · leé el pedido y cargalo acá sin salir</div></div>
+          <span style={{marginLeft:'auto',fontSize:11,opacity:.8}}>→</span>
+        </button>
         <div className="suma-band" style={{marginBottom:12}}>
           <div><div style={{fontSize:11,color:'var(--txt2)'}}>Pedidos hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{pedidos.filter(p=>p.fecha===hoyF).length}</div></div>
           <div style={{textAlign:'right'}}><div style={{fontSize:11,color:'var(--txt2)'}}>Cobrado hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--green)'}}>{formatPeso(totalHoy)}</div></div>
         </div>
-        <div className="tab-bar">
+        <div className="tab-bar" style={{flexWrap:'wrap',gap:6}}>
           {[{k:'hoy',lbl:'Hoy'},{k:'pendientes',lbl:'En proceso'},{k:'todos',lbl:'Todos'}].map(f=>(
             <button key={f.k} onClick={()=>setFiltro(f.k)} className={`tab-btn${filtro===f.k?' activo':''}`}>{f.lbl}</button>
           ))}
+          <button onClick={resumirEnviosWA} style={{marginLeft:'auto',background:'#25D366',color:'#fff',border:'none',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>📱 Resumir envíos</button>
         </div>
         {mostrar.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🛒</div>No hay pedidos<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Nuevo pedido</button></div>}
         {mostrar.map(p=><TarjetaPedido key={p.id} pedido={p} onEditar={()=>setForm(p)} onEstado={cambiarEstado} onEliminar={eliminar}/>)}
       </div>
+      {form!==null&&<>
+        <div onClick={()=>setForm(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.45)',zIndex:800}}/>
+        <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:801,background:'var(--bg)',borderRadius:'20px 20px 0 0',maxHeight:'90vh',overflowY:'auto',paddingBottom:80,boxShadow:'0 -4px 30px rgba(0,0,0,.2)'}}>
+          <div style={{textAlign:'center',padding:'12px 0 4px',cursor:'grab'}}>
+            <div style={{width:40,height:4,background:'var(--border)',borderRadius:2,display:'inline-block'}}/>
+          </div>
+          <FormPedido inicial={form} clientes={clientes} productos={todosProductos} onGuardar={guardar} onCancelar={()=>setForm(null)} esSheet/>
+        </div>
+      </>}
     </div>
   );
 }
 
-function FormPedido({inicial,clientes,productos,onGuardar,onCancelar}){
+function FormPedido({inicial,clientes,productos,onGuardar,onCancelar,esSheet}){
   const [d,setD]=useState({clienteNombre:'',clienteId:'',tipo:'mostrador',direccion:'',horaEntrega:'',telefono:'',horaCreacion:'',notas:'',pagado:false,formaPago:'efectivo',items:[],total:0,...inicial});
   const [prodId,setProdId]=useState('');const [cant,setCant]=useState('');
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
@@ -2327,8 +2359,14 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar}){
   const guardar=()=>{if(!d.clienteNombre.trim())return alert('Ingresá el nombre del cliente');onGuardar(d);};
   return(
     <div>
-      <Header titulo={d.id?'Editar Pedido':'Nuevo Pedido'} onBack={onCancelar}/>
-      <div className="app-body">
+      {!esSheet&&<Header titulo={d.id?'Editar Pedido':'Nuevo Pedido'} onBack={onCancelar}/>}
+      {esSheet&&(
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 14px 12px',borderBottom:'1px solid var(--border)',marginBottom:4}}>
+          <div style={{fontWeight:700,fontSize:16,color:'var(--txt)'}}>{d.id?'✏️ Editar pedido':'🛵 Nuevo pedido'}</div>
+          <button onClick={onCancelar} style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'var(--txt2)',lineHeight:1,padding:'0 2px'}}>✕</button>
+        </div>
+      )}
+      <div className={esSheet?'':'app-body'} style={esSheet?{padding:'8px 14px 0'}:{}}>
         <label className="lbl">Cliente</label>
         <select value={d.clienteId} onChange={e=>selCliente(e.target.value)} className="inp" style={{marginBottom:6}}>
           <option value="">— Elegí un cliente o escribí abajo —</option>
