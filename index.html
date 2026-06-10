@@ -490,9 +490,25 @@ const NOMBRE_A_FOTO={
   'Colinabo':            'preset:kohlrabi',
   'Hinojo':              'preset:hinojo',
   'Apio':                'preset:apio',
+  'nuguets':              'preset:nuggets',
+  'nuget':               'preset:nuggets',
+  'nuggets de pollo':    'preset:nuggets',
+  'milanesa merluza':    'preset:milanesa-merluza',
+  'milanesas merluza':   'preset:milanesa-merluza',
+  'fish cake':           'preset:milanesa-merluza',
+  'medallon':            'preset:medallon',
+  'medallones':          'preset:medallon',
+  'medallon rebozado':   'preset:medallon',
+  'cordon bleu':         'preset:medallon',
+  'palitos mozzarella':  'preset:mozarella-sticks',
+  'palitos queso':       'preset:mozarella-sticks',
+  'mozzarella':          'preset:mozarella-sticks',
+  'mozarella sticks':    'preset:mozarella-sticks',
 };
+const _NAFK=Object.fromEntries(Object.entries(NOMBRE_A_FOTO).map(([k,v])=>[k.toLowerCase(),v]));
 function getProductFoto(prod){
-  const fotoFuente=prod.foto||NOMBRE_A_FOTO[prod.nombre];
+  const _nm=(prod.nombre||'');
+  const fotoFuente=prod.foto||NOMBRE_A_FOTO[_nm]||_NAFK[_nm.toLowerCase()];
   if(fotoFuente){
     // 1. Foto propia del producto (máxima prioridad)
     const fp=getFotoProducto(fotoFuente);
