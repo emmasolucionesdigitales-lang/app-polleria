@@ -1347,7 +1347,7 @@ function PantallaCatalogo({uid}){
           {filtrados.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🛒</div>No hay productos.<br/>Agregá productos en <b>Stock → Precios</b> o en los calculadores de cajones y congelados.</div>}
           <div className="catalogo-grid">
             {filtrados.map(p=>{
-              const cs=catStyle(p.categoria);
+              const cs=catStyle(p.categoria||(p.tipo==='verduleria'?'Verdulería':p.tipo==='congelados'?'Congelados':p.tipo==='cajon'?'🐔 Pollo':undefined));
               const enC=carrito.find(i=>i.prod.id===p.id);
               const esPeso=esPorPeso(p.unidad);
               const fotoData=renderFotoProducto(p.foto,cs,2.2);
@@ -1508,7 +1508,7 @@ function PantallaPrecios({uid, sinHeader=false}){
             <div className="sec-title">{cat} <span style={{fontWeight:400}}>({prods.length})</span></div>
             {prods.map(p=>{
               const m=p.precioCosto>0?Math.round(((Number(p.precioVenta)-Number(p.precioCosto))/Number(p.precioCosto))*100):null;
-              const cs=catStyle(p.categoria);
+              const cs=catStyle(p.categoria||(p.tipo==='verduleria'?'Verdulería':p.tipo==='congelados'?'Congelados':p.tipo==='cajon'?'🐔 Pollo':undefined));
               const fotoReal=getProductFoto(p);
               return(
                 <div key={p.id} className="card">
@@ -2403,8 +2403,18 @@ function PantallaPedidos({uid}){
           ))}
           <button onClick={resumirEnviosWA} style={{marginLeft:'auto',background:'#25D366',color:'#fff',border:'none',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>📱 Resumir envíos</button>
         </div>
-        {mostrar.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🛒</div>No hay pedidos<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Nuevo pedido</button></div>}
-        {mostrar.map(p=><TarjetaPedido key={p.id} pedido={p} onEditar={()=>setForm(p)} onEstado={cambiarEstado} onEliminar={eliminar}/>)}
+        {modoEnvios&&(
+          <div style={{fontWeight:700,fontSize:12,color:'var(--txt2)',margin:'4px 0 6px',display:'flex',alignItems:'center',gap:6}}>
+            📋 Envíos de hoy
+            <span style={{background:'#25D366',color:'#fff',borderRadius:10,padding:'1px 8px',fontSize:11}}>
+              {pedidos.filter(p=>(p.tipo==='delivery'||p.tipo==='envio')&&p.fecha===hoyF&&p.estado!=='cancelado').length}
+            </span>
+          </div>
+        )}
+        {!modoEnvios&&mostrar.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🛒</div>No hay pedidos<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Nuevo pedido</button></div>}
+        {(modoEnvios
+          ?pedidos.filter(p=>(p.tipo==='delivery'||p.tipo==='envio')&&p.fecha===hoyF&&p.estado!=='cancelado')
+          :mostrar).map(p=><TarjetaPedido key={p.id} pedido={p} onEditar={()=>setForm(p)} onEstado={cambiarEstado} onEliminar={eliminar}/>)}
       </div>
       {form!==null&&<>
         <div onClick={()=>setForm(null)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.45)',zIndex:800}}/>
