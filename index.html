@@ -2481,13 +2481,22 @@ function PantallaPedidos({uid}){
     const waW=Math.floor(sw*0.42);
     const spec='width='+waW+',height='+sh+',left=0,top=0,resizable=yes,scrollbars=yes';
     window.open('https://web.whatsapp.com','wawin',spec);
-    setModoEnvios(v=>{
-      if(!v) setTimeout(()=>{
-        // intentar mover la app a la derecha
-        try{window.moveTo(waW,0);window.resizeTo(sw-waW,sh);}catch(e){}
-      },800);
-      return true;
-    });
+    setModoEnvios(true);
+  };
+  const acomodarVentanas=()=>{
+    const sw=window.screen.availWidth||1440;
+    const sh=window.screen.availHeight||900;
+    const mitad=Math.floor(sw/2);
+    // Mover y achicar la app a la mitad derecha (formato vertical)
+    try{
+      window.moveTo(mitad,0);
+      window.resizeTo(mitad,sh);
+    }catch(e){
+      alert('Tu navegador no permite mover la ventana automáticamente.\n\nHacelo a mano:\n1. Clic en esta ventana → tecla Win + flecha derecha →\n2. Clic en WhatsApp → tecla Win + flecha izquierda ←');
+    }
+    // Reabrir WA a la izquierda por las dudas
+    const spec='width='+mitad+',height='+sh+',left=0,top=0,resizable=yes,scrollbars=yes';
+    window.open('https://web.whatsapp.com','wawin',spec);
   };
   const hoyF=hoy();
   const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'||p.estado==='preparando'):pedidos;
@@ -2517,10 +2526,10 @@ function PantallaPedidos({uid}){
                 </div>
               </div>
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <div style={{background:'rgba(255,255,255,.15)',borderRadius:6,padding:'3px 8px',fontSize:10,textAlign:'center',cursor:'default'}}>
-                  <div style={{fontWeight:700}}>🪟 Organizar ventanas</div>
-                  <div style={{opacity:.85}}>WA: Win+← · App: Win+→</div>
-                </div>
+                <button onClick={acomodarVentanas} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',borderRadius:6,padding:'4px 10px',fontSize:10,textAlign:'center',cursor:'pointer'}}>
+                  <div style={{fontWeight:700}}>🪟 Acomodar ventanas</div>
+                  <div style={{opacity:.85}}>Tocá para dividir la pantalla</div>
+                </button>
                 <button onClick={()=>setModoEnvios(false)} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',borderRadius:6,padding:'4px 8px',cursor:'pointer',fontSize:12,fontWeight:700}}>✕ Salir</button>
               </div>
             </div>
@@ -2989,7 +2998,7 @@ function App(){
       <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
         {contenido}
       </div>
-      <BotoneraFlotante uid={uid} abajo={20}/>
+      {tab!=='pedidos'&&<BotoneraFlotante uid={uid} abajo={20}/>}
     </div>
   );
   /* ── MODO CELULAR: nav abajo ── */
@@ -2997,7 +3006,7 @@ function App(){
     <div style={{paddingBottom:72}}>
       {contenido}
       <NavBar activo={tab} onChange={setTab}/>
-      <BotoneraFlotante uid={uid} abajo={76}/>
+      {tab!=='pedidos'&&<BotoneraFlotante uid={uid} abajo={76}/>}
     </div>
   );
 }
