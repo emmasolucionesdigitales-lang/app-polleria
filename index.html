@@ -2478,10 +2478,16 @@ function PantallaPedidos({uid}){
   const activarModoEnvios=()=>{
     const sw=window.screen.availWidth||1440;
     const sh=window.screen.availHeight||900;
-    const waW=Math.min(490,Math.floor(sw*0.44));
+    const waW=Math.floor(sw*0.42);
     const spec='width='+waW+',height='+sh+',left=0,top=0,resizable=yes,scrollbars=yes';
     window.open('https://web.whatsapp.com','wawin',spec);
-    setModoEnvios(true);
+    setModoEnvios(v=>{
+      if(!v) setTimeout(()=>{
+        // intentar mover la app a la derecha
+        try{window.moveTo(waW,0);window.resizeTo(sw-waW,sh);}catch(e){}
+      },800);
+      return true;
+    });
   };
   const hoyF=hoy();
   const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'||p.estado==='preparando'):pedidos;
@@ -2490,15 +2496,39 @@ function PantallaPedidos({uid}){
     <div>
       <Header titulo="Pedidos" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()} subtitulo="Gestión Pollería"/>
       <div className="app-body">
-        <button onClick={modoEnvios?()=>setModoEnvios(false):activarModoEnvios} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:modoEnvios?'#128C7E':'#25D366',color:'#fff',border:'none',borderRadius:10,padding:'10px 14px',fontSize:13,cursor:'pointer',marginBottom:10,textAlign:'left'}}>
-          <span style={{fontSize:22,lineHeight:1}}>📱</span>
-          <div>
-            <div style={{fontWeight:700,fontSize:13}}>{modoEnvios?'✅ Modo WhatsApp activo — tocá para salir':'Activar Modo Recibir Pedidos por WhatsApp'}</div>
-            <div style={{fontSize:10,opacity:.85,marginTop:1}}>{modoEnvios?'WA abierto al costado · formulario listo abajo':'WA Web se abre al lado · leés y cargás sin cambiar de pantalla'}</div>
+        {!modoEnvios&&(
+          <button onClick={activarModoEnvios} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'#25D366',color:'#fff',border:'none',borderRadius:10,padding:'10px 14px',fontSize:13,cursor:'pointer',marginBottom:10,textAlign:'left'}}>
+            <span style={{fontSize:22,lineHeight:1}}>📱</span>
+            <div>
+              <div style={{fontWeight:700,fontSize:13}}>Activar Modo Recibir Pedidos por WhatsApp</div>
+              <div style={{fontSize:10,opacity:.85,marginTop:1}}>WhatsApp Web se abre al costado · formulario siempre visible para cargar sin salir</div>
+            </div>
+            <span style={{marginLeft:'auto',fontSize:13}}>→</span>
+          </button>
+        )}
+        {modoEnvios&&(
+          <div style={{marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#128C7E',color:'#fff',borderRadius:'10px 10px 0 0',padding:'8px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>📱</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:12}}>Modo WhatsApp activo</div>
+                  <div style={{fontSize:10,opacity:.85}}>WA abierto al costado · leé el pedido y completá el formulario abajo</div>
+                </div>
+              </div>
+              <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                <div style={{background:'rgba(255,255,255,.15)',borderRadius:6,padding:'3px 8px',fontSize:10,textAlign:'center',cursor:'default'}}>
+                  <div style={{fontWeight:700}}>🪟 Organizar ventanas</div>
+                  <div style={{opacity:.85}}>WA: Win+← · App: Win+→</div>
+                </div>
+                <button onClick={()=>setModoEnvios(false)} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',borderRadius:6,padding:'4px 8px',cursor:'pointer',fontSize:12,fontWeight:700}}>✕ Salir</button>
+              </div>
+            </div>
+            <div style={{border:'2px solid #128C7E',borderTop:'none',borderRadius:'0 0 10px 10px',overflow:'hidden'}}>
+              <FormEnvioRapido productos={todosProductos} clientes={clientes} uid={uid}/>
+            </div>
           </div>
-          <span style={{marginLeft:'auto',fontSize:13}}>{modoEnvios?'✕':'→'}</span>
-        </button>
-        {modoEnvios&&<div style={{marginBottom:12}}><FormEnvioRapido productos={todosProductos} clientes={clientes} uid={uid}/></div>}
+        )}
         <div className="suma-band" style={{marginBottom:12}}>
           <div><div style={{fontSize:11,color:'var(--txt2)'}}>Pedidos hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{pedidos.filter(p=>p.fecha===hoyF).length}</div></div>
           <div style={{textAlign:'right'}}><div style={{fontSize:11,color:'var(--txt2)'}}>Cobrado hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--green)'}}>{formatPeso(totalHoy)}</div></div>
@@ -2896,6 +2926,46 @@ function AppWrapper(){
   return React.createElement(App);
 }
 
+function BotoneraFlotante({uid,abajo}){
+  const [open,setOpen]=useState(false);
+  const [productos,setProductos]=useState([]);
+  const [clientes,setClientes]=useState([]);
+  const [stockItems,setStockItems]=useState([]);
+  useEffect(()=>{
+    if(!uid)return;
+    const u1=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc').onSnapshot(s=>setProductos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u2=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc').onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const u3=db.collection(`polleria/${uid}/stock`).orderBy('nombre','asc').onSnapshot(s=>setStockItems(s.docs.map(d=>({id:d.id,...d.data()}))));
+    return()=>{u1();u2();u3();};
+  },[uid]);
+  const todosProductos=React.useMemo(()=>{
+    const np=new Set(productos.map(p=>(p.nombre||'').toLowerCase().trim()));
+    const sv=stockItems.filter(s=>(s.precioVenta||0)>0&&!np.has((s.nombre||'').toLowerCase().trim()));
+    return[...productos,...sv].sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+  },[productos,stockItems]);
+  return(<>
+    <button onClick={()=>setOpen(true)} title="Nuevo pedido rápido"
+      style={{position:'fixed',bottom:abajo||80,right:16,zIndex:600,width:58,height:58,borderRadius:'50%',
+        background:'#25D366',color:'#fff',border:'none',fontSize:22,cursor:'pointer',
+        boxShadow:'0 4px 20px rgba(37,211,102,.5)',display:'flex',alignItems:'center',justifyContent:'center',
+        transition:'transform .15s, box-shadow .15s'}}>
+      🛵
+    </button>
+    {open&&<>
+      <div onClick={()=>setOpen(false)} style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.5)',zIndex:900}}/>
+      <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:901,background:'var(--bg)',borderRadius:'20px 20px 0 0',maxHeight:'92vh',overflowY:'auto',paddingBottom:80,boxShadow:'0 -4px 30px rgba(0,0,0,.2)'}}>
+        <div style={{textAlign:'center',padding:'12px 0 4px',cursor:'grab'}}>
+          <div style={{width:40,height:4,background:'var(--border)',borderRadius:2,display:'inline-block'}}/>
+        </div>
+        <div style={{padding:'0 0 4px',textAlign:'center',fontSize:11,color:'var(--txt2)'}}>
+          Nuevo pedido de envío · toca fuera para cerrar
+        </div>
+        <FormEnvioRapido productos={todosProductos} clientes={clientes} uid={uid} onGuardado={()=>setOpen(false)}/>
+      </div>
+    </>}
+  </>);
+}
+
 function App(){
   const uid=getLicenciaPoll()?.deviceId||'default';
   const [tab,setTab]=useState('catalogo');
@@ -2919,6 +2989,7 @@ function App(){
       <div style={{flex:1,minWidth:0,overflowX:'hidden'}}>
         {contenido}
       </div>
+      <BotoneraFlotante uid={uid} abajo={20}/>
     </div>
   );
   /* ── MODO CELULAR: nav abajo ── */
@@ -2926,6 +2997,7 @@ function App(){
     <div style={{paddingBottom:72}}>
       {contenido}
       <NavBar activo={tab} onChange={setTab}/>
+      <BotoneraFlotante uid={uid} abajo={76}/>
     </div>
   );
 }
