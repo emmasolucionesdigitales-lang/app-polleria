@@ -2446,6 +2446,67 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
   );
 }
 
+function VentanaFlotanteEnvio({productos,clientes,uid,onCerrar,onAcomodar}){
+  // modo: 'panel' (pegado derecha) | 'flotante' (arrastrable) | 'inline' (ancho completo arriba)
+  const [modoV,setModoV]=useState('inline');
+  const [pos,setPos]=useState({x:window.innerWidth-360,y:90});
+  const [drag,setDrag]=useState(null);
+  const onDown=e=>{
+    if(modoV!=='flotante')return;
+    const t=e.touches?e.touches[0]:e;
+    setDrag({dx:t.clientX-pos.x,dy:t.clientY-pos.y});
+  };
+  useEffect(()=>{
+    if(!drag)return;
+    const move=e=>{
+      const t=e.touches?e.touches[0]:e;
+      setPos({x:Math.max(0,Math.min(window.innerWidth-320,t.clientX-drag.dx)),y:Math.max(0,Math.min(window.innerHeight-100,t.clientY-drag.dy))});
+    };
+    const up=()=>setDrag(null);
+    window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+    window.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+    return()=>{window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',up);};
+  },[drag]);
+
+  // Estilos según modo
+  let contStyle={};
+  if(modoV==='panel'){
+    contStyle={position:'fixed',top:0,right:0,bottom:0,width:340,zIndex:700,boxShadow:'-4px 0 24px rgba(0,0,0,.2)',overflowY:'auto',borderRadius:0};
+  }else if(modoV==='flotante'){
+    contStyle={position:'fixed',left:pos.x,top:pos.y,width:320,zIndex:700,boxShadow:'0 8px 32px rgba(0,0,0,.35)',maxHeight:'85vh',overflowY:'auto',borderRadius:12};
+  }else{
+    contStyle={marginBottom:10};
+  }
+
+  const BarraModos=()=>(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#128C7E',color:'#fff',padding:'7px 10px',
+      borderRadius:modoV==='inline'?'10px 10px 0 0':modoV==='panel'?0:'12px 12px 0 0',cursor:modoV==='flotante'?'grab':'default'}}
+      onMouseDown={onDown} onTouchStart={onDown}>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontSize:14}}>{modoV==='flotante'?'✋':'📱'}</span>
+        <div style={{fontWeight:700,fontSize:12}}>{modoV==='flotante'?'Arrastrá desde aquí':'Cargar envío'}</div>
+      </div>
+      <div style={{display:'flex',gap:3,alignItems:'center'}}>
+        <button onClick={()=>setModoV('inline')}   title="Ancho completo" style={{background:modoV==='inline'?'rgba(255,255,255,.35)':'rgba(255,255,255,.12)',border:'none',color:'#fff',borderRadius:5,padding:'3px 6px',cursor:'pointer',fontSize:12}}>▭</button>
+        <button onClick={()=>setModoV('panel')}    title="Panel a la derecha" style={{background:modoV==='panel'?'rgba(255,255,255,.35)':'rgba(255,255,255,.12)',border:'none',color:'#fff',borderRadius:5,padding:'3px 6px',cursor:'pointer',fontSize:12}}>⬛</button>
+        <button onClick={()=>setModoV('flotante')} title="Ventana flotante" style={{background:modoV==='flotante'?'rgba(255,255,255,.35)':'rgba(255,255,255,.12)',border:'none',color:'#fff',borderRadius:5,padding:'3px 6px',cursor:'pointer',fontSize:12}}>⧉</button>
+        {onAcomodar&&<button onClick={onAcomodar} title="Acomodar ventanas del navegador" style={{background:'rgba(255,255,255,.12)',border:'none',color:'#fff',borderRadius:5,padding:'3px 7px',cursor:'pointer',fontSize:11}}>🪟</button>}
+        <button onClick={onCerrar} title="Salir del modo" style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',borderRadius:5,padding:'3px 7px',cursor:'pointer',fontSize:11,fontWeight:700}}>✕</button>
+      </div>
+    </div>
+  );
+
+  return(<>
+    {modoV==='flotante'&&<div onClick={()=>setModoV('inline')} style={{position:'fixed',inset:0,zIndex:699,background:'transparent'}}/>}
+    <div style={contStyle}>
+      <BarraModos/>
+      <div style={{border:'2px solid #128C7E',borderTop:'none',borderRadius:modoV==='inline'?'0 0 10px 10px':modoV==='panel'?0:'0 0 12px 12px',overflow:'hidden',background:'var(--bg)'}}>
+        <FormEnvioRapido productos={productos} clientes={clientes} uid={uid}/>
+      </div>
+    </div>
+  </>);
+}
+
 function PantallaPedidos({uid}){
   const [pedidos,setPedidos]=useState([]);const [clientes,setClientes]=useState([]);const [productos,setProductos]=useState([]);const [stockItems,setStockItems]=useState([]);const [form,setForm]=useState(null);const [filtro,setFiltro]=useState('hoy');
   const [modoEnvios,setModoEnvios]=useState(false);
@@ -2516,27 +2577,7 @@ function PantallaPedidos({uid}){
           </button>
         )}
         {modoEnvios&&(
-          <div style={{marginBottom:10}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#128C7E',color:'#fff',borderRadius:'10px 10px 0 0',padding:'8px 14px'}}>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:16}}>📱</span>
-                <div>
-                  <div style={{fontWeight:700,fontSize:12}}>Modo WhatsApp activo</div>
-                  <div style={{fontSize:10,opacity:.85}}>WA abierto al costado · leé el pedido y completá el formulario abajo</div>
-                </div>
-              </div>
-              <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                <button onClick={acomodarVentanas} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',borderRadius:6,padding:'4px 10px',fontSize:10,textAlign:'center',cursor:'pointer'}}>
-                  <div style={{fontWeight:700}}>🪟 Acomodar ventanas</div>
-                  <div style={{opacity:.85}}>Tocá para dividir la pantalla</div>
-                </button>
-                <button onClick={()=>setModoEnvios(false)} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',borderRadius:6,padding:'4px 8px',cursor:'pointer',fontSize:12,fontWeight:700}}>✕ Salir</button>
-              </div>
-            </div>
-            <div style={{border:'2px solid #128C7E',borderTop:'none',borderRadius:'0 0 10px 10px',overflow:'hidden'}}>
-              <FormEnvioRapido productos={todosProductos} clientes={clientes} uid={uid}/>
-            </div>
-          </div>
+          <VentanaFlotanteEnvio productos={todosProductos} clientes={clientes} uid={uid} onCerrar={()=>setModoEnvios(false)} onAcomodar={acomodarVentanas}/>
         )}
         <div className="suma-band" style={{marginBottom:12}}>
           <div><div style={{fontSize:11,color:'var(--txt2)'}}>Pedidos hoy</div><div style={{fontWeight:700,fontSize:20,color:'var(--txt)'}}>{pedidos.filter(p=>p.fecha===hoyF).length}</div></div>
