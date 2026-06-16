@@ -3045,7 +3045,15 @@ function ConfigTema(){
 function ConfigSkin(){
   const [skinActual,setSkinActual]=useState(getSkin);
   const [guardado,setGuardado]=useState(false);
-  const aplicar=id=>{setSkinActual(id);aplicarSkin(id);setGuardado(true);setTimeout(()=>setGuardado(false),2000);};
+  const [dbg,setDbg]=useState('');
+  const aplicar=id=>{
+    setSkinActual(id);
+    aplicarSkin(id);
+    const aplicado=document.documentElement.getAttribute('data-skin');
+    const radio=getComputedStyle(document.documentElement).getPropertyValue('--radius').trim();
+    setDbg('data-skin='+aplicado+' · --radius='+radio);
+    setGuardado(true);setTimeout(()=>setGuardado(false),2000);
+  };
   return(
     <>
       <p style={{fontSize:12,color:'var(--txt2)',marginBottom:12,lineHeight:1.5}}>
@@ -3063,6 +3071,7 @@ function ConfigSkin(){
         ))}
       </div>
       {guardado&&<div style={{fontSize:13,color:'var(--green)',textAlign:'center',marginTop:10,fontWeight:600}}>✓ Estilo aplicado</div>}
+      {dbg&&<div style={{fontSize:10,color:'var(--txt3)',textAlign:'center',marginTop:6,fontFamily:'monospace'}}>🔧 {dbg} · v2.1</div>}
     </>
   );
 }
@@ -3254,30 +3263,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(<AppWrapper/>);
 
   <script>
   // ── SERVICE WORKER (PWA - funciona sin internet) ──────────────────
-  const PL_SW = `
-    const CACHE = 'pl-v1';
-    self.addEventListener('install', e => { self.skipWaiting(); });
-    self.addEventListener('activate', e => {
-      e.waitUntil(caches.keys().then(keys =>
-        Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-      ));
-    });
-    self.addEventListener('fetch', e => {
-      if (e.request.method !== 'GET') return;
-      e.respondWith(
-        caches.match(e.request).then(cached => {
-          const net = fetch(e.request).then(res => {
-            if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-            return res;
-          }).catch(() => cached);
-          return cached || net;
-        })
-      );
-    });
-  `;
+  // Service Worker deshabilitado: causaba errores en GitHub Pages y problemas de caché.
+  // Además, desregistramos cualquier SW viejo que haya quedado registrado.
   if ('serviceWorker' in navigator) {
-    const blob = new Blob([PL_SW], { type: 'application/javascript' });
-    navigator.serviceWorker.register(URL.createObjectURL(blob));
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      regs.forEach(function(r){ r.unregister(); });
+    }).catch(function(){});
   }
   </script>
 </body>
