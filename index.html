@@ -745,6 +745,49 @@ const formatPeso = n => '$'+Number(n||0).toLocaleString('es-AR',{minimumFraction
 const ahora = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 const fechaCorta = () => new Date().toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
 
+/* ─── #4 DESCUENTO DE STOCK AL VENDER + #5 CONSUMO FIFO DE LOTES ─── */
+// Resta del inventario lo que se vendió. Si el producto no está en stock, lo ignora (no rompe la venta).
+async function descontarStockVenta(uid, items){
+  try{
+    const stockCol=db.collection(`polleria/${uid}/stock`);
+    const snap=await stockCol.get();
+    const porNombre={};
+    snap.docs.forEach(d=>{const data=d.data();porNombre[(data.nombre||'').toLowerCase().trim()]={id:d.id,cantidad:Number(data.cantidad)||0};});
+    for(const it of (items||[])){
+      const cant=Number(it.cantidad)||0;
+      if(cant<=0)continue;
+      const key=(it.nombre||'').toLowerCase().trim();
+      const st=porNombre[key];
+      if(st){
+        const nueva=Math.max(0,+(st.cantidad-cant).toFixed(3));
+        await stockCol.doc(st.id).update({cantidad:nueva});
+        porNombre[key].cantidad=nueva;
+      }
+      await consumirLotesFIFO(uid, it.nombre, cant);
+    }
+  }catch(e){console.warn('descontarStockVenta:',e.message);}
+}
+// FIFO: descuenta lo vendido de los lotes más antiguos de ese producto (si existen lotes).
+async function consumirLotesFIFO(uid, nombre, cant){
+  try{
+    if(!cant||cant<=0||!nombre)return;
+    const lotesCol=db.collection(`polleria/${uid}/lotes`);
+    const snap=await lotesCol.where('productoNombre','==',nombre).get();
+    const lotes=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(l=>(Number(l.kgRestante)||0)>0)
+      .sort((a,b)=>String(a.fechaIngreso||'').localeCompare(String(b.fechaIngreso||'')));
+    let restante=cant;
+    for(const l of lotes){
+      if(restante<=0)break;
+      const disp=Number(l.kgRestante)||0;
+      const usar=Math.min(disp,restante);
+      const nuevo=+(disp-usar).toFixed(3);
+      await lotesCol.doc(l.id).update({kgRestante:nuevo,agotado:nuevo<=0.001});
+      restante-=usar;
+    }
+  }catch(e){console.warn('consumirLotesFIFO:',e.message);}
+}
+
 /* Colores e iconos por categoría */
 const CAT_STYLE = {
   '🐔 Pollo':          { bg:'#FFF8E1', emoji:'🐔' },
@@ -1351,6 +1394,7 @@ function ModalVentaRapida({producto, clientes, uid, onCerrar}){
       const cliente = clientes.find(c=>c.id===clienteId);
       const ts = firebase.firestore.FieldValue.serverTimestamp();
       await db.collection(`polleria/${uid}/pedidos`).add({clienteNombre:cliente?cliente.nombre:'Venta directa',clienteId:clienteId||'',tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',formaPago:pago,items:[{_id:Date.now(),nombre:producto.nombre,unidad:producto.unidad||'kg',cantidad,precio,subtotal:total}],total,fecha:hoy(),createdAt:ts});
+      await descontarStockVenta(uid,[{nombre:producto.nombre,cantidad}]);
       if(pago==='fiado'&&clienteId){const ref=db.collection(`polleria/${uid}/clientes`).doc(clienteId);const snap=await ref.get();if(snap.exists){await ref.update({saldoFiado:(Number(snap.data().saldoFiado)||0)+total});}}
       onCerrar(true);
     } catch(e){ alert('Error al guardar: '+e.message); }
@@ -1377,6 +1421,7 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
       const items=carrito.map(i=>({_id:Date.now()+Math.random(),nombre:i.prod.nombre,unidad:i.prod.unidad||'kg',cantidad:i.cantidad,precio:i.prod.precioVenta||0,subtotal:(i.prod.precioVenta||0)*i.cantidad}));
       const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'delivery':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),horaCreacion:esEnvio?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'',telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
       const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
+      await descontarStockVenta(uid,items);
       onVentaConfirmada({...pedidoData,id:ref.id,items});
       setClienteNombre('');setTelefono('');setDatosPago('');setPago('efectivo');setEsEnvio(false);setDireccion('');
     }catch(e){alert('Error: '+e.message);}
@@ -1407,10 +1452,38 @@ const esPorPeso=u=>['kg','litro','litros'].includes(u||'kg');
 
 function ModalPeso({prod,cantActual,onAgregar,onCerrar}){
   const [val,setVal]=useState(cantActual>0?String(cantActual):'');
+  const [leyendo,setLeyendo]=useState(false);
   const num=parseFloat(val)||0;
   const total=num*(prod.precioVenta||0);
   const confirmar=()=>{if(num>0){onAgregar(num);onCerrar();}};
-  return(<div className="overlay" onClick={onCerrar}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-drag"/><div style={{fontWeight:700,fontSize:16,color:'var(--txt)',marginBottom:2}}>{prod.nombre}</div><div style={{fontSize:13,color:'var(--txt2)',marginBottom:14}}>{formatPeso(prod.precioVenta||0)} / {prod.unidad||'kg'}</div><label className="lbl">Ingresá el peso ({prod.unidad||'kg'})</label><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}><input type="number" step="0.001" min="0" autoFocus value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&confirmar()} className="inp" style={{flex:1,fontSize:28,textAlign:'center',fontWeight:700,padding:'10px'}} placeholder="0.000"/><span style={{fontSize:16,fontWeight:700,color:'var(--txt2)',minWidth:28}}>{prod.unidad||'kg'}</span></div><div style={{display:'flex',gap:5,marginBottom:14,flexWrap:'wrap'}}>{[0.25,0.5,1,1.5,2,3,5].map(v=>(<button key={v} onClick={()=>setVal(String(v))} style={{flex:'1 0 auto',minWidth:40,padding:'7px 4px',borderRadius:'var(--radius)',border:`1px solid ${parseFloat(val)===v?'var(--green)':'var(--border)'}`,background:parseFloat(val)===v?'var(--green-bg)':'var(--bg2)',color:parseFloat(val)===v?'var(--green)':'var(--txt)',fontSize:13,fontWeight:700,cursor:'pointer'}}>{v}</button>))}</div>{num>0&&(<div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontSize:13,color:'var(--green)',fontWeight:600}}>Total</span><span style={{fontSize:22,fontWeight:700,color:'var(--green)'}}>{formatPeso(total)}</span></div>)}<button onClick={confirmar} disabled={num<=0} className="btn-full" style={{background:'var(--green)',opacity:num<=0?0.4:1}}>{cantActual>0?'🔄 Actualizar en carrito':'🛒 Agregar al carrito'}</button></div></div>);
+  const leerBalanza=async()=>{
+    if(!('serial' in navigator)){alert('⚖️ La lectura automática necesita Chrome o Edge en una computadora. En el celular, ingresá el peso a mano.');return;}
+    setLeyendo(true);
+    let port,reader;
+    try{
+      port=await navigator.serial.requestPort();
+      await port.open({baudRate:9600});
+      reader=port.readable.getReader();
+      const dec=new TextDecoder();
+      let buffer='',encontrado=null;const t0=Date.now();
+      while(Date.now()-t0<4000){
+        const r=await reader.read();
+        if(r.done)break;
+        buffer+=dec.decode(r.value,{stream:true});
+        const m=buffer.match(/-?\d+[.,]?\d*/g);
+        if(m&&m.length){const n=parseFloat(m[m.length-1].replace(',','.'));if(!isNaN(n)&&n>0){encontrado=n;break;}}
+      }
+      if(encontrado!=null)setVal(String(encontrado));
+      else alert('No pude leer un peso. Revisá que la balanza esté encendida y enviando datos, o ingresalo a mano.');
+    }catch(e){
+      if(!(e&&e.name==='NotFoundError'))alert('Error con la balanza: '+(e.message||e)+'. Probá ingresar el peso a mano.');
+    }finally{
+      try{if(reader)reader.releaseLock();}catch(_){}
+      try{if(port)await port.close();}catch(_){}
+      setLeyendo(false);
+    }
+  };
+  return(<div className="overlay" onClick={onCerrar}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-drag"/><div style={{fontWeight:700,fontSize:16,color:'var(--txt)',marginBottom:2}}>{prod.nombre}</div><div style={{fontSize:13,color:'var(--txt2)',marginBottom:14}}>{formatPeso(prod.precioVenta||0)} / {prod.unidad||'kg'}</div><label className="lbl">Ingresá el peso ({prod.unidad||'kg'})</label><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}><input type="number" step="0.001" min="0" autoFocus value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>e.key==='Enter'&&confirmar()} className="inp" style={{flex:1,fontSize:28,textAlign:'center',fontWeight:700,padding:'10px'}} placeholder="0.000"/><span style={{fontSize:16,fontWeight:700,color:'var(--txt2)',minWidth:28}}>{prod.unidad||'kg'}</span></div><button onClick={leerBalanza} disabled={leyendo} className="btn-sec" style={{width:'100%',marginBottom:12,fontSize:13,padding:10}}>{leyendo?'⏳ Leyendo balanza...':'⚖️ Leer de balanza (Chrome PC)'}</button><div style={{display:'flex',gap:5,marginBottom:14,flexWrap:'wrap'}}>{[0.25,0.5,1,1.5,2,3,5].map(v=>(<button key={v} onClick={()=>setVal(String(v))} style={{flex:'1 0 auto',minWidth:40,padding:'7px 4px',borderRadius:'var(--radius)',border:`1px solid ${parseFloat(val)===v?'var(--green)':'var(--border)'}`,background:parseFloat(val)===v?'var(--green-bg)':'var(--bg2)',color:parseFloat(val)===v?'var(--green)':'var(--txt)',fontSize:13,fontWeight:700,cursor:'pointer'}}>{v}</button>))}</div>{num>0&&(<div style={{background:'var(--green-bg)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}><span style={{fontSize:13,color:'var(--green)',fontWeight:600}}>Total</span><span style={{fontSize:22,fontWeight:700,color:'var(--green)'}}>{formatPeso(total)}</span></div>)}<button onClick={confirmar} disabled={num<=0} className="btn-full" style={{background:'var(--green)',opacity:num<=0?0.4:1}}>{cantActual>0?'🔄 Actualizar en carrito':'🛒 Agregar al carrito'}</button></div></div>);
 }
 
 function PantallaCatalogo({uid}){
@@ -1879,6 +1952,13 @@ function CalculadoraCajon({uid}){
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
   const [rendimientoPct,setRendimientoPct]=useState(70);
+  // #5 Lotes/proveedor
+  const [proveedores,setProveedores]=useState([]);
+  const [proveedorId,setProveedorId]=useState('');
+  const [vencHoras,setVencHoras]=useState(72);
+  // #3 Margen objetivo
+  const [margenObj,setMargenObj]=useState(40);
+  useEffect(()=>db.collection(`polleria/${uid}/proveedores`).orderBy('nombre','asc').onSnapshot(s=>setProveedores(s.docs.map(d=>({id:d.id,...d.data()})))),[]);
 
   const totKg=+(cajones*kgCajon).toFixed(2);
   const rendimientoKg=+(totKg*rendimientoPct/100).toFixed(2);
@@ -1922,6 +2002,17 @@ function CalculadoraCajon({uid}){
   const gananciaTotal=totalIngreso-precioTotalPagado;
   const gananciaPct=precioTotalPagado>0?+((gananciaTotal/precioTotalPagado)*100).toFixed(1):0;
 
+  // #3 Escala todos los precios para llegar al margen objetivo (mantiene la proporción entre cortes)
+  const aplicarMargen=()=>{
+    if(precioTotalPagado<=0)return alert('Primero cargá el precio pagado por cajón');
+    if(totalIngreso<=0)return alert('No hay precios de venta para escalar');
+    const objetivo=precioTotalPagado*(1+(Number(margenObj)||0)/100);
+    const factor=objetivo/totalIngreso;
+    const obj={};M.piezas.forEach(p=>{obj[p.n]=Math.round(getPv(p.n)*factor);});
+    setPreciosVenta(obj);
+    mostrarToast(`✅ Precios ajustados para ${margenObj}% de ganancia`);
+  };
+
   // Badge comparación con mercado
   const badgeMercado=(n,pv)=>{
     const r=PRECIOS_MERCADO_POLLO[n]; if(!r||!pv) return null;
@@ -1938,6 +2029,8 @@ function CalculadoraCajon({uid}){
     try{
       const stockCol=db.collection(`polleria/${uid}/stock`);
       const prodCol=db.collection(`polleria/${uid}/productos`);
+      const lotesCol=db.collection(`polleria/${uid}/lotes`);
+      const prov=proveedores.find(x=>x.id===proveedorId)||null;
       for(const p of M.piezas){
         const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const pVenta=getPv(p.n);
@@ -1960,8 +2053,25 @@ function CalculadoraCajon({uid}){
           precioVenta:+pVenta.toFixed(2),
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         },{merge:true});
+        // #5 Crear lote para trazabilidad + FIFO (solo si hay kg)
+        if(p.kgEst>0){
+          await lotesCol.add({
+            productoNombre:p.n,
+            proveedorId:prov?prov.id:'',
+            proveedorNombre:prov?prov.nombre:'Sin proveedor',
+            fechaIngreso:hoy(),
+            horaIngreso:ahora(),
+            kgInicial:+p.kgEst.toFixed(2),
+            kgRestante:+p.kgEst.toFixed(2),
+            precioCosto:+costoPorKg.toFixed(2),
+            vencimientoHoras:Number(vencHoras)||72,
+            agotado:false,
+            ingresoTs:Date.now(),
+            createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+          });
+        }
       }
-      mostrarToast(`✅ ${M.piezas.length} cortes guardados en inventario y catálogo`);
+      mostrarToast(`✅ ${M.piezas.length} cortes guardados + lotes creados`);
     }catch(e){alert('Error: '+e.message);}
     setGuardando(false);
   };
@@ -2023,6 +2133,27 @@ function CalculadoraCajon({uid}){
             Costo: <b style={{color:'var(--txt)'}}>{formatPeso(costoPorKg)}/kg</b>
             {' · '}Total: <b style={{color:'var(--red)'}}>{formatPeso(precioTotalPagado)}</b>
           </div>}
+          <div style={{display:'flex',gap:6,marginTop:8}}>
+            <span style={{fontSize:11,color:'var(--txt3)',alignSelf:'center'}}>¿Subió el cajón?</span>
+            <button onClick={()=>setPrecioCajon(String(Math.round((Number(precioCajon)||0)*1.05)))} disabled={!precioCajon} style={{flex:1,fontSize:12,padding:'5px',borderRadius:'var(--radius)',border:'1px solid var(--orange)',background:'var(--orange-bg)',color:'var(--orange)',fontWeight:700,cursor:'pointer'}}>+5%</button>
+            <button onClick={()=>setPrecioCajon(String(Math.round((Number(precioCajon)||0)*1.10)))} disabled={!precioCajon} style={{flex:1,fontSize:12,padding:'5px',borderRadius:'var(--radius)',border:'1px solid var(--orange)',background:'var(--orange-bg)',color:'var(--orange)',fontWeight:700,cursor:'pointer'}}>+10%</button>
+            <button onClick={()=>setPrecioCajon(String(Math.round((Number(precioCajon)||0)*1.15)))} disabled={!precioCajon} style={{flex:1,fontSize:12,padding:'5px',borderRadius:'var(--radius)',border:'1px solid var(--orange)',background:'var(--orange-bg)',color:'var(--orange)',fontWeight:700,cursor:'pointer'}}>+15%</button>
+          </div>
+        </div>
+        <div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
+          <label className="lbl" style={{marginTop:0,color:'var(--blue)',fontWeight:700,fontSize:12}}>📅 Trazabilidad del lote</label>
+          <div style={{fontSize:11,color:'var(--txt2)',marginBottom:6}}>De quién vino y en cuántas horas vence (para FIFO y alertas).</div>
+          <label className="lbl" style={{marginTop:0}}>Proveedor</label>
+          <select value={proveedorId} onChange={e=>setProveedorId(e.target.value)} className="inp" style={{marginBottom:8}}>
+            <option value="">— Sin proveedor —</option>
+            {proveedores.map(pr=>(<option key={pr.id} value={pr.id}>{pr.nombre}</option>))}
+          </select>
+          {proveedores.length===0&&<div style={{fontSize:11,color:'var(--txt3)',marginBottom:8}}>💡 Cargá proveedores en la pestaña 🚚 Proveedores.</div>}
+          <label className="lbl">Vence en (horas)</label>
+          <div style={{display:'flex',gap:6}}>
+            {[48,72,96].map(h=>(<button key={h} onClick={()=>setVencHoras(h)} className={`chip${vencHoras===h?' activo':''}`} style={{flex:1}}>{h}hs</button>))}
+            <input type="number" min={1} value={vencHoras} onChange={e=>setVencHoras(Math.max(1,Number(e.target.value)))} className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'4px 6px'}}/>
+          </div>
         </div>
         <label className="lbl">Tipo de corte</label>
         <div className="chip-group" style={{marginBottom:0}}>
@@ -2040,6 +2171,19 @@ function CalculadoraCajon({uid}){
             style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--txt2)',cursor:'pointer',fontWeight:600}}>
             ↺ Usar precios de mercado
           </button>
+        </div>
+
+        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:14}}>
+          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 Margen objetivo</label>
+          <div style={{fontSize:11,color:'var(--txt2)',marginBottom:8}}>Ajustá todos los precios de una para ganar este % sobre el costo del cajón.</div>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:'0 0 auto'}}>{m}%</button>))}
+            <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
+            <button onClick={aplicarMargen} className="btn-pri" style={{flex:1,padding:'8px 6px',fontSize:13}}>Aplicar</button>
+          </div>
+          {precioTotalPagado>0&&totalIngreso>0&&<div style={{fontSize:11,color:gananciaPct>=margenObj?'var(--green)':'var(--orange)',marginTop:6,fontWeight:600}}>
+            Ahora estás en {gananciaPct}% {gananciaPct>=margenObj?'✓':`(meta: ${margenObj}%)`}
+          </div>}
         </div>
 
         {M.piezas.map(p=>{
@@ -2305,6 +2449,577 @@ function FormVerduleria({inicial,onGuardar,onCancelar}){
   );
 }
 
+/* ─── MERMAS / PÉRDIDAS DIARIAS ─── */
+function SeccionMermas({uid,stockItems}){
+  const [mermas,setMermas]=useState([]);
+  const [prodId,setProdId]=useState('');
+  const [kg,setKg]=useState('');
+  const [motivo,setMotivo]=useState('goteo');
+  const [nota,setNota]=useState('');
+  const [descontar,setDescontar]=useState(true);
+  const [guardando,setGuardando]=useState(false);
+  const [toastMsg,setToastMsg]=useState('');
+  const col=db.collection(`polleria/${uid}/mermas`);
+  useEffect(()=>col.orderBy('createdAt','desc').onSnapshot(s=>setMermas(s.docs.map(d=>({id:d.id,...d.data()})))),[]);
+
+  const MOTIVOS={
+    goteo:{lbl:'💧 Goteo / agua',color:'var(--blue)'},
+    grasa:{lbl:'🧈 Grasa / recorte',color:'var(--orange)'},
+    decomiso:{lbl:'🗑️ Decomiso',color:'var(--red)'},
+    otro:{lbl:'❓ Otro',color:'var(--txt2)'},
+  };
+  const prodSel=stockItems.find(i=>i.id===prodId)||null;
+  const unidad=prodSel?(prodSel.unidad||'kg'):'kg';
+  const costoUnit=prodSel?(Number(prodSel.precioCosto)||0):0;
+  const mostrar=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+
+  const anotar=async()=>{
+    const cant=parseFloat(kg);
+    if(!cant||cant<=0)return alert('Ingresá cuánto se perdió');
+    setGuardando(true);
+    try{
+      await col.add({
+        fecha:hoy(),
+        productoId:prodSel?prodSel.id:'',
+        productoNombre:prodSel?prodSel.nombre:'Genérico',
+        kg:+cant.toFixed(3),
+        unidad,
+        motivo,
+        costoUnit,
+        nota:nota.trim(),
+        descontado:!!(descontar&&prodSel),
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      if(descontar&&prodSel){
+        const ref=db.collection(`polleria/${uid}/stock`).doc(prodSel.id);
+        const actual=Number(prodSel.cantidad)||0;
+        await ref.update({cantidad:Math.max(0,+(actual-cant).toFixed(3))});
+      }
+      setKg('');setNota('');
+      mostrar(descontar&&prodSel?'✅ Merma anotada y descontada del stock':'✅ Merma anotada');
+    }catch(e){alert('Error: '+e.message);}
+    setGuardando(false);
+  };
+  const eliminar=async id=>{if(!confirm('¿Borrar este registro de merma?'))return;await col.doc(id).delete();};
+
+  const hoyF=hoy();
+  const mesF=hoy().slice(0,7);
+  const mermasHoy=mermas.filter(m=>m.fecha===hoyF);
+  const mermasMes=mermas.filter(m=>(m.fecha||'').slice(0,7)===mesF);
+  const kgHoy=mermasHoy.reduce((s,m)=>s+(Number(m.kg)||0),0);
+  const pesoHoy=mermasHoy.reduce((s,m)=>s+(Number(m.kg)||0)*(Number(m.costoUnit)||0),0);
+  const kgMes=mermasMes.reduce((s,m)=>s+(Number(m.kg)||0),0);
+  const pesoMes=mermasMes.reduce((s,m)=>s+(Number(m.kg)||0)*(Number(m.costoUnit)||0),0);
+  const porFecha={};mermas.forEach(m=>{const f=m.fecha||'sin fecha';if(!porFecha[f])porFecha[f]=[];porFecha[f].push(m);});
+
+  return(
+    <div>
+      <Toast msg={toastMsg}/>
+      <div style={{display:'flex',gap:8,marginBottom:12}}>
+        <div style={{flex:1,background:'var(--red-bg)',border:'1px solid var(--red)',borderRadius:'var(--radius-lg)',padding:'10px 12px'}}>
+          <div style={{fontSize:10,color:'var(--txt2)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Hoy</div>
+          <div style={{fontSize:22,fontWeight:700,color:'var(--red)'}}>{+kgHoy.toFixed(2)} <span style={{fontSize:13,fontWeight:400}}>kg</span></div>
+          {pesoHoy>0&&<div style={{fontSize:11,color:'var(--txt2)'}}>~{formatPeso(pesoHoy)} en costo</div>}
+        </div>
+        <div style={{flex:1,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:'var(--radius-lg)',padding:'10px 12px'}}>
+          <div style={{fontSize:10,color:'var(--txt2)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em'}}>Este mes</div>
+          <div style={{fontSize:22,fontWeight:700,color:'var(--txt)'}}>{+kgMes.toFixed(2)} <span style={{fontSize:13,fontWeight:400}}>kg</span></div>
+          {pesoMes>0&&<div style={{fontSize:11,color:'var(--txt2)'}}>~{formatPeso(pesoMes)} en costo</div>}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="ptitle">🥩 Anotar merma / pérdida</div>
+        <label className="lbl" style={{marginTop:0}}>Producto <span style={{color:'var(--txt3)',fontWeight:400}}>(opcional)</span></label>
+        <select value={prodId} onChange={e=>setProdId(e.target.value)} className="inp" style={{marginBottom:10}}>
+          <option value="">— Genérico (sin ítem puntual) —</option>
+          {stockItems.map(i=>(<option key={i.id} value={i.id}>{i.nombre} ({i.cantidad||0} {i.unidad})</option>))}
+        </select>
+        <label className="lbl">¿Cuánto se perdió? ({unidad})</label>
+        <input type="number" step="0.001" min="0" value={kg} onChange={e=>setKg(e.target.value)} className="inp" placeholder="0.000" style={{fontWeight:700,fontSize:22,marginTop:4}}/>
+        <label className="lbl">Motivo</label>
+        <div className="chip-group" style={{marginBottom:10}}>
+          {Object.entries(MOTIVOS).map(([k,v])=>(<button key={k} onClick={()=>setMotivo(k)} className={`chip${motivo===k?' activo':''}`}>{v.lbl}</button>))}
+        </div>
+        <label className="lbl">Nota <span style={{color:'var(--txt3)',fontWeight:400}}>(opcional)</span></label>
+        <input value={nota} onChange={e=>setNota(e.target.value)} className="inp" placeholder="Ej: goteo de 3 cajones" style={{marginBottom:10}}/>
+        {prodSel&&(
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'var(--txt2)',marginBottom:12,cursor:'pointer'}}>
+            <input type="checkbox" checked={descontar} onChange={e=>setDescontar(e.target.checked)} style={{width:18,height:18,accentColor:'var(--red)'}}/>
+            <span>Descontar estos {unidad} del stock de <b style={{color:'var(--txt)'}}>{prodSel.nombre}</b></span>
+          </label>
+        )}
+        <button onClick={anotar} disabled={guardando||!kg} className="btn-full" style={{background:'var(--red)'}}>
+          {guardando?'Guardando...':'🥩 Anotar merma'}
+        </button>
+      </div>
+
+      <div className="sec-title">📋 Historial de mermas</div>
+      {mermas.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🥩</div>No hay mermas registradas.<br/>Anotá las pérdidas del día para que no figuren como faltante.</div>}
+      {Object.entries(porFecha).map(([fecha,arr])=>{
+        const kgDia=arr.reduce((s,m)=>s+(Number(m.kg)||0),0);
+        return(
+          <div key={fecha}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'14px 0 6px'}}>
+              <span style={{fontSize:12,fontWeight:700,color:'var(--txt2)'}}>{fecha===hoyF?'📅 Hoy':fecha}</span>
+              <span style={{fontSize:12,color:'var(--red)',fontWeight:700}}>{+kgDia.toFixed(2)} kg</span>
+            </div>
+            {arr.map(m=>{
+              const mo=MOTIVOS[m.motivo]||MOTIVOS.otro;
+              return(
+                <div key={m.id} className="card">
+                  <div className="card-body">
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div className="card-name">{m.productoNombre||'Genérico'} · {+Number(m.kg).toFixed(3)} {m.unidad||'kg'}</div>
+                        <div style={{marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontSize:11,fontWeight:700,color:mo.color,background:'var(--bg2)',borderRadius:4,padding:'2px 7px'}}>{mo.lbl}</span>
+                          {m.descontado&&<span style={{fontSize:10,color:'var(--blue)'}}>↓ descontado del stock</span>}
+                          {Number(m.costoUnit)>0&&<span style={{fontSize:11,color:'var(--txt2)'}}>~{formatPeso(Number(m.kg)*Number(m.costoUnit))}</span>}
+                        </div>
+                        {m.nota&&<div className="card-sub" style={{marginTop:4}}>{m.nota}</div>}
+                      </div>
+                      <button onClick={()=>eliminar(m.id)} className="btn-ic" style={{color:'var(--red)',flexShrink:0}}>🗑️</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── #2 PROVEEDORES ─── */
+function SeccionProveedores({uid}){
+  const [provs,setProvs]=useState([]);
+  const [editId,setEditId]=useState(null); // null=cerrado, ''=nuevo, 'id'=editando
+  const [d,setD]=useState({nombre:'',telefono:'',producto:'',notas:''});
+  const col=db.collection(`polleria/${uid}/proveedores`);
+  useEffect(()=>col.orderBy('nombre','asc').onSnapshot(s=>setProvs(s.docs.map(x=>({id:x.id,...x.data()})))),[]);
+  const abrirNuevo=()=>{setD({nombre:'',telefono:'',producto:'',notas:''});setEditId('');};
+  const abrirEditar=p=>{setD({nombre:p.nombre||'',telefono:p.telefono||'',producto:p.producto||'',notas:p.notas||''});setEditId(p.id);};
+  const cerrar=()=>setEditId(null);
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const guardar=async()=>{
+    if(!d.nombre.trim())return alert('El nombre es obligatorio');
+    if(editId)await col.doc(editId).update(d);
+    else await col.add({...d,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    cerrar();
+  };
+  const eliminar=async id=>{if(!confirm('¿Eliminar proveedor?'))return;await col.doc(id).delete();if(editId===id)cerrar();};
+  return(
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div className="sec-title" style={{margin:0}}>🚚 Proveedores mayoristas</div>
+        {editId===null&&<button onClick={abrirNuevo} className="btn-pri" style={{fontSize:13,padding:'7px 14px'}}>+ Agregar</button>}
+      </div>
+      {editId!==null&&(
+        <div className="panel">
+          <div className="ptitle">{editId?'✏️ Editar proveedor':'🚚 Nuevo proveedor'}</div>
+          <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Avícola del Norte"/>
+          <Campo label="📞 Teléfono" value={d.telefono} onChange={v=>set('telefono',v)} placeholder="381-123-4567" tipo="tel"/>
+          <Campo label="🐔 Qué provee" value={d.producto} onChange={v=>set('producto',v)} placeholder="Ej: Pollo entero, menudencias..."/>
+          <Campo label="📝 Notas" value={d.notas} onChange={v=>set('notas',v)} placeholder="Días de entrega, condiciones..."/>
+          <div style={{display:'flex',gap:8,marginTop:14}}>
+            <button onClick={guardar} className="btn-pri" style={{flex:1,padding:12}}>{editId?'✓ Guardar':'+ Agregar'}</button>
+            <button onClick={cerrar} className="btn-sec" style={{padding:12}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      {provs.length===0&&editId===null&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🚚</div>No hay proveedores cargados.<br/>Agregá tus proveedores para rastrear de quién vino cada cajón.</div>}
+      {provs.map(p=>(
+        <div key={p.id} className="card">
+          <div className="card-body">
+            <div className="card-name">{p.nombre}</div>
+            {p.telefono&&<div className="card-sub">📞 {p.telefono}</div>}
+            {p.producto&&<div className="card-sub">🐔 {p.producto}</div>}
+            {p.notas&&<div className="card-sub" style={{marginTop:2}}>{p.notas}</div>}
+            <div className="card-actions">
+              <button onClick={()=>abrirEditar(p)} className="btn-ic">✏️ Editar</button>
+              <button onClick={()=>eliminar(p.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── #5 LOTES (FIFO + vencimiento) ─── */
+function SeccionLotes({uid}){
+  const [lotes,setLotes]=useState([]);
+  const [verAgotados,setVerAgotados]=useState(false);
+  const [,setTick]=useState(0);
+  const col=db.collection(`polleria/${uid}/lotes`);
+  useEffect(()=>col.onSnapshot(s=>setLotes(s.docs.map(d=>({id:d.id,...d.data()})))),[]);
+  useEffect(()=>{const t=setInterval(()=>setTick(x=>x+1),60000);return()=>clearInterval(t);},[]);
+
+  const agotar=async id=>{if(!confirm('¿Marcar este lote como agotado?'))return;await col.doc(id).update({kgRestante:0,agotado:true});};
+  const eliminar=async id=>{if(!confirm('¿Eliminar este lote del registro?'))return;await col.doc(id).delete();};
+
+  const horasDe=l=>{const ts=Number(l.ingresoTs)||0;if(!ts)return 0;return (Date.now()-ts)/3600000;};
+  const estadoDe=l=>{const h=horasDe(l);const v=Number(l.vencimientoHoras)||72;if(h>=v)return{k:'vencido',ico:'🔴',txt:'VENCIDO',c:'var(--red)'};if(h>=v*0.66)return{k:'porvencer',ico:'🟡',txt:'Por vencer',c:'var(--orange)'};return{k:'fresco',ico:'🟢',txt:'Fresco',c:'var(--green)'};};
+  const fmtHoras=h=>{const hh=Math.floor(h);if(hh<24)return `${hh}h`;const d=Math.floor(hh/24);return `${d}d ${hh%24}h`;};
+
+  const activos=lotes.filter(l=>(Number(l.kgRestante)||0)>0.001&&!l.agotado);
+  const agotados=lotes.filter(l=>(Number(l.kgRestante)||0)<=0.001||l.agotado);
+  const ordenados=[...activos].sort((a,b)=>(Number(a.ingresoTs)||0)-(Number(b.ingresoTs)||0));
+  const alerta=ordenados.filter(l=>estadoDe(l).k!=='fresco');
+
+  return(
+    <div>
+      <div className="sec-title">📅 Lotes en cámara — FIFO</div>
+      <div style={{fontSize:12,color:'var(--txt2)',marginBottom:10}}>Ordenados del más viejo al más nuevo: vendé primero los de arriba. 🟢 fresco · 🟡 por vencer · 🔴 vencido.</div>
+      {alerta.length>0&&(
+        <div style={{background:'var(--red-bg)',border:'1px solid var(--red)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:12}}>
+          <b style={{color:'var(--red)',fontSize:13}}>⚠️ {alerta.length} lote{alerta.length>1?'s':''} para sacar ya: </b>
+          <span style={{fontSize:13,color:'var(--txt2)'}}>{alerta.map(l=>`${l.productoNombre} (${fmtHoras(horasDe(l))})`).join(', ')}</span>
+        </div>
+      )}
+      {ordenados.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>📅</div>No hay lotes activos.<br/>Se crean solos al cargar un cajón en 🐔 Cajones.</div>}
+      {ordenados.map((l,idx)=>{
+        const e=estadoDe(l);
+        const pctRest=Number(l.kgInicial)>0?Math.round((Number(l.kgRestante)/Number(l.kgInicial))*100):0;
+        return(
+          <div key={l.id} className="card" style={{borderColor:e.c}}>
+            <div className="card-body">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    {idx===0&&<span style={{fontSize:10,fontWeight:700,color:'var(--green)',background:'var(--green-bg)',borderRadius:4,padding:'1px 6px'}}>SACAR 1°</span>}
+                    <span className="card-name">{l.productoNombre}</span>
+                  </div>
+                  <div className="card-sub" style={{marginTop:3}}>🚚 {l.proveedorNombre||'Sin proveedor'} · 📅 {formatFecha(l.fechaIngreso)} {l.horaIngreso||''}</div>
+                  <div className="card-sub">⏱️ {fmtHoras(horasDe(l))} en cámara (vence {l.vencimientoHoras||72}h)</div>
+                </div>
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <span style={{fontSize:11,fontWeight:700,color:e.c,background:'var(--bg2)',borderRadius:4,padding:'2px 7px',whiteSpace:'nowrap'}}>{e.ico} {e.txt}</span>
+                  <div style={{fontWeight:700,fontSize:18,color:'var(--txt)',marginTop:6}}>{+Number(l.kgRestante).toFixed(2)} kg</div>
+                  <div style={{fontSize:10,color:'var(--txt2)'}}>de {+Number(l.kgInicial).toFixed(2)} ({pctRest}%)</div>
+                </div>
+              </div>
+              <div className="card-actions">
+                <button onClick={()=>agotar(l.id)} className="btn-ic">✓ Marcar agotado</button>
+                <button onClick={()=>eliminar(l.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {agotados.length>0&&(
+        <div style={{marginTop:14}}>
+          <button onClick={()=>setVerAgotados(v=>!v)} className="btn-sec" style={{width:'100%'}}>{verAgotados?'▲ Ocultar':'▼ Ver'} agotados ({agotados.length})</button>
+          {verAgotados&&agotados.map(l=>(
+            <div key={l.id} className="card" style={{opacity:0.6}}>
+              <div className="card-body">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div><div className="card-name">{l.productoNombre}</div><div className="card-sub">🚚 {l.proveedorNombre} · 📅 {formatFecha(l.fechaIngreso)}</div></div>
+                  <button onClick={()=>eliminar(l.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── #6 DESPOSTE EN VIVO ─── */
+function SeccionDesposte({uid}){
+  const [stockItems,setStockItems]=useState([]);
+  const [kgDesp,setKgDesp]=useState('');
+  const [modo,setModo]=useState('piezas');
+  const [guardando,setGuardando]=useState(false);
+  const [toastMsg,setToastMsg]=useState('');
+  const stockCol=db.collection(`polleria/${uid}/stock`);
+  useEffect(()=>stockCol.orderBy('nombre','asc').onSnapshot(s=>setStockItems(s.docs.map(d=>({id:d.id,...d.data()})))),[]);
+  const mostrar=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+
+  const entero=stockItems.find(i=>(i.nombre||'').toLowerCase().includes('entero'));
+  const dispEntero=entero?Number(entero.cantidad)||0:0;
+  const costoEntero=entero?Number(entero.precioCosto)||0:0;
+
+  const CORTES={
+    piezas:{label:'🍗 Trozado', piezas:[
+      {n:'Pechugas',pct:0.25},{n:'Pata-muslo',pct:0.30},{n:'Alas',pct:0.18},{n:'Muslos',pct:0.14},{n:'Carcasas',pct:0.13},
+    ]},
+    filet:{label:'🥩 Filet', piezas:[
+      {n:'Filet pechuga',pct:0.25},{n:'Milanesas',pct:0.22},{n:'Pata-muslo',pct:0.30},{n:'Carcasas caldo',pct:0.13},
+    ]},
+  };
+  const M=CORTES[modo];
+  const kg=parseFloat(kgDesp)||0;
+  const cortesKg=M.piezas.map(p=>({...p,kg:+(kg*p.pct).toFixed(3)}));
+  const totalCortes=cortesKg.reduce((s,p)=>s+p.kg,0);
+  const mermaKg=+(kg-totalCortes).toFixed(3);
+
+  const despostar=async()=>{
+    if(!entero)return alert('No encontré stock de "Pollo entero". Cargá un cajón en modo 🐔 Entero primero.');
+    if(kg<=0)return alert('Ingresá cuántos kg vas a despostar');
+    if(kg>dispEntero)return alert(`Solo tenés ${dispEntero} kg de pollo entero`);
+    setGuardando(true);
+    try{
+      await stockCol.doc(entero.id).update({cantidad:Math.max(0,+(dispEntero-kg).toFixed(3))});
+      const prodCol=db.collection(`polleria/${uid}/productos`);
+      for(const c of cortesKg){
+        if(c.kg<=0)continue;
+        const docId='pollo-'+c.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const ref=stockCol.doc(docId);
+        const snap=await ref.get();
+        const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
+        const precioPrev=snap.exists?(Number(snap.data().precioVenta)||0):0;
+        const precioVenta=precioPrev>0?precioPrev:(PRECIOS_MERCADO_POLLO[c.n]?.sug||Math.round(costoEntero*1.4));
+        await ref.set({
+          nombre:c.n,categoria:'Pollo',tipo:'cajon',
+          cantidad:+(actual+c.kg).toFixed(3),
+          unidad:'kg',precioCosto:costoEntero,precioVenta,stockMinimo:0,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        },{merge:true});
+        await prodCol.doc(docId).set({nombre:c.n,categoria:'🐔 Pollo',unidad:'kg',precioCosto:costoEntero,precioVenta,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      if(mermaKg>0.001){
+        await db.collection(`polleria/${uid}/mermas`).add({
+          fecha:hoy(),productoId:entero.id,productoNombre:'Pollo entero (desposte)',
+          kg:mermaKg,unidad:'kg',motivo:'grasa',costoUnit:costoEntero,
+          nota:`Recorte de despostar ${kg}kg`,descontado:true,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      setKgDesp('');
+      mostrar(`✅ Desposté ${kg}kg → ${cortesKg.length} cortes`);
+    }catch(e){alert('Error: '+e.message);}
+    setGuardando(false);
+  };
+
+  return(
+    <div>
+      <Toast msg={toastMsg}/>
+      <div className="panel">
+        <div className="ptitle">🔪 Despostar pollo entero → cortes</div>
+        {entero?(
+          <div className="suma-band" style={{marginBottom:10}}>
+            <span style={{fontSize:13,color:'var(--txt2)'}}>Disponible: <b style={{color:'var(--txt)'}}>{entero.nombre}</b></span>
+            <span style={{fontSize:18,fontWeight:700,color:'var(--txt)'}}>{dispEntero} kg</span>
+          </div>
+        ):(
+          <div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:10,fontSize:13,color:'var(--orange)'}}>
+            ⚠️ No hay stock de "Pollo entero". Cargá un cajón en 🧮 Cargar cajón (modo 🐔 Entero) primero.
+          </div>
+        )}
+        <label className="lbl">¿Cuántos kg despostar?</label>
+        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
+          <input type="number" step="0.1" min="0" value={kgDesp} onChange={e=>setKgDesp(e.target.value)} className="inp" placeholder="0" style={{fontWeight:700,fontSize:22,flex:1}}/>
+          {entero&&<button onClick={()=>setKgDesp(String(dispEntero))} className="btn-sec" style={{padding:'8px 12px',flexShrink:0}}>Todo</button>}
+        </div>
+        <label className="lbl">Tipo de corte</label>
+        <div className="chip-group" style={{marginBottom:10}}>
+          {Object.entries(CORTES).map(([k,v])=>(<button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>))}
+        </div>
+        {kg>0&&(
+          <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:'var(--txt2)',marginBottom:6}}>Vas a obtener:</div>
+            {cortesKg.map(c=>(
+              <div key={c.n} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13}}>
+                <span style={{color:'var(--txt2)'}}>{c.n}</span>
+                <b style={{color:'var(--txt)'}}>{c.kg} kg</b>
+              </div>
+            ))}
+            {mermaKg>0.001&&<div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13,borderTop:'1px solid var(--border)',marginTop:4,paddingTop:6}}>
+              <span style={{color:'var(--red)'}}>🥩 Merma (recorte)</span><b style={{color:'var(--red)'}}>{mermaKg} kg</b>
+            </div>}
+          </div>
+        )}
+        <button onClick={despostar} disabled={guardando||!entero||kg<=0} className="btn-full" style={{background:'var(--orange)',opacity:(!entero||kg<=0)?0.4:1}}>
+          {guardando?'⏳ Despostando...':'🔪 Despostar ahora'}
+        </button>
+        <div style={{fontSize:11,color:'var(--txt3)',marginTop:8,textAlign:'center'}}>Resta del pollo entero y suma a los cortes. La merma del recorte se registra sola.</div>
+      </div>
+    </div>
+  );
+}
+
+/* Envoltorio: alterna entre cargar cajón y despostar */
+function SeccionPollo({uid}){
+  const [modo,setModo]=useState('cargar');
+  return(
+    <div>
+      <div className="tab-bar" style={{marginBottom:12}}>
+        <button onClick={()=>setModo('cargar')} className={`tab-btn${modo==='cargar'?' activo':''}`} style={{flex:1}}>🧮 Cargar cajón</button>
+        <button onClick={()=>setModo('despostar')} className={`tab-btn${modo==='despostar'?' activo':''}`} style={{flex:1}}>🔪 Despostar stock</button>
+      </div>
+      {modo==='cargar'?<CalculadoraCajon uid={uid}/>:<SeccionDesposte uid={uid}/>}
+    </div>
+  );
+}
+
+/* ─── #7 RECETAS COMPUESTAS ─── */
+function SeccionRecetas({uid}){
+  const [recetas,setRecetas]=useState([]);
+  const [stockItems,setStockItems]=useState([]);
+  const [editId,setEditId]=useState(null);
+  const [d,setD]=useState({nombre:'',rinde:1,unidadRinde:'unidad',precioVenta:'',ingredientes:[]});
+  const [selIng,setSelIng]=useState('');
+  const [tandas,setTandas]=useState({});
+  const [toastMsg,setToastMsg]=useState('');
+  const recCol=db.collection(`polleria/${uid}/recetas`);
+  const stockCol=db.collection(`polleria/${uid}/stock`);
+  useEffect(()=>{
+    const u1=recCol.orderBy('nombre','asc').onSnapshot(s=>setRecetas(s.docs.map(x=>({id:x.id,...x.data()}))));
+    const u2=stockCol.orderBy('nombre','asc').onSnapshot(s=>setStockItems(s.docs.map(x=>({id:x.id,...x.data()}))));
+    return()=>{u1();u2();};
+  },[]);
+  const mostrar=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+  const costoActual=ing=>{const st=stockItems.find(i=>(i.nombre||'').toLowerCase().trim()===(ing.nombre||'').toLowerCase().trim());return st&&Number(st.precioCosto)>0?Number(st.precioCosto):(Number(ing.costoUnit)||0);};
+  const costoDe=r=>(r.ingredientes||[]).reduce((s,ing)=>s+(Number(ing.cantidad)||0)*costoActual(ing),0);
+
+  const abrirNuevo=()=>{setD({nombre:'',rinde:1,unidadRinde:'unidad',precioVenta:'',ingredientes:[]});setEditId('');};
+  const abrirEditar=r=>{setD({nombre:r.nombre||'',rinde:r.rinde||1,unidadRinde:r.unidadRinde||'unidad',precioVenta:r.precioVenta||'',ingredientes:(r.ingredientes||[]).map(i=>({...i}))});setEditId(r.id);};
+  const cerrar=()=>{setEditId(null);setSelIng('');};
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const setIng=(idx,k,v)=>setD(p=>({...p,ingredientes:p.ingredientes.map((it,i)=>i===idx?{...it,[k]:v}:it)}));
+  const quitarIng=idx=>setD(p=>({...p,ingredientes:p.ingredientes.filter((_,i)=>i!==idx)}));
+  const agregarDesdeStock=()=>{const st=stockItems.find(i=>i.id===selIng);if(!st)return;setD(p=>({...p,ingredientes:[...p.ingredientes,{nombre:st.nombre,cantidad:1,unidad:st.unidad||'kg',costoUnit:Number(st.precioCosto)||0}]}));setSelIng('');};
+  const agregarManual=()=>setD(p=>({...p,ingredientes:[...p.ingredientes,{nombre:'',cantidad:1,unidad:'kg',costoUnit:0}]}));
+
+  const guardar=async()=>{
+    if(!d.nombre.trim())return alert('Ponele un nombre a la receta');
+    if(!d.ingredientes.length)return alert('Agregá al menos un ingrediente');
+    const payload={nombre:d.nombre.trim(),rinde:Number(d.rinde)||1,unidadRinde:d.unidadRinde,precioVenta:Number(d.precioVenta)||0,ingredientes:d.ingredientes.map(i=>({nombre:(i.nombre||'').trim(),cantidad:Number(i.cantidad)||0,unidad:i.unidad||'kg',costoUnit:Number(i.costoUnit)||0}))};
+    if(editId)await recCol.doc(editId).update(payload);
+    else await recCol.add({...payload,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    cerrar();
+  };
+  const eliminar=async id=>{if(!confirm('¿Eliminar receta?'))return;await recCol.doc(id).delete();};
+
+  const producir=async r=>{
+    const n=Number(tandas[r.id])||1;
+    if(n<=0)return;
+    if(!confirm(`¿Producir ${n} tanda(s) de "${r.nombre}"? Se descontarán los ingredientes del stock.`))return;
+    try{
+      for(const ing of (r.ingredientes||[])){
+        const st=stockItems.find(i=>(i.nombre||'').toLowerCase().trim()===(ing.nombre||'').toLowerCase().trim());
+        if(st){const usar=(Number(ing.cantidad)||0)*n;await stockCol.doc(st.id).update({cantidad:Math.max(0,+(((Number(st.cantidad)||0)-usar)).toFixed(3))});}
+      }
+      const docId='receta-'+r.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+      const costoUnitTerm=(Number(r.rinde)>0)?+(costoDe(r)/Number(r.rinde)).toFixed(2):0;
+      const ref=stockCol.doc(docId);
+      const snap=await ref.get();
+      const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
+      const totalRinde=actual+(Number(r.rinde)||1)*n;
+      await ref.set({nombre:r.nombre,categoria:'Preparados',tipo:'receta',cantidad:+totalRinde.toFixed(3),unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await db.collection(`polleria/${uid}/productos`).doc(docId).set({nombre:r.nombre,categoria:'🍴 Preparados',unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      mostrar(`✅ Produjiste ${(Number(r.rinde)||1)*n} ${r.unidadRinde} de ${r.nombre}`);
+    }catch(e){alert('Error: '+e.message);}
+  };
+
+  const UNI=['unidad','kg','g','docena','litro','bandeja'];
+  const costoForm=d.ingredientes.reduce((s,ing)=>s+(Number(ing.cantidad)||0)*costoActual(ing),0);
+  const costoUnitForm=Number(d.rinde)>0?costoForm/Number(d.rinde):0;
+  const margenForm=costoUnitForm>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-costoUnitForm)/costoUnitForm)*100):null;
+
+  return(
+    <div>
+      <Toast msg={toastMsg}/>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div className="sec-title" style={{margin:0}}>👨‍🍳 Recetas / preparados</div>
+        {editId===null&&<button onClick={abrirNuevo} className="btn-pri" style={{fontSize:13,padding:'7px 14px'}}>+ Nueva</button>}
+      </div>
+
+      {editId!==null&&(
+        <div className="panel">
+          <div className="ptitle">{editId?'✏️ Editar receta':'👨‍🍳 Nueva receta'}</div>
+          <Campo label="Nombre del producto *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Milanesas de pollo"/>
+          <div style={{display:'flex',gap:8}}>
+            <div style={{flex:1}}><Campo label="Rinde (cuántas produce)" value={d.rinde} onChange={v=>set('rinde',v)} tipo="number" placeholder="10"/></div>
+            <div style={{flex:1}}>
+              <label className="lbl">Unidad</label>
+              <select value={d.unidadRinde} onChange={e=>set('unidadRinde',e.target.value)} className="inp">{UNI.map(u=><option key={u} value={u}>{u}</option>)}</select>
+            </div>
+          </div>
+
+          <label className="lbl">🧾 Ingredientes</label>
+          {d.ingredientes.length===0&&<div style={{fontSize:12,color:'var(--txt3)',marginBottom:8}}>Agregá los ingredientes desde tu stock o manualmente.</div>}
+          {d.ingredientes.map((ing,idx)=>{
+            const cActual=costoActual(ing);
+            const enStock=stockItems.some(i=>(i.nombre||'').toLowerCase().trim()===(ing.nombre||'').toLowerCase().trim());
+            return(
+              <div key={idx} style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'8px 10px',marginBottom:6}}>
+                <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+                  <input value={ing.nombre} onChange={e=>setIng(idx,'nombre',e.target.value)} className="inp" placeholder="Ingrediente" style={{flex:1,padding:'5px 8px',fontSize:13}}/>
+                  <button onClick={()=>quitarIng(idx)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16,flexShrink:0}}>✕</button>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <input type="number" step="0.001" value={ing.cantidad} onChange={e=>setIng(idx,'cantidad',e.target.value)} className="inp" placeholder="cant" style={{width:64,padding:'5px 6px',fontSize:13,textAlign:'center'}}/>
+                  <select value={ing.unidad} onChange={e=>setIng(idx,'unidad',e.target.value)} className="inp" style={{width:78,padding:'5px 4px',fontSize:12}}>{UNI.map(u=><option key={u} value={u}>{u}</option>)}</select>
+                  <span style={{fontSize:11,color:'var(--txt2)'}}>×</span>
+                  <input type="number" value={enStock?cActual:ing.costoUnit} onChange={e=>setIng(idx,'costoUnit',e.target.value)} disabled={enStock} className="inp" placeholder="costo/u" style={{flex:1,padding:'5px 6px',fontSize:13,opacity:enStock?0.7:1}}/>
+                  <span style={{fontSize:12,fontWeight:700,color:'var(--txt)',whiteSpace:'nowrap'}}>{formatPeso((Number(ing.cantidad)||0)*cActual)}</span>
+                </div>
+                {enStock&&<div style={{fontSize:10,color:'var(--blue)',marginTop:3}}>↻ costo tomado del stock (se actualiza solo)</div>}
+              </div>
+            );
+          })}
+          <div style={{display:'flex',gap:6,marginBottom:10,marginTop:4}}>
+            <select value={selIng} onChange={e=>setSelIng(e.target.value)} className="inp" style={{flex:1,fontSize:13}}>
+              <option value="">+ Agregar desde stock…</option>
+              {stockItems.map(i=><option key={i.id} value={i.id}>{i.nombre} ({formatPeso(i.precioCosto||0)}/{i.unidad})</option>)}
+            </select>
+            <button onClick={agregarDesdeStock} disabled={!selIng} className="btn-sec" style={{padding:'8px 12px',flexShrink:0}}>+</button>
+          </div>
+          <button onClick={agregarManual} className="btn-sec" style={{width:'100%',marginBottom:12,fontSize:13}}>✏️ Agregar ingrediente manual</button>
+
+          <Campo label="💰 Precio de venta (por unidad terminada)" value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
+
+          <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginTop:6}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}><span style={{color:'var(--txt2)'}}>Costo total receta</span><b style={{color:'var(--txt)'}}>{formatPeso(costoForm)}</b></div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:3}}><span style={{color:'var(--txt2)'}}>Costo por {d.unidadRinde}</span><b style={{color:'var(--orange)'}}>{formatPeso(costoUnitForm)}</b></div>
+            {margenForm!==null&&<div style={{display:'flex',justifyContent:'space-between',fontSize:13}}><span style={{color:'var(--txt2)'}}>Ganancia por {d.unidadRinde}</span><b style={{color:margenForm>=0?'var(--green)':'var(--red)'}}>{margenForm}% ({formatPeso(Number(d.precioVenta)-costoUnitForm)})</b></div>}
+          </div>
+
+          <div style={{display:'flex',gap:8,marginTop:14}}>
+            <button onClick={guardar} className="btn-pri" style={{flex:1,padding:12}}>{editId?'✓ Guardar':'+ Crear receta'}</button>
+            <button onClick={cerrar} className="btn-sec" style={{padding:12}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {recetas.length===0&&editId===null&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>👨‍🍳</div>No hay recetas.<br/>Creá tus preparados (milanesas, hamburguesas) para calcular su costo real.</div>}
+      {recetas.map(r=>{
+        const costo=costoDe(r);
+        const costoUnit=Number(r.rinde)>0?costo/Number(r.rinde):0;
+        const margen=costoUnit>0&&Number(r.precioVenta)>0?Math.round(((Number(r.precioVenta)-costoUnit)/costoUnit)*100):null;
+        return(
+          <div key={r.id} className="card">
+            <div className="card-body">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div className="card-name">{r.nombre}</div>
+                  <div className="card-sub">Rinde {r.rinde} {r.unidadRinde} · {(r.ingredientes||[]).length} ingredientes</div>
+                  <div className="card-sub">Costo/u: <b style={{color:'var(--orange)'}}>{formatPeso(costoUnit)}</b> · Venta: {formatPeso(r.precioVenta)}</div>
+                  {margen!==null&&<span className={margen>=30?'pill pill-green':margen>=10?'pill pill-orange':'pill pill-red'} style={{marginTop:4,display:'inline-block'}}>Ganancia: {margen}%</span>}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:6,alignItems:'center',marginTop:10}}>
+                <span style={{fontSize:12,color:'var(--txt2)'}}>Tandas:</span>
+                <input type="number" min={1} value={tandas[r.id]||1} onChange={e=>setTandas(t=>({...t,[r.id]:e.target.value}))} className="inp" style={{width:56,padding:'5px 6px',textAlign:'center',fontWeight:700}}/>
+                <button onClick={()=>producir(r)} className="btn-pri" style={{flex:1,padding:'8px 6px',fontSize:13,background:'var(--green)'}}>👨‍🍳 Producir</button>
+              </div>
+              <div className="card-actions">
+                <button onClick={()=>abrirEditar(r)} className="btn-ic">✏️ Editar</button>
+                <button onClick={()=>eliminar(r.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PantallaStock({uid}){
   const [items,setItems]=useState([]);const [form,setForm]=useState(null);const [verduForm,setVerduForm]=useState(null);
   const [buscar,setBuscar]=useState('');const [sec,setSec]=useState('stock');
@@ -2326,7 +3041,7 @@ function PantallaStock({uid}){
       <Header titulo="Stock / Inventario" onAdd={headerAdd}/>
       <div className="app-body">
         <div className="tab-bar" style={{overflowX:'auto'}}>
-          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
+          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'lotes',lbl:'📅 Lotes'},{k:'mermas',lbl:'🥩 Mermas'},{k:'recetas',lbl:'👨‍🍳 Recetas'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'proveedores',lbl:'🚚 Proveedores'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
             <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`} style={{flexShrink:0,whiteSpace:'nowrap'}}>{s.lbl}</button>
           ))}
         </div>
@@ -2367,9 +3082,13 @@ function PantallaStock({uid}){
             </div>
           ))}
         </>}
-        {sec==='cajon'&&<CalculadoraCajon uid={uid}/>}
+        {sec==='cajon'&&<SeccionPollo uid={uid}/>}
+        {sec==='lotes'&&<SeccionLotes uid={uid}/>}
         {sec==='congelados'&&<CalculadoraCongelados uid={uid}/>}
         {sec==='verduleria'&&<SeccionVerduleria items={items.filter(i=>i.tipo==='verduleria')} onAgregar={()=>setVerduForm({})} onEditar={item=>setVerduForm(item)} onEliminar={eliminar} onAjustar={ajustar}/>}
+        {sec==='mermas'&&<SeccionMermas uid={uid} stockItems={items}/>}
+        {sec==='recetas'&&<SeccionRecetas uid={uid}/>}
+        {sec==='proveedores'&&<SeccionProveedores uid={uid}/>}
         {sec==='precios'&&<PantallaPrecios uid={uid} sinHeader={true}/>}
       </div>
     </div>
@@ -2564,6 +3283,7 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
         telefono:d.tel,direccion:d.dir,notas:d.nota,esEnvio:true,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
+      await descontarStockVenta(uid,items);
       setOk(true);setTimeout(()=>setOk(false),2500);
       setD({nombre:'',dir:'',tel:'',pago:'efectivo',nota:''});
       setItems([]);
@@ -3312,13 +4032,18 @@ ReactDOM.createRoot(document.getElementById('root')).render(<AppWrapper/>);
 </script>
 
   <script>
-  // ── SERVICE WORKER (PWA - funciona sin internet) ──────────────────
-  // Service Worker deshabilitado: causaba errores en GitHub Pages y problemas de caché.
-  // Además, desregistramos cualquier SW viejo que haya quedado registrado.
+  // ── SERVICE WORKER (PWA offline · estrategia NETWORK-FIRST) ──────────
+  // Network-first: siempre busca primero la versión más nueva en internet,
+  // y solo usa el caché cuando estás sin conexión. Esto evita el problema
+  // anterior de quedar pegado con una versión vieja en GitHub Pages.
+  // IMPORTANTE: requiere subir el archivo sw.js junto a index.html.
+  // Si no subís sw.js, la app igual funciona (no se cachea, nada más).
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(regs){
-      regs.forEach(function(r){ r.unregister(); });
-    }).catch(function(){});
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(err){
+        console.warn('Service Worker no registrado (¿falta subir sw.js?):', err && err.message);
+      });
+    });
   }
   </script>
 </body>
