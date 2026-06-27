@@ -763,7 +763,6 @@ async function descontarStockVenta(uid, items){
         await stockCol.doc(st.id).update({cantidad:nueva});
         porNombre[key].cantidad=nueva;
       }
-      await consumirLotesFIFO(uid, it.nombre, cant);
     }
   }catch(e){console.warn('descontarStockVenta:',e.message);}
 }
@@ -1952,13 +1951,8 @@ function CalculadoraCajon({uid}){
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
   const [rendimientoPct,setRendimientoPct]=useState(70);
-  // #5 Lotes/proveedor
-  const [proveedores,setProveedores]=useState([]);
-  const [proveedorId,setProveedorId]=useState('');
-  const [vencHoras,setVencHoras]=useState(72);
-  // #3 Margen objetivo
+  // #3 Margen objetivo (motor del costeo por valor)
   const [margenObj,setMargenObj]=useState(40);
-  useEffect(()=>db.collection(`polleria/${uid}/proveedores`).orderBy('nombre','asc').onSnapshot(s=>setProveedores(s.docs.map(d=>({id:d.id,...d.data()})))),[]);
 
   const totKg=+(cajones*kgCajon).toFixed(2);
   const rendimientoKg=+(totKg*rendimientoPct/100).toFixed(2);
@@ -1988,30 +1982,23 @@ function CalculadoraCajon({uid}){
   const M=MODOS[modo];
   const conRef=tot>0;
 
-  // Precio de venta: usa el editado, o el sugerido del mercado
-  const getPv=n=>preciosVenta[n]!==undefined?Number(preciosVenta[n]):(PRECIOS_MERCADO_POLLO[n]?.sug||0);
+  // ── COSTEO POR VALOR ──────────────────────────────────────────────
+  // Cada corte vale distinto (la carcasa NO es el filet). Repartimos el costo
+  // del cajón según el valor de cada corte, no por kilo parejo. Así la carcasa
+  // carga poco costo y el filet carga más; con el mismo margen, sale el precio justo.
+  const refValor=n=>PRECIOS_MERCADO_POLLO[n]?.sug||0;                       // valor relativo del corte
+  const valorTotalCajon=M.piezas.reduce((s,p)=>s+p.kgEst*refValor(p.n),0);  // valor total de todos los cortes
+  const costoKgCorte=n=>(precioTotalPagado>0&&valorTotalCajon>0)?(precioTotalPagado*refValor(n)/valorTotalCajon):0; // costo $/kg por valor
+  const precioAuto=n=>Math.round(costoKgCorte(n)*(1+(Number(margenObj)||0)/100)); // precio = costo + margen
+  const getPv=n=>preciosVenta[n]!==undefined?Number(preciosVenta[n]):precioAuto(n); // editado a mano, o automático
   const setPv=(n,v)=>setPreciosVenta(p=>({...p,[n]:v}));
-  const restaurarPrecios=()=>{
-    const obj={};M.piezas.forEach(p=>{obj[p.n]=PRECIOS_MERCADO_POLLO[p.n]?.sug||0;});
-    setPreciosVenta(obj);
-  };
+  const volverAutomatico=()=>{setPreciosVenta({});mostrarToast('↺ Precios automáticos restablecidos');};
 
   // Cálculos financieros
   const ingresoPieza=p=>+(p.kgEst*getPv(p.n)).toFixed(2);
   const totalIngreso=M.piezas.reduce((s,p)=>s+ingresoPieza(p),0);
   const gananciaTotal=totalIngreso-precioTotalPagado;
   const gananciaPct=precioTotalPagado>0?+((gananciaTotal/precioTotalPagado)*100).toFixed(1):0;
-
-  // #3 Escala todos los precios para llegar al margen objetivo (mantiene la proporción entre cortes)
-  const aplicarMargen=()=>{
-    if(precioTotalPagado<=0)return alert('Primero cargá el precio pagado por cajón');
-    if(totalIngreso<=0)return alert('No hay precios de venta para escalar');
-    const objetivo=precioTotalPagado*(1+(Number(margenObj)||0)/100);
-    const factor=objetivo/totalIngreso;
-    const obj={};M.piezas.forEach(p=>{obj[p.n]=Math.round(getPv(p.n)*factor);});
-    setPreciosVenta(obj);
-    mostrarToast(`✅ Precios ajustados para ${margenObj}% de ganancia`);
-  };
 
   // Badge comparación con mercado
   const badgeMercado=(n,pv)=>{
@@ -2029,11 +2016,10 @@ function CalculadoraCajon({uid}){
     try{
       const stockCol=db.collection(`polleria/${uid}/stock`);
       const prodCol=db.collection(`polleria/${uid}/productos`);
-      const lotesCol=db.collection(`polleria/${uid}/lotes`);
-      const prov=proveedores.find(x=>x.id===proveedorId)||null;
       for(const p of M.piezas){
         const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const pVenta=getPv(p.n);
+        const pCosto=+costoKgCorte(p.n).toFixed(2);
         const stockRef=stockCol.doc(docId);
         const snap=await stockRef.get();
         const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
@@ -2041,7 +2027,7 @@ function CalculadoraCajon({uid}){
           nombre:p.n,categoria:'Pollo',tipo:'cajon',
           cantidad:+(cantActual+p.kgEst).toFixed(2),
           unidad:'kg',
-          precioCosto:+costoPorKg.toFixed(2),
+          precioCosto:pCosto,
           precioVenta:+pVenta.toFixed(2),
           stockMinimo:0,
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
@@ -2049,29 +2035,12 @@ function CalculadoraCajon({uid}){
         await prodCol.doc(docId).set({
           nombre:p.n,categoria:'🐔 Pollo',
           unidad:'kg',
-          precioCosto:+costoPorKg.toFixed(2),
+          precioCosto:pCosto,
           precioVenta:+pVenta.toFixed(2),
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         },{merge:true});
-        // #5 Crear lote para trazabilidad + FIFO (solo si hay kg)
-        if(p.kgEst>0){
-          await lotesCol.add({
-            productoNombre:p.n,
-            proveedorId:prov?prov.id:'',
-            proveedorNombre:prov?prov.nombre:'Sin proveedor',
-            fechaIngreso:hoy(),
-            horaIngreso:ahora(),
-            kgInicial:+p.kgEst.toFixed(2),
-            kgRestante:+p.kgEst.toFixed(2),
-            precioCosto:+costoPorKg.toFixed(2),
-            vencimientoHoras:Number(vencHoras)||72,
-            agotado:false,
-            ingresoTs:Date.now(),
-            createdAt:firebase.firestore.FieldValue.serverTimestamp(),
-          });
-        }
       }
-      mostrarToast(`✅ ${M.piezas.length} cortes guardados + lotes creados`);
+      mostrarToast(`✅ ${M.piezas.length} cortes publicados al catálogo`);
     }catch(e){alert('Error: '+e.message);}
     setGuardando(false);
   };
@@ -2140,84 +2109,62 @@ function CalculadoraCajon({uid}){
             <button onClick={()=>setPrecioCajon(String(Math.round((Number(precioCajon)||0)*1.15)))} disabled={!precioCajon} style={{flex:1,fontSize:12,padding:'5px',borderRadius:'var(--radius)',border:'1px solid var(--orange)',background:'var(--orange-bg)',color:'var(--orange)',fontWeight:700,cursor:'pointer'}}>+15%</button>
           </div>
         </div>
-        <div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
-          <label className="lbl" style={{marginTop:0,color:'var(--blue)',fontWeight:700,fontSize:12}}>📅 Trazabilidad del lote</label>
-          <div style={{fontSize:11,color:'var(--txt2)',marginBottom:6}}>De quién vino y en cuántas horas vence (para FIFO y alertas).</div>
-          <label className="lbl" style={{marginTop:0}}>Proveedor</label>
-          <select value={proveedorId} onChange={e=>setProveedorId(e.target.value)} className="inp" style={{marginBottom:8}}>
-            <option value="">— Sin proveedor —</option>
-            {proveedores.map(pr=>(<option key={pr.id} value={pr.id}>{pr.nombre}</option>))}
-          </select>
-          {proveedores.length===0&&<div style={{fontSize:11,color:'var(--txt3)',marginBottom:8}}>💡 Cargá proveedores en la pestaña 🚚 Proveedores.</div>}
-          <label className="lbl">Vence en (horas)</label>
-          <div style={{display:'flex',gap:6}}>
-            {[48,72,96].map(h=>(<button key={h} onClick={()=>setVencHoras(h)} className={`chip${vencHoras===h?' activo':''}`} style={{flex:1}}>{h}hs</button>))}
-            <input type="number" min={1} value={vencHoras} onChange={e=>setVencHoras(Math.max(1,Number(e.target.value)))} className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'4px 6px'}}/>
-          </div>
-        </div>
-        <label className="lbl">Tipo de corte</label>
-        <div className="chip-group" style={{marginBottom:0}}>
+        <label className="lbl">¿Para qué vas a usar el cajón?</label>
+        <div className="chip-group" style={{marginBottom:12}}>
           {Object.entries(MODOS).map(([k,v])=>(
             <button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>
           ))}
         </div>
+        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px'}}>
+          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 ¿Cuánto querés ganar?</label>
+          <div style={{fontSize:11,color:'var(--txt2)',marginBottom:8}}>Los precios de cada corte se calculan solos con este margen.</div>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:1}}>{m}%</button>))}
+            <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:70,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
+          </div>
+        </div>
       </div>
 
-      {/* ── Precios por corte ── */}
+      {/* ── Precios por corte (automáticos) ── */}
       <div className="panel">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-          <div className="ptitle" style={{margin:0}}>🏷️ Precio de venta por corte</div>
-          <button onClick={restaurarPrecios}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+          <div className="ptitle" style={{margin:0}}>🏷️ Precios calculados</div>
+          <button onClick={volverAutomatico}
             style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--txt2)',cursor:'pointer',fontWeight:600}}>
-            ↺ Usar precios de mercado
+            ↺ Automáticos
           </button>
         </div>
-
-        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:14}}>
-          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 Margen objetivo</label>
-          <div style={{fontSize:11,color:'var(--txt2)',marginBottom:8}}>Ajustá todos los precios de una para ganar este % sobre el costo del cajón.</div>
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:'0 0 auto'}}>{m}%</button>))}
-            <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
-            <button onClick={aplicarMargen} className="btn-pri" style={{flex:1,padding:'8px 6px',fontSize:13}}>Aplicar</button>
-          </div>
-          {precioTotalPagado>0&&totalIngreso>0&&<div style={{fontSize:11,color:gananciaPct>=margenObj?'var(--green)':'var(--orange)',marginTop:6,fontWeight:600}}>
-            Ahora estás en {gananciaPct}% {gananciaPct>=margenObj?'✓':`(meta: ${margenObj}%)`}
-          </div>}
-        </div>
+        <div style={{fontSize:11,color:'var(--txt2)',marginBottom:12}}>Cada corte con su precio según cuánto vale (la carcasa más barata, el filet más caro). Podés editar cualquiera.</div>
 
         {M.piezas.map(p=>{
           const pv=getPv(p.n);
-          const ref=PRECIOS_MERCADO_POLLO[p.n];
+          const costoCorte=costoKgCorte(p.n);
           const sub=ingresoPieza(p);
-          const ganPieza=costoPorKg>0?+(p.kgEst*(pv-costoPorKg)).toFixed(0):0;
+          const ganPieza=costoCorte>0?+(p.kgEst*(pv-costoCorte)).toFixed(0):0;
+          const margenCorte=costoCorte>0?Math.round(((pv-costoCorte)/costoCorte)*100):null;
+          const editado=preciosVenta[p.n]!==undefined;
           return(
             <div key={p.n} style={{marginBottom:10,padding:'12px',background:'var(--bg2)',borderRadius:'var(--radius)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
                 <div>
                   <span style={{fontWeight:700,fontSize:14,color:'var(--txt)'}}>{p.n}</span>
-                  {badgeMercado(p.n,pv)}
-                  {p.ref&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:2}}>{p.ref}</div>}
+                  {margenCorte!==null&&<span style={{fontSize:10,fontWeight:700,marginLeft:6,color:editado?'var(--orange)':'var(--green)',background:editado?'var(--orange-bg)':'var(--green-bg)',borderRadius:4,padding:'1px 6px'}}>{editado?`${margenCorte}% · editado`:`gana ${margenCorte}%`}</span>}
+                  {costoCorte>0&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:2}}>costo {formatPeso(costoCorte)}/kg</div>}
                 </div>
                 <span style={{fontSize:13,color:'var(--txt2)',fontWeight:600}}>{p.kgEst} kg</span>
               </div>
-              {ref&&<div style={{fontSize:11,color:'var(--txt3)',marginBottom:8}}>
-                Referencia mercado: <b>{formatPeso(ref.min)}</b> – <b>{formatPeso(ref.max)}</b> / kg
-              </div>}
               <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
                 <div style={{flex:1}}>
                   <label style={{fontSize:11,color:'var(--txt2)',display:'block',marginBottom:3}}>Precio de venta ($/kg)</label>
                   <input type="number" min={0} step={100}
-                    value={preciosVenta[p.n]!==undefined?preciosVenta[p.n]:(ref?.sug||'')}
+                    value={editado?preciosVenta[p.n]:precioAuto(p.n)}
                     onChange={e=>setPv(p.n,e.target.value)}
                     className="inp" style={{fontWeight:700,fontSize:18}}/>
                 </div>
                 <div style={{textAlign:'right',minWidth:100,paddingBottom:2}}>
                   <div style={{fontSize:11,color:'var(--txt2)'}}>Subtotal venta</div>
                   <div style={{fontWeight:700,fontSize:18,color:'var(--green)'}}>{formatPeso(sub)}</div>
-                  {costoPorKg>0&&<div style={{fontSize:11,color:ganPieza>=0?'var(--green)':'var(--red)'}}>
-                    gan: {formatPeso(ganPieza)}
-                  </div>}
+                  {costoCorte>0&&<div style={{fontSize:11,color:ganPieza>=0?'var(--green)':'var(--red)'}}>gan: {formatPeso(ganPieza)}</div>}
                 </div>
               </div>
             </div>
@@ -2233,7 +2180,7 @@ function CalculadoraCajon({uid}){
             {[
               {lbl:'📦 Kg brutos → vendibles', val:`${totKg}kg → ${rendimientoKg}kg (${rendimientoPct}%)`, c:'var(--orange)'},
               {lbl:'💸 Costo total',    val:formatPeso(precioTotalPagado),  c:'var(--red)'},
-              {lbl:'📊 Costo/kg vendible', val:formatPeso(costoPorKg)+'/kg', c:'var(--orange)'},
+              {lbl:'📊 Costo promedio/kg', val:formatPeso(costoPorKg)+'/kg', c:'var(--orange)'},
               {lbl:'💰 Ingreso estimado',  val:formatPeso(totalIngreso),        c:'var(--blue)'},
               {lbl:'✨ Ganancia',       val:`${formatPeso(gananciaTotal)} (${gananciaPct}%)`, c:gananciaTotal>=0?'var(--green)':'var(--red)'},
             ].map(r=>(
@@ -3041,7 +2988,7 @@ function PantallaStock({uid}){
       <Header titulo="Stock / Inventario" onAdd={headerAdd}/>
       <div className="app-body">
         <div className="tab-bar" style={{overflowX:'auto'}}>
-          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'lotes',lbl:'📅 Lotes'},{k:'mermas',lbl:'🥩 Mermas'},{k:'recetas',lbl:'👨‍🍳 Recetas'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'proveedores',lbl:'🚚 Proveedores'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
+          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
             <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`} style={{flexShrink:0,whiteSpace:'nowrap'}}>{s.lbl}</button>
           ))}
         </div>
