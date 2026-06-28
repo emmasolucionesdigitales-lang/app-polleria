@@ -1941,6 +1941,13 @@ const PRECIOS_MERCADO_POLLO={
   'Carcasas caldo': {min:1800,max:2200,sug:2000},
 };
 
+const CORTES_DEFAULT=[
+  {n:'Pechuga',         pct:40, precioRef:4000},
+  {n:'Pata-muslo',      pct:30, precioRef:3000},
+  {n:'Alas',            pct:20, precioRef:2000},
+  {n:'Carcasa+menudos', pct:10, precioRef:1000},
+];
+
 function CalculadoraCajon({uid}){
   const [cajones,setCajones]=useState(1);
   const [kgCajon,setKgCajon]=useState(20);
@@ -1950,9 +1957,23 @@ function CalculadoraCajon({uid}){
   const [preciosVenta,setPreciosVenta]=useState({});
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
-  const [rendimientoPct,setRendimientoPct]=useState(70);
-  // #3 Margen objetivo (motor del costeo por valor)
-  const [margenObj,setMargenObj]=useState(40);
+  const [rendimientoPct,setRendimientoPct]=useState(90);
+  const [margenObj,setMargenObj]=useState(30);
+  // Config editable (precargada): cortes del trozado + precio del pollo entero
+  const [cortesCfg,setCortesCfg]=useState(CORTES_DEFAULT);
+  const [precioEntero,setPrecioEntero]=useState(4400);
+  const [editandoCfg,setEditandoCfg]=useState(false);
+  const [guardandoCfg,setGuardandoCfg]=useState(false);
+  const cfgRef=db.collection(`polleria/${uid}/config`).doc('cajon');
+  useEffect(()=>{
+    cfgRef.get().then(snap=>{
+      if(snap.exists){const d=snap.data();
+        if(Array.isArray(d.cortes)&&d.cortes.length)setCortesCfg(d.cortes);
+        if(d.precioEntero)setPrecioEntero(d.precioEntero);
+        if(d.rendimientoPct)setRendimientoPct(d.rendimientoPct);
+      }
+    }).catch(()=>{});
+  },[]);
 
   const totKg=+(cajones*kgCajon).toFixed(2);
   const rendimientoKg=+(totKg*rendimientoPct/100).toFixed(2);
@@ -1963,36 +1984,45 @@ function CalculadoraCajon({uid}){
 
   const MODOS={
     completo:{label:'🐔 Entero', piezas:[
-      {n:'Pollo entero', kgEst:rendimientoKg, ref:tot>0?`${tot} pollos`:'', u:'kg'},
+      {n:'Pollo entero', kgEst:rendimientoKg, precioRef:Number(precioEntero)||0},
     ]},
-    piezas:{label:'🍗 Trozado', piezas:[
-      {n:'Pechugas',   kgEst:+(rendimientoKg*0.25).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
-      {n:'Pata-muslo', kgEst:+(rendimientoKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
-      {n:'Alas',       kgEst:+(rendimientoKg*0.18).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
-      {n:'Muslos',     kgEst:+(rendimientoKg*0.14).toFixed(2), ref:tot>0?`${tot*2} piezas`:'', u:'kg'},
-      {n:'Carcasas',   kgEst:+(rendimientoKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',   u:'kg'},
-    ]},
-    filet:{label:'🥩 Filet', piezas:[
-      {n:'Filet pechuga',  kgEst:+(rendimientoKg*0.25).toFixed(2), ref:tot>0?`${tot} filetes`:'',   u:'kg'},
-      {n:'Milanesas',      kgEst:+(rendimientoKg*0.22).toFixed(2), ref:tot>0?`${tot*4} piezas`:'',  u:'kg'},
-      {n:'Pata-muslo',     kgEst:+(rendimientoKg*0.30).toFixed(2), ref:tot>0?`${tot*2} piezas`:'',  u:'kg'},
-      {n:'Carcasas caldo', kgEst:+(rendimientoKg*0.13).toFixed(2), ref:tot>0?`${tot} piezas`:'',    u:'kg'},
-    ]},
+    piezas:{label:'🍗 Trozado', piezas:cortesCfg.map(c=>({
+      n:c.n,
+      kgEst:+(rendimientoKg*(Number(c.pct)||0)/100).toFixed(2),
+      precioRef:Number(c.precioRef)||0,
+    }))},
   };
   const M=MODOS[modo];
   const conRef=tot>0;
 
   // ── COSTEO POR VALOR ──────────────────────────────────────────────
   // Cada corte vale distinto (la carcasa NO es el filet). Repartimos el costo
-  // del cajón según el valor de cada corte, no por kilo parejo. Así la carcasa
-  // carga poco costo y el filet carga más; con el mismo margen, sale el precio justo.
-  const refValor=n=>PRECIOS_MERCADO_POLLO[n]?.sug||0;                       // valor relativo del corte
-  const valorTotalCajon=M.piezas.reduce((s,p)=>s+p.kgEst*refValor(p.n),0);  // valor total de todos los cortes
-  const costoKgCorte=n=>(precioTotalPagado>0&&valorTotalCajon>0)?(precioTotalPagado*refValor(n)/valorTotalCajon):0; // costo $/kg por valor
+  // del cajón según el valor de cada corte, no por kilo parejo. Los valores
+  // de referencia (porcentajes y precios) los edita el usuario y quedan guardados.
+  const refValor=n=>{const p=M.piezas.find(x=>x.n===n);return p?(Number(p.precioRef)||0):0;};
+  const valorTotalCajon=M.piezas.reduce((s,p)=>s+p.kgEst*refValor(p.n),0);
+  const costoKgCorte=n=>(precioTotalPagado>0&&valorTotalCajon>0)?(precioTotalPagado*refValor(n)/valorTotalCajon):0;
   const precioAuto=n=>Math.round(costoKgCorte(n)*(1+(Number(margenObj)||0)/100)); // precio = costo + margen
   const getPv=n=>preciosVenta[n]!==undefined?Number(preciosVenta[n]):precioAuto(n); // editado a mano, o automático
   const setPv=(n,v)=>setPreciosVenta(p=>({...p,[n]:v}));
   const volverAutomatico=()=>{setPreciosVenta({});mostrarToast('↺ Precios automáticos restablecidos');};
+
+  // Editar y guardar la configuración de cortes
+  const setCorte=(idx,k,v)=>setCortesCfg(cs=>cs.map((c,i)=>i===idx?{...c,[k]:v}:c));
+  const sumaPct=cortesCfg.reduce((s,c)=>s+(Number(c.pct)||0),0);
+  const guardarCfg=async()=>{
+    setGuardandoCfg(true);
+    try{
+      await cfgRef.set({
+        cortes:cortesCfg.map(c=>({n:c.n,pct:Number(c.pct)||0,precioRef:Number(c.precioRef)||0})),
+        precioEntero:Number(precioEntero)||0,
+        rendimientoPct:Number(rendimientoPct)||90,
+      },{merge:true});
+      setEditandoCfg(false);
+      mostrarToast('✅ Configuración guardada');
+    }catch(e){alert('Error: '+e.message);}
+    setGuardandoCfg(false);
+  };
 
   // Cálculos financieros
   const ingresoPieza=p=>+(p.kgEst*getPv(p.n)).toFixed(2);
@@ -2049,7 +2079,35 @@ function CalculadoraCajon({uid}){
     <div>
       {/* ── Panel básico ── */}
       <div className="panel">
-        <div className="ptitle">🧮 Calculadora de Cajón</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <div className="ptitle" style={{margin:0}}>🧮 Calculadora de Cajón</div>
+          <button onClick={()=>setEditandoCfg(v=>!v)} style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:editandoCfg?'var(--blue-bg)':'var(--bg2)',color:editandoCfg?'var(--blue)':'var(--txt2)',cursor:'pointer',fontWeight:600}}>⚙️ Cortes</button>
+        </div>
+        {editandoCfg&&(
+          <div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:'12px',marginBottom:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:2}}>⚙️ Cortes y precios de referencia</div>
+            <div style={{fontSize:11,color:'var(--txt2)',marginBottom:10}}>Ajustá cuánto rinde cada corte (%) y su valor ($/kg). Esto define cómo se reparte el costo.</div>
+            <div style={{display:'flex',gap:6,fontSize:10,color:'var(--txt3)',fontWeight:700,padding:'0 2px 4px'}}>
+              <span style={{flex:1}}>CORTE</span><span style={{width:54,textAlign:'center'}}>%</span><span style={{width:78,textAlign:'center'}}>$/kg</span>
+            </div>
+            {cortesCfg.map((c,idx)=>(
+              <div key={idx} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+                <span style={{flex:1,fontSize:13,color:'var(--txt)',fontWeight:500}}>{c.n}</span>
+                <input type="number" min={0} value={c.pct} onChange={e=>setCorte(idx,'pct',e.target.value)} className="inp" style={{width:54,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
+                <input type="number" min={0} step={100} value={c.precioRef} onChange={e=>setCorte(idx,'precioRef',e.target.value)} className="inp" style={{width:78,textAlign:'center',padding:'5px 4px',fontSize:13}}/>
+              </div>
+            ))}
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:sumaPct===100?'var(--green)':'var(--orange)',fontWeight:700,margin:'2px 2px 10px'}}>
+              <span>Suma de %</span><span>{sumaPct}% {sumaPct===100?'✓':'(debería dar 100)'}</span>
+            </div>
+            <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:10}}>
+              <span style={{flex:1,fontSize:13,color:'var(--txt)',fontWeight:500}}>🐔 Pollo entero</span>
+              <span style={{width:54,textAlign:'center',fontSize:11,color:'var(--txt3)'}}>—</span>
+              <input type="number" min={0} step={100} value={precioEntero} onChange={e=>setPrecioEntero(e.target.value)} className="inp" style={{width:78,textAlign:'center',padding:'5px 4px',fontSize:13}}/>
+            </div>
+            <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',padding:10,fontSize:13}}>{guardandoCfg?'Guardando...':'💾 Guardar configuración'}</button>
+          </div>
+        )}
         <div style={{display:'flex',gap:10,marginBottom:10}}>
           <div style={{flex:1}}>
             <label className="lbl" style={{marginTop:0}}>Cajones</label>
