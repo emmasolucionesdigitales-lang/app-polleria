@@ -1507,19 +1507,19 @@ function PantallaCatalogo({uid}){
     return()=>{u1();u2();u3();};
   },[]);
 
-  // Combinar productos + stock sin duplicar
+  // Normalización de nombres de categoría (para mostrarlas con emoji)
   const catMap={'Pollo':'🐔 Pollo','Congelados':'❄️ Congelados',
     'Verdulería':'🥦 Verdulería','Verduleria':'🥦 Verdulería',
     'Huevos y Lácteos':'🥚 Huevos y Lácteos','Huevos':'🥚 Huevos y Lácteos'};
+  // Catálogo vinculado al stock: solo aparece lo que hay cargado y con precio.
+  // Aplica igual a pollo, congelados y verdulería. Si limpiás el stock, desaparece de Vender.
   const todosProductos=React.useMemo(()=>{
-    const nombresEnProd=new Set(productos.map(p=>(p.nombre||'').toLowerCase().trim()));
-    const stockVisibles=stockItems.filter(s=>
-      (s.precioVenta||0)>0 && !nombresEnProd.has((s.nombre||'').toLowerCase().trim())
-    );
     const norm=p=>({...p, categoria:catMap[p.categoria]||p.categoria||'📦 Otros'});
-    return [...productos.map(norm),...stockVisibles.map(norm)]
+    return stockItems
+      .filter(s=>(Number(s.precioVenta)||0)>0 && (Number(s.cantidad)||0)>0)
+      .map(norm)
       .sort((a,b)=>(a.categoria||'').localeCompare(b.categoria||'')||(a.nombre||'').localeCompare(b.nombre||''));
-  },[productos,stockItems]);
+  },[stockItems]);
 
   const mostrarToast=msg=>{setToast(msg);setTimeout(()=>setToast(''),2200);};
 
@@ -1542,7 +1542,7 @@ function PantallaCatalogo({uid}){
     setCarrito(prev=>{
       const ex=prev.find(i=>i.prod.id===prodId);
       if(ex) return prev.map(i=>i.prod.id===prodId?{...i,cantidad:peso}:i);
-      const prod=productos.find(p=>p.id===prodId);
+      const prod=todosProductos.find(p=>p.id===prodId);
       return[...prev,{prod,cantidad:peso}];
     });
   };
@@ -1619,6 +1619,7 @@ function PantallaCatalogo({uid}){
                   <div className="prod-card-info">
                     <div className="prod-card-nombre">{p.nombre}</div>
                     <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
+                    <div style={{fontSize:11,color:'var(--green)',fontWeight:600,margin:'1px 0 2px'}}>📦 {(Number(p.cantidad)||0)} {p.unidad||'kg'} en stock</div>
                     <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
                     <button className="prod-card-btn" style={{background:enC?'var(--green)':'var(--txt)'}}>
                       {enC?(esPeso?`⚖️ ${enC.cantidad} ${p.unidad||'kg'}`:`🛒 ${enC.cantidad} unid.`):(esPeso?'⚖️ Ingresar peso':'+ Agregar')}
