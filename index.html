@@ -1388,8 +1388,8 @@ function PantallaActivacionPoll({onActivado}){
             <p style="color:#999;font-size:12px;margin-top:20px">¿Necesitás ayuda? Escribinos por WhatsApp: <b>+54 9 381 339-9962</b></p>
             <p style="color:#bbb;font-size:11px">Emma Soluciones Digitales</p>
           </div>`
-        })}).catch(()=>{});
-      } catch(e) {}
+        })}).then(async r=>{const t=await r.text().catch(()=>'');console.log("[Mail bienvenida] status:",r.status,t);if(!r.ok)console.error("[Mail bienvenida] Brevo NO lo envió. Causa probable: remitente sin verificar o cuota agotada. Respuesta:",r.status,t);}).catch(e=>console.error("[Mail bienvenida] No se pudo contactar a Brevo (error de red o CORS):",e));
+      } catch(e) {console.error("[Mail bienvenida] Excepción:",e);}
       onActivado(lic.pin);
     }catch(e){setErr('Error al activar.');}
     setCarg(false);
