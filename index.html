@@ -1060,6 +1060,7 @@ function SelectorTema({onCerrar}){
 
 /* ─── COMPROBANTE (para imprimir) ─── */
 function Comprobante({data,onCerrar}){
+  const [verComanda,setVerComanda]=useState(false);
   const fecha=new Date().toLocaleString('es-AR');
   const nombreNegocio=getNombreLocal();
   const items=data.items||[];
@@ -1109,10 +1110,12 @@ function Comprobante({data,onCerrar}){
           {data.datosTarjeta&&<div className="comp-print-fila" style={{fontSize:11}}><span>Pago datos:</span><span>{data.datosTarjeta}</span></div>}
           <div className="comp-print-footer">Emma Soluciones Digitales · Gestión Pollería<br/>{fecha}</div>
         </div>
-        <div style={{display:'flex',gap:8}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           <button onClick={imprimir} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>🖨️ Imprimir</button>
+          {data.esEnvio&&<button onClick={()=>setVerComanda(true)} className="btn-pri" style={{flex:1,padding:14,fontSize:15,background:'#8b5cf6'}}>🛵 Comanda cocina</button>}
           <button onClick={onCerrar} className="btn-sec" style={{padding:14}}>Cerrar</button>
         </div>
+        {verComanda&&<ComandaEnvio pedido={data} onCerrar={()=>setVerComanda(false)}/>}
       </div>
     </div>
   );
@@ -1164,6 +1167,7 @@ function guardarModo(m){try{localStorage.setItem('polleria-modo',m);}catch{}}
 const TABS=[
   {id:'catalogo', icon:'🛒', label:'Vender'},
   {id:'pedidos',  icon:'📋', label:'Pedidos'},
+  {id:'clientes', icon:'👥', label:'Clientes'},
   {id:'stock',    icon:'📦', label:'Stock'},
   {id:'caja',     icon:'🧾', label:'Caja'},
   {id:'config',   icon:'⚙️', label:'Config'},
@@ -1380,7 +1384,7 @@ function PantallaActivacionPoll({onActivado}){
               <div style="font-size:32px;font-weight:800;color:#dc2626;letter-spacing:8px">${lic.pin}</div>
               <div style="font-size:12px;color:#999;margin-top:4px">Guardalo en un lugar seguro</div>
             </div>
-            <p style="color:#555;font-size:13px">📱 Código de activación: <b>${codigoUp}</b></p>
+            <p style="color:#555;font-size:13px">📱 Código de activación: <b>${cod}</b></p>
             <p style="color:#999;font-size:12px;margin-top:20px">¿Necesitás ayuda? Escribinos por WhatsApp: <b>+54 9 381 339-9962</b></p>
             <p style="color:#bbb;font-size:11px">Emma Soluciones Digitales</p>
           </div>`
@@ -1477,7 +1481,7 @@ function ModalVentaRapida({producto, clientes, uid, onCerrar}){
     try {
       const cliente = clientes.find(c=>c.id===clienteId);
       const ts = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection(`polleria/${uid}/pedidos`).add({clienteNombre:cliente?cliente.nombre:'Venta directa',clienteId:clienteId||'',tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',formaPago:pago,items:[{_id:Date.now(),nombre:producto.nombre,unidad:producto.unidad||'kg',cantidad,precio,subtotal:total}],total,fecha:hoy(),createdAt:ts});
+      await db.collection(`polleria/${uid}/pedidos`).add({clienteNombre:cliente?cliente.nombre:'Venta directa',clienteId:clienteId||'',tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',formaPago:pago,items:[{_id:Date.now(),nombre:producto.nombre,unidad:producto.unidad||'kg',cantidad,precio,subtotal:total}],total,fecha:hoy(),horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),createdAt:ts});
       await descontarStockVenta(uid,[{nombre:producto.nombre,cantidad}]);
       if(pago==='fiado'&&clienteId){const ref=db.collection(`polleria/${uid}/clientes`).doc(clienteId);const snap=await ref.get();if(snap.exists){await ref.update({saldoFiado:(Number(snap.data().saldoFiado)||0)+total});}}
       onCerrar(true);
@@ -1503,10 +1507,11 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
     setCargando(true);
     try{
       const items=carrito.map(i=>({_id:Date.now()+Math.random(),nombre:i.prod.nombre,unidad:i.prod.unidad||'kg',cantidad:i.cantidad,precio:i.prod.precioVenta||0,subtotal:(i.prod.precioVenta||0)*i.cantidad}));
-      const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'delivery':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),horaCreacion:esEnvio?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'',telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'delivery':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
       const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
       await descontarStockVenta(uid,items);
       onVentaConfirmada({...pedidoData,id:ref.id,items});
+      if(esEnvio&&clienteNombre.trim())autoRegistrarCliente(uid,{nombre:clienteNombre,telefono,direccion:direccion.trim()});
       setClienteNombre('');setTelefono('');setDatosPago('');setPago('efectivo');setEsEnvio(false);setDireccion('');
     }catch(e){alert('Error: '+e.message);}
     setCargando(false);
@@ -1645,6 +1650,7 @@ function PantallaCatalogo({uid}){
   const limpiarCarrito=()=>{if(carrito.length&&confirm('¿Limpiar el carrito?'))setCarrito([]);};
 
   const onVentaConfirmada=data=>{
+    setCarrito([]);
     setComprobante(data);
     setCarritoMovil(false);
     mostrarToast('✅ Venta registrada');
@@ -3392,14 +3398,15 @@ function FormStock({inicial,onGuardar,onCancelar}){
 /* ══════════════════════════════════════
    PEDIDOS
 ══════════════════════════════════════ */
-const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},entregado:{label:'Entregado 📦',pillC:'pill pill-gray'},cobrado:{label:'Cobrado ✅',pillC:'pill pill-green'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
+const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},enviado:{label:'Enviado 🛵',pillC:'pill pill-blue'},entregado:{label:'Entregado 📦',pillC:'pill pill-gray'},cobrado:{label:'Cobrado ✅',pillC:'pill pill-green'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
 
 function ComandaEnvio({pedido,onCerrar}){
   const nombreNegocio=getNombreLocal();
   const est=ESTADOS[pedido.estado]||ESTADOS.pendiente;
   const horaImp=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   const imprimir=()=>window.print();
-  const PASOS=['pendiente','preparando','listo','entregado','cobrado'];
+  const esEnv=(pedido.tipo==='delivery'||pedido.tipo==='envio');
+  const PASOS=esEnv?['pendiente','preparando','enviado','entregado','cobrado']:['pendiente','preparando','listo','entregado','cobrado'];
   const idxAct=PASOS.indexOf(pedido.estado);
   return(
     <div className="overlay" onClick={onCerrar}>
@@ -3509,13 +3516,16 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
         {esEnvio&&pedido.telefono&&<p style={{fontSize:13,marginTop:4,color:'var(--txt)'}}>📞 {pedido.telefono}</p>}
         <div className="card-actions" style={{flexWrap:'wrap',gap:6}}>
           <button onClick={onEditar} className="btn-ic">✏️</button>
-          {esEnvio&&<button onClick={()=>setComanda(true)} className="btn-ic">🖨️ Comanda</button>}
+          <button onClick={()=>setComanda(true)} className="btn-ic">🖨️ Comanda</button>
           {esEnvio&&pedido.telefono&&<button onClick={abrirWhatsApp} style={{fontSize:13,padding:'7px 12px',borderRadius:'var(--radius)',border:'1px solid #25D366',background:'transparent',color:'#25D366',cursor:'pointer',fontWeight:600}}>📱 WhatsApp</button>}
-          {pedido.estado==='pendiente'&&<button onClick={()=>onEstado(pedido.id,'preparando')} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--blue)'}}>👨‍🍳 Preparando</button>}
-          {pedido.estado==='preparando'&&<button onClick={()=>onEstado(pedido.id,'listo')} className="btn-pri" style={{fontSize:13,padding:'7px 12px'}}>✓ Listo</button>}
-          {pedido.estado==='listo'&&<button onClick={()=>onEstado(pedido.id,'entregado')} className="btn-ic" style={{fontSize:13}}>📦 Entregado</button>}
-          {pedido.estado==='entregado'&&<button onClick={()=>onEstado(pedido.id,'cobrado')} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--green)'}}>✅ Cobrado</button>}
-          {(pedido.estado==='pendiente'||pedido.estado==='preparando')&&<button onClick={()=>onEstado(pedido.id,'cancelado')} className="btn-ic" style={{fontSize:13,color:'var(--red)'}}>✕ Cancelar</button>}
+          {pedido.estado==='pendiente'&&<button onClick={()=>onEstado(pedido.id,{estado:'preparando'})} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--blue)'}}>👨‍🍳 Preparar</button>}
+          {pedido.estado==='preparando'&&esEnvio&&<button onClick={()=>onEstado(pedido.id,{estado:'enviado',...(pedido.formaPago==='transferencia'&&!pedido.pagado?{pagado:true}:{})})} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'#8b5cf6'}}>🛵 Enviar</button>}
+          {pedido.estado==='preparando'&&!esEnvio&&<button onClick={()=>onEstado(pedido.id,{estado:'listo'})} className="btn-pri" style={{fontSize:13,padding:'7px 12px'}}>✓ Listo</button>}
+          {(pedido.estado==='enviado'||pedido.estado==='listo')&&<button onClick={()=>onEstado(pedido.id,{estado:'entregado'})} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--green)'}}>📦 Entregado</button>}
+          {pedido.estado==='entregado'&&pedido.formaPago==='fiado'&&<button onClick={()=>onEstado(pedido.id,{estado:'cobrado'})} className="btn-ic" style={{fontSize:13,color:'#f59e0b'}}>📒 Cerrar (queda fiado)</button>}
+          {pedido.estado==='entregado'&&pedido.formaPago!=='fiado'&&!pedido.pagado&&<button onClick={()=>onEstado(pedido.id,{estado:'cobrado',pagado:true})} className="btn-pri" style={{fontSize:13,padding:'7px 12px',background:'var(--green)'}}>💰 Cobrado</button>}
+          {pedido.estado==='entregado'&&pedido.formaPago!=='fiado'&&pedido.pagado&&<button onClick={()=>onEstado(pedido.id,{estado:'cobrado'})} className="btn-ic" style={{fontSize:13}}>✅ Cerrar</button>}
+          {(pedido.estado==='pendiente'||pedido.estado==='preparando')&&<button onClick={()=>onEstado(pedido.id,{estado:'cancelado'})} className="btn-ic" style={{fontSize:13,color:'var(--red)'}}>✕ Cancelar</button>}
           <button onClick={()=>onEliminar(pedido.id)} className="btn-ic" style={{marginLeft:'auto',color:'var(--red)'}}>🗑️</button>
         </div>
       </div>}
@@ -3730,8 +3740,8 @@ function PantallaPedidos({uid}){
     const stockVisibles=stockItems.filter(s=>(s.precioVenta||0)>0&&!nombresEnProd.has((s.nombre||'').toLowerCase().trim()));
     return [...productos,...stockVisibles].sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   },[productos,stockItems]);
-  const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente',horaCreacion:r.tipo==='delivery'?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''});setForm(null);};
-  const cambiarEstado=async(id,estado)=>await db.collection(`polleria/${uid}/pedidos`).doc(id).update({estado,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente',horaCreacion:r.tipo==='delivery'?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''});if((r.tipo==='delivery'||r.esEnvio)&&r.clienteNombre&&r.clienteNombre.trim())autoRegistrarCliente(uid,{nombre:r.clienteNombre,telefono:r.telefono,direccion:r.direccion});setForm(null);};
+  const cambiarEstado=async(id,updates)=>await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...updates,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
   const eliminar=async id=>{if(!confirm('¿Eliminar pedido?'))return;await db.collection(`polleria/${uid}/pedidos`).doc(id).delete();};
   const resumirEnviosWA=()=>{
     const hoyF2=hoy();
@@ -3768,7 +3778,7 @@ function PantallaPedidos({uid}){
     window.open('https://web.whatsapp.com','wawin',spec);
   };
   const hoyF=hoy();
-  const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>p.estado==='pendiente'||p.estado==='preparando'):pedidos;
+  const mostrar=filtro==='hoy'?pedidos.filter(p=>p.fecha===hoyF):filtro==='pendientes'?pedidos.filter(p=>['pendiente','preparando','listo','enviado'].includes(p.estado)):pedidos;
   const totalHoy=pedidos.filter(p=>p.fecha===hoyF&&p.pagado&&p.estado!=='cancelado').reduce((s,p)=>s+(p.total||0),0);
   return(
     <div>
@@ -4375,6 +4385,104 @@ function BotoneraFlotante({uid,abajo}){
   </>);
 }
 
+// Guarda/actualiza un cliente automáticamente (usado al hacer envíos)
+async function autoRegistrarCliente(uid,{nombre,telefono,direccion}){
+  if(!nombre||!nombre.trim()||nombre.trim().toLowerCase()==='venta directa')return;
+  try{
+    const col=db.collection(`polleria/${uid}/clientes`);
+    const snap=await col.get();
+    const telLimpio=(telefono||'').replace(/\D/g,'');
+    const existe=snap.docs.find(dd=>{
+      const c=dd.data();
+      const mismoNombre=(c.nombre||'').trim().toLowerCase()===nombre.trim().toLowerCase();
+      const mismoTel=telLimpio.length>=6&&(c.telefono||'').replace(/\D/g,'')===telLimpio;
+      return mismoNombre||mismoTel;
+    });
+    if(existe){
+      const c=existe.data();const upd={};
+      if(telefono&&!c.telefono)upd.telefono=telefono;
+      if(direccion&&!c.direccion)upd.direccion=direccion;
+      if(Object.keys(upd).length)await col.doc(existe.id).update(upd);
+    }else{
+      await col.add({nombre:nombre.trim(),apellido:'',telefono:telefono||'',direccion:direccion||'',saldoFiado:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    }
+  }catch(e){}
+}
+
+function PantallaClientes({uid}){
+  const [clientes,setClientes]=useState([]);
+  const [editId,setEditId]=useState(null); // null=cerrado, ''=nuevo, 'id'=editando
+  const [d,setD]=useState({nombre:'',apellido:'',telefono:'',direccion:''});
+  const [busca,setBusca]=useState('');
+  const col=db.collection(`polleria/${uid}/clientes`);
+  useEffect(()=>col.orderBy('nombre','asc').onSnapshot(s=>setClientes(s.docs.map(x=>({id:x.id,...x.data()})))),[]);
+  const abrirNuevo=()=>{setD({nombre:'',apellido:'',telefono:'',direccion:''});setEditId('');};
+  const abrirEditar=c=>{setD({nombre:c.nombre||'',apellido:c.apellido||'',telefono:c.telefono||'',direccion:c.direccion||''});setEditId(c.id);};
+  const cerrar=()=>setEditId(null);
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const guardar=async()=>{
+    if(!d.nombre.trim())return alert('El nombre es obligatorio');
+    if(editId)await col.doc(editId).update(d);
+    else await col.add({...d,saldoFiado:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    cerrar();
+  };
+  const eliminar=async(id,saldo)=>{
+    if(Number(saldo)>0&&!confirm('⚠️ Este cliente tiene fiado pendiente. ¿Eliminar igual?'))return;
+    if(!confirm('¿Eliminar cliente?'))return;
+    await col.doc(id).delete();if(editId===id)cerrar();
+  };
+  const lista=clientes.filter(c=>((c.nombre||'')+' '+(c.apellido||'')+' '+(c.telefono||'')).toLowerCase().includes(busca.toLowerCase().trim()));
+  const totalFiado=clientes.reduce((s,c)=>s+(Number(c.saldoFiado)||0),0);
+  return(
+    <div>
+      <Header titulo="Clientes"/>
+      <div className="app-body">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div className="sec-title" style={{margin:0}}>👥 Mis clientes <span style={{color:'var(--txt2)',fontWeight:400,fontSize:13}}>({clientes.length})</span></div>
+          {editId===null&&<button onClick={abrirNuevo} className="btn-pri" style={{fontSize:13,padding:'7px 14px'}}>+ Agregar</button>}
+        </div>
+        {totalFiado>0&&editId===null&&(
+          <div className="panel" style={{marginBottom:10}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:13,fontWeight:600,color:'var(--red)'}}>📒 Fiado total pendiente</span>
+              <span style={{fontSize:18,fontWeight:800,color:'var(--red)'}}>{formatPeso(totalFiado)}</span>
+            </div>
+          </div>
+        )}
+        {editId!==null&&(
+          <div className="panel">
+            <div className="ptitle">{editId?'✏️ Editar cliente':'👤 Nuevo cliente'}</div>
+            <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Juan"/>
+            <Campo label="Apellido" value={d.apellido} onChange={v=>set('apellido',v)} placeholder="Ej: Pérez"/>
+            <Campo label="📞 Teléfono" value={d.telefono} onChange={v=>set('telefono',v)} placeholder="381-123-4567" tipo="tel"/>
+            <Campo label="📍 Dirección" value={d.direccion} onChange={v=>set('direccion',v)} placeholder="Calle, número, barrio"/>
+            <div style={{display:'flex',gap:8,marginTop:14}}>
+              <button onClick={guardar} className="btn-pri" style={{flex:1,padding:12}}>{editId?'✓ Guardar':'+ Agregar'}</button>
+              <button onClick={cerrar} className="btn-sec" style={{padding:12}}>Cancelar</button>
+            </div>
+          </div>
+        )}
+        {clientes.length>0&&editId===null&&<input value={busca} onChange={e=>setBusca(e.target.value)} className="inp" placeholder="🔍 Buscar cliente..." style={{marginBottom:10}}/>}
+        {clientes.length===0&&editId===null&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>👥</div>No hay clientes cargados.<br/>Agregalos a mano, o se guardan solos cuando hacés un envío.</div>}
+        {lista.map(c=>(
+          <div key={c.id} className="card">
+            <div className="card-body">
+              <div className="card-name">{c.nombre} {c.apellido||''}</div>
+              {c.telefono&&<div className="card-sub">📞 {c.telefono}</div>}
+              {c.direccion&&<div className="card-sub">📍 {c.direccion}</div>}
+              {Number(c.saldoFiado)>0&&<div className="card-sub" style={{color:'var(--red)',fontWeight:700,marginTop:2}}>📒 Debe: {formatPeso(c.saldoFiado)}</div>}
+              <div className="card-actions">
+                <button onClick={()=>abrirEditar(c)} className="btn-ic">✏️ Editar</button>
+                <button onClick={()=>eliminar(c.id,c.saldoFiado)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const uid=getLicenciaPoll()?.deviceId||'default';
   const [tab,setTab]=useState('catalogo');
@@ -4385,6 +4493,7 @@ function App(){
   const pantallas={
     catalogo:<PantallaCatalogo uid={uid}/>,
     pedidos: <PantallaPedidos  uid={uid}/>,
+    clientes:<PantallaClientes uid={uid}/>,
     precios: <PantallaPrecios  uid={uid}/>,
     stock:   <PantallaStock    uid={uid}/>,
     caja:    <PantallaCaja     uid={uid}/>,
