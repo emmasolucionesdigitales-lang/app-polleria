@@ -3568,7 +3568,7 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
   const prodSel=productos.find(x=>x.id===selProd||x.nombre===selProd);
   const addItem=()=>{
     if(!prodSel||!selCant)return;
-    const cant=parseFloat(selCant)||1;
+    const cant=parseFloat(String(selCant).replace(',','.'))||1;
     setItems(prev=>[...prev.filter(i=>i.nombre!==prodSel.nombre),{
       nombre:prodSel.nombre,cantidad:cant,unidad:prodSel.unidad||'kg',
       precioUnit:prodSel.precioVenta||0,subtotal:(prodSel.precioVenta||0)*cant
@@ -3578,23 +3578,32 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
   const removeItem=n=>setItems(p=>p.filter(i=>i.nombre!==n));
   const total=items.reduce((s,i)=>s+(i.subtotal||0),0);
   const guardar=async()=>{
-    if(!d.nombre.trim()||!items.length)return;
+    // Si eligió un producto pero no apretó "+", lo agrego igual
+    let itemsFinal=items;
+    if(prodSel&&selCant){
+      const cant=parseFloat(String(selCant).replace(',','.'))||1;
+      itemsFinal=[...items.filter(i=>i.nombre!==prodSel.nombre),{nombre:prodSel.nombre,cantidad:cant,unidad:prodSel.unidad||'kg',precioUnit:prodSel.precioVenta||0,subtotal:(prodSel.precioVenta||0)*cant}];
+    }
+    if(!d.nombre.trim())return alert('Falta el nombre del cliente');
+    if(!itemsFinal.length)return alert('Agregá al menos un producto al pedido');
     setLoading(true);
     try{
+      const totalFinal=itemsFinal.reduce((s,i)=>s+(i.subtotal||0),0);
       await db.collection(`polleria/${uid}/pedidos`).add({
         clienteNombre:d.nombre.trim(),clienteId:d.cliId||'',tipo:'delivery',estado:'pendiente',
-        pagado:d.pago!=='fiado',formaPago:d.pago,items,total,fecha:hoy(),
+        pagado:d.pago!=='fiado',formaPago:d.pago,items:itemsFinal,total:totalFinal,fecha:hoy(),
         horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
         telefono:d.tel,direccion:d.dir,notas:d.nota,esEnvio:true,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
-      await descontarStockVenta(uid,items);
+      await descontarStockVenta(uid,itemsFinal);
       autoRegistrarCliente(uid,{nombre:d.nombre,telefono:d.tel,direccion:d.dir});
       setOk(true);setTimeout(()=>setOk(false),2500);
       setD({nombre:'',dir:'',tel:'',pago:'efectivo',nota:'',cliId:''});
-      setItems([]);
+      setItems([]);setSelProd('');setSelCant('1');
       if(onGuardado)onGuardado();
-    }finally{setLoading(false);}
+    }catch(e){console.error('[Guardar envío]',e);alert('No se pudo guardar el envío:\n'+(e&&e.message?e.message:e));}
+    finally{setLoading(false);}
   };
   return(
     <div style={{background:'var(--bg)',border:'2px solid #25D366',borderRadius:12,padding:12,display:'flex',flexDirection:'column',gap:7}}>
@@ -3642,8 +3651,8 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
         </select>
         <input value={d.nota} onChange={e=>set('nota',e.target.value)} placeholder="📝 Nota..." className="inp" style={{flex:1,fontSize:12}}/>
       </div>
-      <button onClick={guardar} disabled={loading||!d.nombre.trim()||!items.length} className="btn-pri"
-        style={{padding:'11px 0',fontSize:14,fontWeight:700,opacity:(!d.nombre.trim()||!items.length||loading)?0.5:1}}>
+      <button onClick={guardar} disabled={loading||!d.nombre.trim()||(!items.length&&!prodSel)} className="btn-pri"
+        style={{padding:'11px 0',fontSize:14,fontWeight:700,opacity:(!d.nombre.trim()||(!items.length&&!prodSel)||loading)?0.5:1}}>
         {loading?'Guardando...':'💾 Guardar envío'}
       </button>
     </div>
