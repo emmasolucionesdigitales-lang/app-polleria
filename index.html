@@ -911,12 +911,12 @@ const comprimirImagen = (file, maxPx=300, quality=0.75) => new Promise(res => {
 });
 
 /* ─── CAMPO SIMPLE ─── */
-function Campo({label,value,onChange,placeholder,tipo='text',rows}){
+function Campo({label,value,onChange,placeholder,tipo='text',rows,list}){
   return(<>
     <label className="lbl">{label}</label>
     {rows
       ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} className="inp" style={{resize:'vertical'}}/>
-      : <input type={tipo} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="inp"/>
+      : <input type={tipo} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="inp" list={list}/>
     }
   </>);
 }
@@ -1546,7 +1546,8 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
     <div style={{borderTop:'2px solid var(--border)',paddingTop:10,flexShrink:0}}>
       <label className="lbl" style={{marginTop:0}}>Forma de pago</label>
       <div className="pago-grid">{[{k:'efectivo',lbl:'💵 Efectivo'},{k:'transferencia',lbl:'📲 Transfer.'},{k:'debito',lbl:'💳 Débito'},{k:'credito',lbl:'💳 Crédito'},{k:'fiado',lbl:'📒 Fiado'}].map(m=>(<button key={m.k} onClick={()=>{setPago(m.k);setDatosPago('');}} className={`btn-metodo${pago===m.k?' activo':''}`} style={{fontSize:11,padding:'7px 4px'}}>{m.lbl}</button>))}</div>
-      <Campo label="Cliente (opcional)" value={clienteNombre} onChange={setClienteNombre} placeholder="Nombre del cliente..."/>
+      <Campo label="Cliente (opcional)" value={clienteNombre} onChange={v=>{const c=(clientes||[]).find(cl=>(cl.nombre||'').toLowerCase().trim()===v.toLowerCase().trim());setClienteNombre(v);if(c){if(c.telefono)setTelefono(c.telefono);if(c.direccion)setDireccion(c.direccion);}}} placeholder="Nombre del cliente..." list="carrito-clientes"/>
+      <datalist id="carrito-clientes">{(clientes||[]).map(c=><option key={c.id} value={c.nombre}/>)}</datalist>
       {esConDatos&&<><Campo label="📞 Teléfono" value={telefono} onChange={setTelefono} placeholder="381-123-4567" tipo="tel"/><Campo label={pago==='transferencia'?'🏦 CBU / Alias':'💳 Titular y últimos 4 dígitos'} value={datosPago} onChange={setDatosPago} placeholder={pago==='transferencia'?'CBU o alias':'Ej: Juan García - 4521'}/></>}
       <div style={{margin:'10px 0',padding:'10px 12px',borderRadius:'var(--radius)',border:`2px solid ${esEnvio?'#e94560':'var(--border)'}`,background:esEnvio?'rgba(233,69,96,.06)':'var(--bg2)'}}>
         <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}><input type="checkbox" checked={esEnvio} onChange={e=>setEsEnvio(e.target.checked)} style={{width:18,height:18,accentColor:'#e94560',cursor:'pointer'}}/><div><div style={{fontSize:13,fontWeight:700,color:'var(--txt)'}}>🛵 Envío a domicilio</div><div style={{fontSize:11,color:'var(--txt2)'}}>Se registra como pedido pendiente</div></div></label>
@@ -3557,7 +3558,7 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
   );
 }
 function FormEnvioRapido({productos,clientes,uid,onGuardado}){
-  const [d,setD]=useState({nombre:'',dir:'',tel:'',pago:'efectivo',nota:''});
+  const [d,setD]=useState({nombre:'',dir:'',tel:'',pago:'efectivo',nota:'',cliId:''});
   const [items,setItems]=useState([]);
   const [selProd,setSelProd]=useState('');
   const [selCant,setSelCant]=useState('1');
@@ -3581,7 +3582,7 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
     setLoading(true);
     try{
       await db.collection(`polleria/${uid}/pedidos`).add({
-        clienteNombre:d.nombre.trim(),clienteId:'',tipo:'delivery',estado:'pendiente',
+        clienteNombre:d.nombre.trim(),clienteId:d.cliId||'',tipo:'delivery',estado:'pendiente',
         pagado:d.pago!=='fiado',formaPago:d.pago,items,total,fecha:hoy(),
         horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
         telefono:d.tel,direccion:d.dir,notas:d.nota,esEnvio:true,
@@ -3590,7 +3591,7 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
       await descontarStockVenta(uid,items);
       autoRegistrarCliente(uid,{nombre:d.nombre,telefono:d.tel,direccion:d.dir});
       setOk(true);setTimeout(()=>setOk(false),2500);
-      setD({nombre:'',dir:'',tel:'',pago:'efectivo',nota:''});
+      setD({nombre:'',dir:'',tel:'',pago:'efectivo',nota:'',cliId:''});
       setItems([]);
       if(onGuardado)onGuardado();
     }finally{setLoading(false);}
@@ -3602,7 +3603,7 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
         {ok&&<span style={{color:'var(--green)',fontSize:12,fontWeight:700,background:'var(--green-bg)',borderRadius:6,padding:'2px 8px'}}>✅ Guardado!</span>}
       </div>
       <div style={{display:'flex',gap:6}}>
-        <input value={d.nombre} onChange={e=>set('nombre',e.target.value)} placeholder="👤 Nombre del cliente *" className="inp" style={{flex:1,fontSize:13}} list="rp-clientes"/>
+        <input value={d.nombre} onChange={e=>{const v=e.target.value;const c=clientes.find(cl=>(cl.nombre||'').toLowerCase().trim()===v.toLowerCase().trim());setD(p=>({...p,nombre:v,cliId:c?c.id:'',...(c?{tel:c.telefono||p.tel,dir:c.direccion||p.dir}:{})}));}} placeholder="👤 Nombre del cliente *" className="inp" style={{flex:1,fontSize:13}} list="rp-clientes"/>
         <datalist id="rp-clientes">{clientes.map(c=><option key={c.id} value={c.nombre}/>)}</datalist>
         <input value={d.tel} onChange={e=>set('tel',e.target.value)} placeholder="📞 Tel." className="inp" style={{width:110,fontSize:13}} type="tel"/>
       </div>
@@ -3871,7 +3872,7 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar,esSheet}){
     setProdId('');setCant('');
   };
   const quitarItem=id=>{const items=d.items.filter(i=>i._id!==id);setD(p=>({...p,items,total:items.reduce((s,i)=>s+i.subtotal,0)}));};
-  const selCliente=id=>{const c=clientes.find(c=>c.id===id);if(c)setD(p=>({...p,clienteId:id,clienteNombre:c.nombre,direccion:c.direccion||p.direccion}));else setD(p=>({...p,clienteId:'',clienteNombre:''}));};
+  const selCliente=id=>{const c=clientes.find(c=>c.id===id);if(c)setD(p=>({...p,clienteId:id,clienteNombre:c.nombre,direccion:c.direccion||p.direccion,telefono:c.telefono||p.telefono}));else setD(p=>({...p,clienteId:'',clienteNombre:''}));};
   const guardar=()=>{if(!d.clienteNombre.trim())return alert('Ingresá el nombre del cliente');onGuardar(d);};
   return(
     <div>
@@ -3888,7 +3889,8 @@ function FormPedido({inicial,clientes,productos,onGuardar,onCancelar,esSheet}){
           <option value="">— Elegí un cliente o escribí abajo —</option>
           {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <Campo label="O escribí el nombre" value={d.clienteNombre} onChange={v=>set('clienteNombre',v)} placeholder="Nombre del cliente *"/>
+        <Campo label="O escribí el nombre" value={d.clienteNombre} onChange={v=>{const c=clientes.find(cl=>(cl.nombre||'').toLowerCase().trim()===v.toLowerCase().trim());setD(p=>({...p,clienteNombre:v,...(c?{clienteId:c.id,telefono:c.telefono||p.telefono,direccion:c.direccion||p.direccion}:{})}));}} placeholder="Nombre del cliente *" list="fp-clientes"/>
+        <datalist id="fp-clientes">{clientes.map(c=><option key={c.id} value={c.nombre}/>)}</datalist>
         <label className="lbl">Tipo</label>
         <div className="chip-group">
           {[{k:'mostrador',lbl:'🏪 Mostrador'},{k:'delivery',lbl:'🚴 Delivery'}].map(t=><button key={t.k} onClick={()=>set('tipo',t.k)} className={`chip${d.tipo===t.k?' activo':''}`}>{t.lbl}</button>)}
