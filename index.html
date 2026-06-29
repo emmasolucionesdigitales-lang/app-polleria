@@ -810,7 +810,7 @@ const db = firebase.firestore();
 try{db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
 const auth = firebase.auth();
 // Auth anónima para reglas Firestore
-auth.signInAnonymously().catch(function(){});
+auth.signInAnonymously().catch(function(e){console.error("[Auth anónimo] FALLÓ:",e&&e.code,"-",e&&e.message,"→ Activá 'Anonymous' en Firebase → Authentication");});
 // Licencias — app-control-de-apps
 var pollLicApp = firebase.apps.find(function(a){return a.name==='licencias';}) ||
   firebase.initializeApp({
@@ -3424,6 +3424,7 @@ function FormStock({inicial,onGuardar,onCancelar}){
 const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},enviado:{label:'Enviado 🛵',pillC:'pill pill-blue'},entregado:{label:'Entregado 📦',pillC:'pill pill-gray'},cobrado:{label:'Cobrado ✅',pillC:'pill pill-green'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
 const COLOR_ESTADO={pendiente:'#ef4444',preparando:'#f59e0b',enviado:'#3b82f6',listo:'#22c55e',entregado:'#22c55e',cobrado:'#16a34a',cancelado:'#9ca3af'};
 
+function sumarMin(hhmm,min){if(!hhmm||!/^\d{1,2}:\d{2}/.test(hhmm))return'';const p=hhmm.split(':');const d=new Date();d.setHours(parseInt(p[0],10),parseInt(p[1],10)+min,0,0);return d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});}
 function ComandaEnvio({pedido,onCerrar}){
   const nombreNegocio=getNombreLocal();
   const est=ESTADOS[pedido.estado]||ESTADOS.pendiente;
@@ -3458,6 +3459,7 @@ function ComandaEnvio({pedido,onCerrar}){
           <div style={{display:'flex',gap:12,marginBottom:10,fontSize:12,color:'var(--txt2)',flexWrap:'wrap'}}>
             <span>📅 {formatFecha(pedido.fecha)}</span>
             {pedido.horaCreacion&&<span>🕐 Ingresó: <b>{pedido.horaCreacion}</b></span>}
+            {esEnv&&pedido.horaCreacion&&<span style={{color:'#ea580c',fontWeight:700}}>🛵 Salida ~<b>{sumarMin(pedido.horaCreacion,30)}</b></span>}
             {pedido.horaEntrega&&<span>⏰ Entrega: <b>{pedido.horaEntrega}</b></span>}
           </div>
           <div style={{fontSize:12,fontWeight:700,color:'var(--txt)',marginBottom:5}}>Productos:</div>
@@ -3524,7 +3526,7 @@ function TarjetaPedido({pedido,onEditar,onEstado,onEliminar}){
             <div className="card-name">{pedido.clienteNombre||'Cliente s/n'}{esEnvio&&<span style={{marginLeft:6,fontSize:11,background:'rgba(233,69,96,.12)',color:'#e94560',borderRadius:8,padding:'1px 7px',fontWeight:600}}>🛵 Envío</span>}</div>
             <div className="card-sub">{(pedido.items||[]).map(i=>`${i.cantidad} ${i.unidad} de ${i.nombre}`).join(', ')||'—'}</div>
             <div className="card-sub" style={{marginTop:4}}>
-              📅 {formatFecha(pedido.fecha)}{pedido.horaCreacion?` 🕐 ${pedido.horaCreacion}`:''}{pedido.horaEntrega?` · ⏰ ${pedido.horaEntrega}`:''}{pedido.pagado?' · ✅':' · 💳'}
+              📅 {formatFecha(pedido.fecha)}{pedido.horaCreacion?` 🕐 ${pedido.horaCreacion}`:''}{esEnvio&&pedido.horaCreacion?` · 🛵 sale ~${sumarMin(pedido.horaCreacion,30)}`:''}{pedido.horaEntrega?` · ⏰ ${pedido.horaEntrega}`:''}{pedido.pagado?' · ✅':' · 💳'}
             </div>
             {esEnvio&&pedido.direccion&&<div className="card-sub" style={{color:'#e94560',marginTop:2}}>📍 {pedido.direccion}</div>}
           </div>
