@@ -3345,6 +3345,17 @@ function SeccionMilanesas({uid}){
   );
 }
 
+function ProduccionWrap({uid}){
+  const [v,setV]=useState('milanesas');
+  return(<div>
+    <div className="tab-bar" style={{marginBottom:12}}>
+      <button onClick={()=>setV('milanesas')} className={`tab-btn${v==='milanesas'?' activo':''}`} style={{flex:1}}>🔪 Milanesas</button>
+      <button onClick={()=>setV('general')} className={`tab-btn${v==='general'?' activo':''}`} style={{flex:1}}>🍴 General</button>
+    </div>
+    {v==='milanesas'?<SeccionMilanesas uid={uid}/>:<SeccionProduccion uid={uid}/>}
+  </div>);
+}
+
 function SeccionPollo({uid}){
   const [modo,setModo]=useState('cargar');
   return(
@@ -3352,9 +3363,8 @@ function SeccionPollo({uid}){
       <div className="tab-bar" style={{marginBottom:12}}>
         <button onClick={()=>setModo('cargar')} className={`tab-btn${modo==='cargar'?' activo':''}`} style={{flex:1}}>🍗 Trozado</button>
         <button onClick={()=>setModo('produccion')} className={`tab-btn${modo==='produccion'?' activo':''}`} style={{flex:1}}>🍴 Producción</button>
-        <button onClick={()=>setModo('milanesas')} className={`tab-btn${modo==='milanesas'?' activo':''}`} style={{flex:1}}>🔪 Milanesas</button>
       </div>
-      {modo==='cargar'?<CalculadoraCajon uid={uid}/>:modo==='produccion'?<SeccionProduccion uid={uid}/>:<SeccionMilanesas uid={uid}/>}
+      {modo==='cargar'?<CalculadoraCajon uid={uid}/>:<ProduccionWrap uid={uid}/>}
     </div>
   );
 }
