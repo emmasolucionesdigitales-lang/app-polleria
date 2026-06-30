@@ -3214,6 +3214,137 @@ function SeccionProduccion({uid}){
   );
 }
 
+function SeccionMilanesas({uid}){
+  const MILA_DEFAULT={
+    carnePechuga:70, carnePatamuslo:65, rindePechuga:12, rindePatamuslo:12,
+    repPuchero:40, repCarcasas:35, repMenudos:25,
+    precioMilaPechuga:8000, precioMilaPatamuslo:9000, precioPuchero:2200, precioCarcasas:2000, precioMenudos:2800
+  };
+  const [cfg,setCfg]=useState(MILA_DEFAULT);
+  const [corte,setCorte]=useState('pechuga');
+  const [kg,setKg]=useState('');
+  const [costoKg,setCostoKg]=useState('');
+  const [editandoCfg,setEditandoCfg]=useState(false);
+  const [guardandoCfg,setGuardandoCfg]=useState(false);
+  const [guardando,setGuardando]=useState(false);
+  const [toastMsg,setToastMsg]=useState('');
+  const cfgRef=db.collection(`polleria/${uid}/config`).doc('milanesas');
+  useEffect(()=>{cfgRef.get().then(s=>{if(s.exists)setCfg({...MILA_DEFAULT,...s.data()});}).catch(()=>{});},[]);
+  const mostrar=m=>{setToastMsg(m);setTimeout(()=>setToastMsg(''),2500);};
+  const setK=(k,v)=>setCfg(c=>({...c,[k]:v}));
+
+  const kgN=parseFloat(String(kg).replace(',','.'))||0;
+  const carnePct=corte==='pechuga'?Number(cfg.carnePechuga)||0:Number(cfg.carnePatamuslo)||0;
+  const rinde=corte==='pechuga'?Number(cfg.rindePechuga)||0:Number(cfg.rindePatamuslo)||0;
+  const precioMila=corte==='pechuga'?Number(cfg.precioMilaPechuga)||0:Number(cfg.precioMilaPatamuslo)||0;
+  const milaNombre=corte==='pechuga'?'Milanesa de pechuga':'Milanesa de pata-muslo';
+  const carneKg=+(kgN*carnePct/100).toFixed(2);
+  const milaKg=+(carneKg*(1+rinde/100)).toFixed(2);
+  const huesoKg=+(kgN*(100-carnePct)/100).toFixed(2);
+  const sumaRep=(Number(cfg.repPuchero)||0)+(Number(cfg.repCarcasas)||0)+(Number(cfg.repMenudos)||0);
+  const pucheroKg=+(huesoKg*(Number(cfg.repPuchero)||0)/100).toFixed(2);
+  const carcasasKg=+(huesoKg*(Number(cfg.repCarcasas)||0)/100).toFixed(2);
+  const menudosKg=+(huesoKg*(Number(cfg.repMenudos)||0)/100).toFixed(2);
+  const outputs=[
+    {nombre:milaNombre, kg:milaKg, precio:precioMila, cat:'🍴 Preparados'},
+    {nombre:'Puchero', kg:pucheroKg, precio:Number(cfg.precioPuchero)||0, cat:'🍗 Pollo'},
+    {nombre:'Carcasas', kg:carcasasKg, precio:Number(cfg.precioCarcasas)||0, cat:'🍗 Pollo'},
+    {nombre:'Menudos', kg:menudosKg, precio:Number(cfg.precioMenudos)||0, cat:'🍗 Pollo'},
+  ].filter(o=>o.kg>0);
+  const costoTotal=+(kgN*(parseFloat(String(costoKg).replace(',','.'))||0)).toFixed(2);
+  const ventaEst=+outputs.reduce((s,o)=>s+o.kg*o.precio,0).toFixed(2);
+
+  const guardarCfg=async()=>{
+    setGuardandoCfg(true);
+    try{ await cfgRef.set(cfg,{merge:true}); setEditandoCfg(false); mostrar('✅ Valores guardados'); }
+    catch(e){alert('Error: '+(e.message||e));}
+    setGuardandoCfg(false);
+  };
+  const producir=async()=>{
+    if(kgN<=0)return alert('Cargá cuántos kg vas a procesar');
+    if(!outputs.length)return alert('No hay nada para producir');
+    setGuardando(true);
+    try{
+      const stockCol=db.collection(`polleria/${uid}/stock`);
+      const prodCol=db.collection(`polleria/${uid}/productos`);
+      const costoMilaKg=milaKg>0&&costoTotal>0?+(costoTotal/milaKg).toFixed(2):0;
+      for(const o of outputs){
+        const docId='prod-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const ref=stockCol.doc(docId);
+        const snap=await ref.get();
+        const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
+        const costo=o.nombre.indexOf('Milanesa')===0?costoMilaKg:0;
+        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:costo,precioVenta:o.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await prodCol.doc(docId).set({nombre:o.nombre,categoria:o.cat,unidad:'kg',precioCosto:costo,precioVenta:o.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      mostrar(`✅ ${outputs.length} productos sumados al stock`);
+      setKg('');
+    }catch(e){alert('Error: '+(e.message||e));}
+    setGuardando(false);
+  };
+
+  const fila=(lbl,val,color)=>(
+    <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+      <span style={{fontSize:13,color:'var(--txt2)'}}>{lbl}</span>
+      <span style={{fontSize:15,fontWeight:700,color:color||'var(--txt)'}}>{val} kg</span>
+    </div>
+  );
+  const cfgRow=(lbl,k,suf='%')=>(
+    <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+      <span style={{flex:1,fontSize:13,color:'var(--txt)'}}>{lbl}</span>
+      <input type="number" min={0} value={cfg[k]} onChange={e=>setK(k,e.target.value)} className="inp" style={{width:84,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
+      <span style={{fontSize:11,color:'var(--txt3)',width:12}}>{suf}</span>
+    </div>
+  );
+
+  return(
+    <div>
+      <Toast msg={toastMsg}/>
+      <div className="panel">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+          <div className="ptitle" style={{margin:0}}>🔪 Milanesas (despiece)</div>
+          <button onClick={()=>setEditandoCfg(v=>!v)} style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:editandoCfg?'var(--green-bg)':'var(--bg2)',color:editandoCfg?'var(--green)':'var(--txt2)',cursor:'pointer',fontWeight:600}}>⚙️ Ajustes</button>
+        </div>
+        {editandoCfg&&<div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',marginBottom:8}}>🍗 Rinde por corte</div>
+          {cfgRow('Pechuga: % que es carne','carnePechuga')}
+          {cfgRow('Pechuga: rinde del empanado','rindePechuga')}
+          {cfgRow('Pata-muslo: % que es carne','carnePatamuslo')}
+          {cfgRow('Pata-muslo: rinde del empanado','rindePatamuslo')}
+          <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🦴 Reparto de los huesos {sumaRep!==100&&<span style={{color:'var(--orange)'}}>(suma {sumaRep}%, deberían dar 100)</span>}</div>
+          {cfgRow('Puchero','repPuchero')}
+          {cfgRow('Carcasas','repCarcasas')}
+          {cfgRow('Menudos','repMenudos')}
+          <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>💰 Precios de venta ($ por kg)</div>
+          {cfgRow('Milanesa de pechuga','precioMilaPechuga','$')}
+          {cfgRow('Milanesa de pata-muslo','precioMilaPatamuslo','$')}
+          {cfgRow('Puchero','precioPuchero','$')}
+          {cfgRow('Carcasas','precioCarcasas','$')}
+          {cfgRow('Menudos','precioMenudos','$')}
+          <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',marginTop:10,padding:9}}>{guardandoCfg?'Guardando...':'💾 Guardar ajustes'}</button>
+        </div>}
+        <div className="tab-bar" style={{marginBottom:12}}>
+          <button onClick={()=>setCorte('pechuga')} className={`tab-btn${corte==='pechuga'?' activo':''}`} style={{flex:1}}>Pechuga</button>
+          <button onClick={()=>setCorte('patamuslo')} className={`tab-btn${corte==='patamuslo'?' activo':''}`} style={{flex:1}}>Pata-muslo</button>
+        </div>
+        <label className="lbl" style={{marginTop:0}}>Kg de {corte==='pechuga'?'pechuga':'pata-muslo'} a procesar</label>
+        <input type="number" min={0} value={kg} onChange={e=>setKg(e.target.value)} placeholder="Ej: 10" className="inp" style={{fontWeight:700,marginBottom:10}}/>
+        <label className="lbl">Costo del kg (opcional, para ver la ganancia)</label>
+        <input type="number" min={0} value={costoKg} onChange={e=>setCostoKg(e.target.value)} placeholder="$/kg" className="inp" style={{fontWeight:700}}/>
+      </div>
+      {kgN>0&&<div className="panel">
+        <div className="ptitle">📦 Lo que sale</div>
+        {fila('🍴 '+milaNombre, milaKg, 'var(--green)')}
+        {fila('🍲 Puchero', pucheroKg)}
+        {fila('🦴 Carcasas', carcasasKg)}
+        {fila('🫀 Menudos', menudosKg)}
+        {costoTotal>0&&<div style={{marginTop:12,fontSize:13,color:'var(--txt2)',lineHeight:1.6}}>Costo: <b style={{color:'var(--txt)'}}>{formatPeso(costoTotal)}</b><br/>Venta estimada: <b style={{color:'var(--green)'}}>{formatPeso(ventaEst)}</b> · Ganancia: <b style={{color:'var(--green)'}}>{formatPeso(ventaEst-costoTotal)}</b></div>}
+        <button onClick={producir} disabled={guardando} className="btn-pri" style={{width:'100%',marginTop:12,padding:12,fontSize:15,background:'var(--green)'}}>{guardando?'Guardando...':'✅ Producir y sumar al stock'}</button>
+      </div>}
+    </div>
+  );
+}
+
 function SeccionPollo({uid}){
   const [modo,setModo]=useState('cargar');
   return(
@@ -3221,8 +3352,9 @@ function SeccionPollo({uid}){
       <div className="tab-bar" style={{marginBottom:12}}>
         <button onClick={()=>setModo('cargar')} className={`tab-btn${modo==='cargar'?' activo':''}`} style={{flex:1}}>🍗 Trozado</button>
         <button onClick={()=>setModo('produccion')} className={`tab-btn${modo==='produccion'?' activo':''}`} style={{flex:1}}>🍴 Producción</button>
+        <button onClick={()=>setModo('milanesas')} className={`tab-btn${modo==='milanesas'?' activo':''}`} style={{flex:1}}>🔪 Milanesas</button>
       </div>
-      {modo==='cargar'?<CalculadoraCajon uid={uid}/>:<SeccionProduccion uid={uid}/>}
+      {modo==='cargar'?<CalculadoraCajon uid={uid}/>:modo==='produccion'?<SeccionProduccion uid={uid}/>:<SeccionMilanesas uid={uid}/>}
     </div>
   );
 }
