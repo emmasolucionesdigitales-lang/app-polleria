@@ -880,7 +880,7 @@ window.dbLicencias = firebase.firestore(pollLicApp);
 const hoy = () => new Date().toISOString().split('T')[0];
 const formatFecha = f => { if(!f) return '─'; const [y,m,d]=f.split('-'); return `${d}/${m}/${y}`; };
 const formatPeso = n => '$'+Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:0});
-const ahora = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+const ahora = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});
 const fechaCorta = () => new Date().toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
 
 /* ─── #4 DESCUENTO DE STOCK AL VENDER + #5 CONSUMO FIFO DE LOTES ─── */
@@ -1189,10 +1189,7 @@ function Header({titulo,onBack,onAdd,onLogout,subtitulo,esCatalogo}){
       <div className="header-left">
         {onBack
           ? <button onClick={onBack} className="btn-back">← Volver</button>
-          : <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontSize:22}}>🐔</span>
-              {onAdd&&<button onClick={onAdd} className="btn-pri" style={{fontSize:18,padding:'4px 12px',lineHeight:1,background:'#e94560',border:'none'}}>+</button>}
-            </div>
+          : <span style={{fontSize:22}}>🐔</span>
         }
       </div>
       {/* CENTRO: nombre de la pollería */}
@@ -1206,7 +1203,6 @@ function Header({titulo,onBack,onAdd,onLogout,subtitulo,esCatalogo}){
           <div className="header-fecha">{fecha}</div>
           <div className="header-hora">{hora}</div>
         </div>
-        {onLogout&&<button onClick={onLogout} style={{background:'rgba(233,69,96,.2)',border:'1px solid #e94560',borderRadius:8,padding:'5px 10px',cursor:'pointer',fontSize:11,fontWeight:700,color:'#e94560'}}>Salir</button>}
       </div>
     </header>
   );
@@ -1259,12 +1255,12 @@ function NavSidebar({activo,onChange}){
   );
 }
 
-/* ── Sub-navegación (pestañas internas) ── */
+/* ── Sub-navegación (pestañas internas, debajo de la portada) ── */
 function SubNav({value,onChange,tabs}){
   return(
-    <div style={{display:'flex',gap:6,padding:'8px 10px',background:'var(--bg)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:35}}>
+    <div style={{display:'flex',gap:6,padding:'10px',background:'var(--bg)'}}>
       {tabs.map(t=>(
-        <button key={t.id} onClick={()=>onChange(t.id)} style={{flex:1,padding:'9px 6px',borderRadius:11,cursor:'pointer',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:value===t.id?'1px solid var(--green)':'1px solid var(--border)',background:value===t.id?'var(--green-bg)':'transparent',color:value===t.id?'var(--green)':'var(--txt2)'}}>
+        <button key={t.id} onClick={()=>onChange(t.id)} style={{flex:1,padding:'10px 6px',borderRadius:11,cursor:'pointer',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:6,border:value===t.id?'1px solid var(--green)':'1px solid var(--border)',background:value===t.id?'var(--green-bg)':'transparent',color:value===t.id?'var(--green)':'var(--txt2)'}}>
           <span style={{fontSize:15}}>{t.icon}</span>{t.label}
         </button>
       ))}
@@ -1273,17 +1269,13 @@ function SubNav({value,onChange,tabs}){
 }
 function VenderCaja({uid}){
   const [sub,setSub]=useState('vender');
-  return(<div>
-    <SubNav value={sub} onChange={setSub} tabs={[{id:'vender',icon:'🛒',label:'Vender'},{id:'caja',icon:'🧾',label:'Caja'}]}/>
-    {sub==='vender'?<PantallaCatalogo uid={uid}/>:<PantallaCaja uid={uid}/>}
-  </div>);
+  const sn=<SubNav value={sub} onChange={setSub} tabs={[{id:'vender',icon:'🛒',label:'Vender'},{id:'caja',icon:'🧾',label:'Caja'}]}/>;
+  return sub==='vender'?<PantallaCatalogo uid={uid} subnav={sn}/>:<PantallaCaja uid={uid} subnav={sn}/>;
 }
 function PedidosClientes({uid}){
   const [sub,setSub]=useState('pedidos');
-  return(<div>
-    <SubNav value={sub} onChange={setSub} tabs={[{id:'pedidos',icon:'📋',label:'Pedidos'},{id:'clientes',icon:'👥',label:'Clientes'}]}/>
-    {sub==='pedidos'?<PantallaPedidos uid={uid}/>:<PantallaClientes uid={uid}/>}
-  </div>);
+  const sn=<SubNav value={sub} onChange={setSub} tabs={[{id:'pedidos',icon:'📋',label:'Pedidos'},{id:'clientes',icon:'👥',label:'Clientes'}]}/>;
+  return sub==='pedidos'?<PantallaPedidos uid={uid} subnav={sn}/>:<PantallaClientes uid={uid} subnav={sn}/>;
 }
 
 /* ─── LOGIN ─── */
@@ -1580,7 +1572,7 @@ function ModalVentaRapida({producto, clientes, uid, onCerrar}){
     try {
       const cliente = clientes.find(c=>c.id===clienteId);
       const ts = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection(`polleria/${uid}/pedidos`).add({clienteNombre:cliente?cliente.nombre:'Venta directa',clienteId:clienteId||'',tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',formaPago:pago,items:[{_id:Date.now(),nombre:producto.nombre,unidad:producto.unidad||'kg',cantidad,precio,subtotal:total}],total,fecha:hoy(),horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),createdAt:ts});
+      await db.collection(`polleria/${uid}/pedidos`).add({clienteNombre:cliente?cliente.nombre:'Venta directa',clienteId:clienteId||'',tipo:'mostrador',estado:'entregado',pagado:pago!=='fiado',formaPago:pago,items:[{_id:Date.now(),nombre:producto.nombre,unidad:producto.unidad||'kg',cantidad,precio,subtotal:total}],total,fecha:hoy(),horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}),createdAt:ts});
       await descontarStockVenta(uid,[{nombre:producto.nombre,cantidad}]);
       if(pago==='fiado'&&clienteId){const ref=db.collection(`polleria/${uid}/clientes`).doc(clienteId);const snap=await ref.get();if(snap.exists){await ref.update({saldoFiado:(Number(snap.data().saldoFiado)||0)+total});}}
       onCerrar(true);
@@ -1606,7 +1598,7 @@ function CarritoPanel({carrito,onCambiarCantidad,onSetCantidad,onEditarPeso,onLi
     setCargando(true);
     try{
       const items=carrito.map(i=>({_id:Date.now()+Math.random(),nombre:i.prod.nombre,unidad:i.prod.unidad||'kg',cantidad:i.cantidad,precio:i.prod.precioVenta||0,subtotal:(i.prod.precioVenta||0)*i.cantidad}));
-      const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'delivery':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      const pedidoData={clienteNombre:clienteNombre||'Venta directa',clienteId:'',tipo:esEnvio?'delivery':'mostrador',estado:esEnvio?'pendiente':'entregado',pagado:pago!=='fiado',formaPago:pago,items,total,fecha:hoy(),horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}),telefono:telefono||'',datosTarjeta:datosPago||'',esEnvio,direccion:esEnvio?direccion.trim():'',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
       const ref=await db.collection(`polleria/${uid}/pedidos`).add(pedidoData);
       await descontarStockVenta(uid,items);
       onVentaConfirmada({...pedidoData,id:ref.id,items});
@@ -1676,7 +1668,7 @@ function ModalPeso({prod,cantActual,onAgregar,onCerrar}){
 }
 
 function normProdNombre(s){return (s||'').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/s$/,'');}
-function PantallaCatalogo({uid}){
+function PantallaCatalogo({uid,subnav}){
   const [productos,setProductos]=useState([]);
   const [stockItems,setStockItems]=useState([]);
   const [clientes,setClientes]=useState([]);
@@ -1777,6 +1769,7 @@ function PantallaCatalogo({uid}){
   return(
     <div>
       <Header titulo="Catálogo / Vender" subtitulo="Punto de venta"/>
+      {subnav}
       <div className="split-layout">
         {/* IZQUIERDA – catálogo */}
         <div className="split-left">
@@ -3423,6 +3416,7 @@ function PantallaStock({uid}){
             <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`} style={{flexShrink:0,whiteSpace:'nowrap'}}>{s.lbl}</button>
           ))}
         </div>
+        {headerAdd&&<button onClick={headerAdd} className="btn-pri" style={{width:'100%',marginBottom:12,padding:10,fontSize:14}}>+ Agregar {sec==='verduleria'?'verdura':'ítem'}</button>}
         {sec==='stock'&&<>
           {bajos.length>0&&<div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:10}}><b style={{color:'var(--orange)',fontSize:13}}>⚠️ Stock bajo: </b><span style={{fontSize:13,color:'var(--txt2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span></div>}
           <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{marginBottom:12}}/>
@@ -3502,11 +3496,11 @@ function FormStock({inicial,onGuardar,onCancelar}){
 const ESTADOS={pendiente:{label:'Pendiente',pillC:'pill pill-orange'},preparando:{label:'Preparando',pillC:'pill pill-blue'},listo:{label:'Listo ✓',pillC:'pill pill-green'},enviado:{label:'Enviado 🛵',pillC:'pill pill-blue'},entregado:{label:'Entregado 📦',pillC:'pill pill-gray'},cobrado:{label:'Cobrado ✅',pillC:'pill pill-green'},cancelado:{label:'Cancelado',pillC:'pill pill-red'}};
 const COLOR_ESTADO={pendiente:'#ef4444',preparando:'#f59e0b',enviado:'#3b82f6',listo:'#22c55e',entregado:'#22c55e',cobrado:'#16a34a',cancelado:'#9ca3af'};
 
-function sumarMin(hhmm,min){if(!hhmm||!/^\d{1,2}:\d{2}/.test(hhmm))return'';const p=hhmm.split(':');const d=new Date();d.setHours(parseInt(p[0],10),parseInt(p[1],10)+min,0,0);return d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});}
+function sumarMin(hhmm,min){if(!hhmm||!/^\d{1,2}:\d{2}/.test(hhmm))return'';const p=hhmm.split(':');const d=new Date();d.setHours(parseInt(p[0],10),parseInt(p[1],10)+min,0,0);return d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});}
 function ComandaEnvio({pedido,onCerrar}){
   const nombreNegocio=getNombreLocal();
   const est=ESTADOS[pedido.estado]||ESTADOS.pendiente;
-  const horaImp=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  const horaImp=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});
   const imprimir=()=>window.print();
   const esEnv=(pedido.tipo==='delivery'||pedido.tipo==='envio');
   const PASOS=esEnv?['pendiente','preparando','enviado','entregado','cobrado']:['pendiente','preparando','listo','entregado','cobrado'];
@@ -3672,7 +3666,7 @@ function FormEnvioRapido({productos,clientes,uid,onGuardado}){
       await db.collection(`polleria/${uid}/pedidos`).add({
         clienteNombre:d.nombre.trim(),clienteId:d.cliId||'',tipo:'delivery',estado:'pendiente',
         pagado:d.pago!=='fiado',formaPago:d.pago,items:itemsFinal,total:totalFinal,fecha:hoy(),
-        horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),
+        horaCreacion:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}),
         telefono:d.tel,direccion:d.dir,notas:d.nota,esEnvio:true,
         createdAt:firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -3839,7 +3833,7 @@ function VentanaFlotanteEnvio({productos,clientes,uid,onCerrar,onAcomodar}){
   );
 }
 
-function PantallaPedidos({uid}){
+function PantallaPedidos({uid,subnav}){
   const [pedidos,setPedidos]=useState([]);const [clientes,setClientes]=useState([]);const [productos,setProductos]=useState([]);const [stockItems,setStockItems]=useState([]);const [form,setForm]=useState(null);const [filtro,setFiltro]=useState('hoy');
   const [modoEnvios,setModoEnvios]=useState(false);
   useEffect(()=>{
@@ -3855,7 +3849,7 @@ function PantallaPedidos({uid}){
     for(const p of combinados){const k=normProdNombre(p.nombre);if(k&&!vistos.has(k)){vistos.add(k);unicos.push(p);}}
     return unicos.sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
   },[productos,stockItems]);
-  const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente',horaCreacion:r.tipo==='delivery'?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''});if((r.tipo==='delivery'||r.esEnvio)&&r.clienteNombre&&r.clienteNombre.trim())autoRegistrarCliente(uid,{nombre:r.clienteNombre,telefono:r.telefono,direccion:r.direccion});setForm(null);};
+  const guardar=async d=>{const{id,...r}=d;const ts=firebase.firestore.FieldValue.serverTimestamp();if(id)await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...r,updatedAt:ts});else await db.collection(`polleria/${uid}/pedidos`).add({...r,createdAt:ts,fecha:hoy(),estado:'pendiente',horaCreacion:r.tipo==='delivery'?new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}):''});if((r.tipo==='delivery'||r.esEnvio)&&r.clienteNombre&&r.clienteNombre.trim())autoRegistrarCliente(uid,{nombre:r.clienteNombre,telefono:r.telefono,direccion:r.direccion});setForm(null);};
   const cambiarEstado=async(id,updates)=>await db.collection(`polleria/${uid}/pedidos`).doc(id).update({...updates,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
   const eliminar=async id=>{if(!confirm('¿Eliminar pedido?'))return;await db.collection(`polleria/${uid}/pedidos`).doc(id).delete();};
   const resumirEnviosWA=()=>{
@@ -3898,16 +3892,15 @@ function PantallaPedidos({uid}){
   return(
     <div>
       <Header titulo="Pedidos" onAdd={()=>setForm({})} onLogout={()=>auth.signOut()} subtitulo="Gestión Pollería"/>
+      {subnav}
       <div className="app-body">
         {!modoEnvios&&(
-          <button onClick={activarModoEnvios} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'#25D366',color:'#fff',border:'none',borderRadius:10,padding:'10px 14px',fontSize:13,cursor:'pointer',marginBottom:10,textAlign:'left'}}>
-            <span style={{fontSize:22,lineHeight:1}}>📱</span>
-            <div>
-              <div style={{fontWeight:700,fontSize:13}}>Activar Modo Recibir Pedidos por WhatsApp</div>
-              <div style={{fontSize:10,opacity:.85,marginTop:1}}>WhatsApp Web se abre al costado · formulario siempre visible para cargar sin salir</div>
-            </div>
-            <span style={{marginLeft:'auto',fontSize:13}}>→</span>
-          </button>
+          <div style={{display:'flex',gap:8,marginBottom:10}}>
+            <button onClick={()=>setForm({})} className="btn-pri" style={{flex:1,padding:'9px',fontSize:13,fontWeight:700}}>+ Nuevo pedido</button>
+            <button onClick={activarModoEnvios} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:'#25D366',color:'#fff',border:'none',borderRadius:'var(--radius)',padding:'9px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              <span style={{fontSize:16}}>📱</span> Modo WhatsApp
+            </button>
+          </div>
         )}
         {modoEnvios&&(
           <VentanaFlotanteEnvio productos={todosProductos} clientes={clientes} uid={uid} onCerrar={()=>setModoEnvios(false)} onAcomodar={acomodarVentanas}/>
@@ -4135,7 +4128,7 @@ function SeccionBalance({uid}){
   );
 }
 
-function PantallaCaja({uid}){
+function PantallaCaja({uid,subnav}){
   const [sec,setSec]=useState('caja');const [pedidos,setPedidos]=useState([]);const [movimientos,setMov]=useState([]);const [formMov,setFormMov]=useState(null);const [fechaCaja,setFechaCaja]=useState(hoy());const [cerrado,setCerrado]=useState(false);
   const colMov=db.collection(`polleria/${uid}/movimientos`);
   useEffect(()=>{
@@ -4185,6 +4178,7 @@ function PantallaCaja({uid}){
   return(
     <div>
       <Header titulo="Caja del Día"/>
+      {subnav}
       <div className="app-body">
         <div className="tab-bar">
           {[{k:'caja',lbl:'💵 Caja'},{k:'transferencias',lbl:'📲 Transf.'},{k:'arqueo',lbl:'🔒 Arqueo'},{k:'balance',lbl:'📊 Balance'}].map(s=>(
@@ -4575,7 +4569,7 @@ async function autoRegistrarCliente(uid,{nombre,telefono,direccion}){
   }catch(e){}
 }
 
-function PantallaClientes({uid}){
+function PantallaClientes({uid,subnav}){
   const [clientes,setClientes]=useState([]);
   const [editId,setEditId]=useState(null); // null=cerrado, ''=nuevo, 'id'=editando
   const [d,setD]=useState({nombre:'',apellido:'',telefono:'',direccion:''});
@@ -4602,6 +4596,7 @@ function PantallaClientes({uid}){
   return(
     <div>
       <Header titulo="Clientes"/>
+      {subnav}
       <div className="app-body">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
           <div className="sec-title" style={{margin:0}}>👥 Mis clientes <span style={{color:'var(--txt2)',fontWeight:400,fontSize:13}}>({clientes.length})</span></div>
