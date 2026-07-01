@@ -608,6 +608,7 @@ function getFotoProducto(preset){
 }
 
 const NOMBRE_A_FOTO={
+  'Milanesas de pechuga':'preset:milanesas',
   'Milanesa de pata-muslo':'preset:milanesas',
   'Milanesa':'preset:milanesas',
   'Milanesas de pollo':'preset:milanesas',
@@ -775,13 +776,11 @@ const NOMBRE_A_FOTO={
 const _NAFK=Object.fromEntries(Object.entries(NOMBRE_A_FOTO).map(([k,v])=>[k.toLowerCase(),v]));
 function getProductFoto(prod){
   const _nm=(prod.nombre||'');
-  const fotoFuente=prod.foto||NOMBRE_A_FOTO[_nm]||_NAFK[_nm.toLowerCase()];
-  if(fotoFuente){
-    // 1. Foto propia del producto (máxima prioridad)
-    const fp=getFotoProducto(fotoFuente);
+  const fuentes=[prod.foto, NOMBRE_A_FOTO[_nm], _NAFK[_nm.toLowerCase()]].filter(Boolean);
+  for(const f of fuentes){
+    const fp=getFotoProducto(f);
     if(fp) return fp;
-    // 2. Sprite Aldelis como fallback
-    const r=getRealFoto(fotoFuente);
+    const r=getRealFoto(f);
     if(r) return {tipo:'sprite',...r};
   }
   return null;
@@ -2485,7 +2484,7 @@ function CalculadoraCajon({uid}){
       </div>
 
       {/* ── Precios por corte / Producción ── */}
-      {modo==='produccion'?<DespieceProduccion uid={uid} kg={totKg} pollos={tot}/>:<div className="panel">
+      {modo==='produccion'?<ProduccionUnificada uid={uid} kg={totKg} pollos={tot}/>:<div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
           <div className="ptitle" style={{margin:0}}>🏷️ Precios calculados</div>
           <button onClick={volverAutomatico}
@@ -3471,17 +3470,19 @@ function ProduccionWrap({uid}){
   </div>);
 }
 
-function SeccionPollo({uid}){
-  const [modo,setModo]=useState('cargar');
-  return(
-    <div>
-      <div className="tab-bar" style={{marginBottom:12}}>
-        <button onClick={()=>setModo('cargar')} className={`tab-btn${modo==='cargar'?' activo':''}`} style={{flex:1}}>🍗 Trozado</button>
-        <button onClick={()=>setModo('produccion')} className={`tab-btn${modo==='produccion'?' activo':''}`} style={{flex:1}}>🍴 Producción</button>
-      </div>
-      {modo==='cargar'?<CalculadoraCajon uid={uid}/>:<ProduccionWrap uid={uid}/>}
+function ProduccionUnificada({uid,kg,pollos}){
+  const [v,setV]=useState('despiece');
+  return(<div>
+    <div className="tab-bar" style={{marginBottom:12}}>
+      <button onClick={()=>setV('despiece')} className={`tab-btn${v==='despiece'?' activo':''}`} style={{flex:1}}>🔪 Despiece del cajón</button>
+      <button onClick={()=>setV('otros')} className={`tab-btn${v==='otros'?' activo':''}`} style={{flex:1}}>🍖 Molida / Kipe / Otros</button>
     </div>
-  );
+    {v==='despiece'?<DespieceProduccion uid={uid} kg={kg} pollos={pollos}/>:<SeccionProduccion uid={uid}/>}
+  </div>);
+}
+
+function SeccionPollo({uid}){
+  return <CalculadoraCajon uid={uid}/>;
 }
 
 /* ─── #7 RECETAS COMPUESTAS ─── */
