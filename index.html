@@ -2134,9 +2134,9 @@ const CORTES_DEFAULT=[
   {n:'Carcasa+menudos', pct:10, precioRef:1000},
 ];
 
-function DespieceProduccion({uid, pollos}){
+function DespieceProduccion({uid, kg, pollos}){
   const DESP_DEFAULT={
-    pPechuga:0.8, pPatamuslo:0.85, pAlitas:0.25, pCarcasa:0.6,
+    pctPechuga:32, pctPatamuslo:34, pctAlitas:10, pctCarcasa:24,
     prPechuga:6000, prPatamuslo:5500, prAlitas:4000,
     carnePechuga:70, carnePatamuslo:65, rindePechuga:12, rindePatamuslo:12,
     repPuchero:40, repCarcasas:35, repMenudos:25,
@@ -2155,10 +2155,11 @@ function DespieceProduccion({uid, pollos}){
   const setK=(k,v)=>setCfg(c=>({...c,[k]:v}));
 
   const n=Number(pollos)||0;
-  const kgPechuga=+(n*(Number(cfg.pPechuga)||0)).toFixed(2);
-  const kgPatamuslo=+(n*(Number(cfg.pPatamuslo)||0)).toFixed(2);
-  const kgAlitas=+(n*(Number(cfg.pAlitas)||0)).toFixed(2);
-  const kgCarcasa=+(n*(Number(cfg.pCarcasa)||0)).toFixed(2);
+  const total=Number(kg)||0;
+  const kgPechuga=+(total*(Number(cfg.pctPechuga)||0)/100).toFixed(2);
+  const kgPatamuslo=+(total*(Number(cfg.pctPatamuslo)||0)/100).toFixed(2);
+  const kgAlitas=+(total*(Number(cfg.pctAlitas)||0)/100).toFixed(2);
+  const kgCarcasa=+(total*(Number(cfg.pctCarcasa)||0)/100).toFixed(2);
   const milaPechuga=decP==='milanesa'?+(kgPechuga*(Number(cfg.carnePechuga)||0)/100*(1+(Number(cfg.rindePechuga)||0)/100)).toFixed(2):0;
   const huesoPechuga=decP==='milanesa'?+(kgPechuga*(100-(Number(cfg.carnePechuga)||0))/100).toFixed(2):0;
   const milaPatamuslo=decPM==='milanesa'?+(kgPatamuslo*(Number(cfg.carnePatamuslo)||0)/100*(1+(Number(cfg.rindePatamuslo)||0)/100)).toFixed(2):0;
@@ -2181,7 +2182,7 @@ function DespieceProduccion({uid, pollos}){
 
   const guardarCfg=async()=>{setGuardandoCfg(true);try{await cfgRef.set(cfg,{merge:true});setEditando(false);mostrar('✅ Valores guardados');}catch(e){alert('Error: '+(e.message||e));}setGuardandoCfg(false);};
   const producir=async()=>{
-    if(n<=0)return alert('Poné cuántos pollos tiene el cajón (arriba)');
+    if(total<=0)return alert('Poné los kg del cajón (arriba)');
     setGuardando(true);
     try{
       const stockCol=db.collection(`polleria/${uid}/stock`);
@@ -2203,11 +2204,11 @@ function DespieceProduccion({uid, pollos}){
   return(
     <div>
       <Toast msg={toastMsg}/>
-      {n<=0 && <div className="panel" style={{textAlign:'center',color:'var(--txt2)',fontSize:13}}>👆 Poné cuántos pollos tiene el cajón (arriba) para calcular el despiece.</div>}
-      {n>0 && <>
+      {total<=0 && <div className="panel" style={{textAlign:'center',color:'var(--txt2)',fontSize:13}}>👆 Poné los kg del cajón (arriba) para ver el despiece.</div>}
+      {total>0 && <>
         <div className="panel">
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="ptitle" style={{margin:0}}>🍴 Producción de {n} pollo{n!==1?'s':''}</div>
+            <div className="ptitle" style={{margin:0}}>🍴 Producción · {total} kg{n>0?` (${n} pollos)`:''}</div>
             <button onClick={()=>setEditando(v=>!v)} style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:editando?'var(--green-bg)':'var(--bg2)',color:editando?'var(--green)':'var(--txt2)',cursor:'pointer',fontWeight:600}}>⚙️ Ajustes</button>
           </div>
           <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:10}}>
@@ -2230,8 +2231,8 @@ function DespieceProduccion({uid, pollos}){
             🪽 Alitas <b style={{color:'var(--txt)'}}>{kgAlitas} kg</b> · 🦴 Carcasa/espinazo <b style={{color:'var(--txt)'}}>{kgCarcasa} kg</b> → van a la venta
           </div>
           {editando && <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,margin:'12px 0'}}>
-            <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',marginBottom:8}}>⚖️ Peso por pollo (kg)</div>
-            {cfgRow('Pechuga','pPechuga','kg')}{cfgRow('Pata-muslo','pPatamuslo','kg')}{cfgRow('Alitas','pAlitas','kg')}{cfgRow('Carcasa/espinazo','pCarcasa','kg')}
+            <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',marginBottom:8}}>📊 % de cada parte del cajón</div>
+            {cfgRow('Pechuga','pctPechuga')}{cfgRow('Pata-muslo','pctPatamuslo')}{cfgRow('Alitas','pctAlitas')}{cfgRow('Carcasa/espinazo','pctCarcasa')}
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🔪 Milanesas (% carne y rinde)</div>
             {cfgRow('Pechuga: % carne','carnePechuga')}{cfgRow('Pechuga: rinde empanado','rindePechuga')}{cfgRow('Pata-muslo: % carne','carnePatamuslo')}{cfgRow('Pata-muslo: rinde empanado','rindePatamuslo')}
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🦴 Reparto de huesos</div>
@@ -2281,10 +2282,9 @@ function CalculadoraCajon({uid}){
   },[]);
 
   const tot=parseInt(nPollos)||0;
-  const KG_POLLO=2.5;
-  const totKg=+(tot*KG_POLLO).toFixed(2);
+  const totKg=+(Number(kgCajon)||20).toFixed(2);
   const rendimientoKg=+(totKg*rendimientoPct/100).toFixed(2);
-  const kgPromedio=tot>0?+(rendimientoKg/tot).toFixed(2):null;
+  const kgPromedio=tot>0?+(totKg/tot).toFixed(2):null;
   const precioTotalPagado=Number(precioCajon)*cajones||0;
   const costoPorKg=rendimientoKg>0&&precioTotalPagado>0?precioTotalPagado/rendimientoKg:0;
 
@@ -2415,15 +2415,23 @@ function CalculadoraCajon({uid}){
             <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',padding:10,fontSize:13}}>{guardandoCfg?'Guardando...':'💾 Guardar configuración'}</button>
           </div>
         )}
-        <div style={{marginBottom:10}}>
-          <label className="lbl" style={{marginTop:0}}>🐔 ¿Cuántos pollos tiene el cajón?</label>
-          <input type="number" min={1} max={40} value={nPollos}
-            onChange={e=>setNPollos(e.target.value)}
-            placeholder="Ej: 8" className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+        <div style={{display:'flex',gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>📦 Kg del cajón</label>
+            <input type="number" min={1} step={0.5} value={kgCajon}
+              onChange={e=>setKgCajon(Math.max(1,Number(e.target.value)))}
+              className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+          </div>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>🐔 N° de pollos</label>
+            <input type="number" min={1} max={40} value={nPollos}
+              onChange={e=>setNPollos(e.target.value)}
+              placeholder="6 a 10" className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+          </div>
         </div>
         <div className="suma-band" style={{marginBottom:6}}>
-          <span style={{fontSize:13,color:'var(--txt2)'}}>{tot||0} pollo{tot!==1?'s':''} × {KG_POLLO} kg c/u</span>
-          <span style={{fontSize:20,fontWeight:700,color:'var(--txt)'}}>= {totKg} kg</span>
+          <span style={{fontSize:13,color:'var(--txt2)'}}>Cajón de {totKg} kg{tot>0?` · ${tot} pollos`:''}</span>
+          <span style={{fontSize:16,fontWeight:700,color:'var(--txt)'}}>{tot>0?`~${kgPromedio} kg/pollo`:'20 kg fijos'}</span>
         </div>
         <div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
@@ -2469,7 +2477,7 @@ function CalculadoraCajon({uid}){
       </div>
 
       {/* ── Precios por corte / Producción ── */}
-      {modo==='produccion'?<DespieceProduccion uid={uid} pollos={tot}/>:<div className="panel">
+      {modo==='produccion'?<DespieceProduccion uid={uid} kg={totKg} pollos={tot}/>:<div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
           <div className="ptitle" style={{margin:0}}>🏷️ Precios calculados</div>
           <button onClick={volverAutomatico}
