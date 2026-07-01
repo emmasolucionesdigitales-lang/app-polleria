@@ -608,6 +608,14 @@ function getFotoProducto(preset){
 }
 
 const NOMBRE_A_FOTO={
+  'Milanesa de pata-muslo':'preset:milanesas',
+  'Milanesa':'preset:milanesas',
+  'Milanesas de pollo':'preset:milanesas',
+  'Pata muslo':'preset:pata',
+  'Patamuslo':'preset:pata',
+  'Puchero':'preset:carcasas',
+  'Carcasa':'preset:carcasas',
+  'Menudos':'preset:menudos',
   'Tomate':'preset:tomates',
   'Papa':'preset:papas',
   'Cebolla':'preset:cebollas',
@@ -2188,7 +2196,7 @@ function DespieceProduccion({uid, kg, pollos}){
       const stockCol=db.collection(`polleria/${uid}/stock`);
       const prodCol=db.collection(`polleria/${uid}/productos`);
       for(const o of outs){
-        const docId='prod-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const docId='pollo-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const ref=stockCol.doc(docId);const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
         await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:0,precioVenta:o.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
@@ -3207,7 +3215,7 @@ function SeccionProduccion({uid}){
       const prodCol=db.collection(`polleria/${uid}/productos`);
       for(const p of productos){
         if(p.kgFinal<=0)continue;
-        const docId='prod-'+p.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const docId='pollo-'+p.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const ref=stockCol.doc(docId);
         const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
@@ -3376,7 +3384,7 @@ function SeccionMilanesas({uid}){
       const prodCol=db.collection(`polleria/${uid}/productos`);
       const costoMilaKg=milaKg>0&&costoTotal>0?+(costoTotal/milaKg).toFixed(2):0;
       for(const o of outputs){
-        const docId='prod-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const docId='pollo-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const ref=stockCol.doc(docId);
         const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
