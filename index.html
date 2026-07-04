@@ -2182,9 +2182,7 @@ function DespieceProduccion({uid, kg, pollos}){
   if(decPM==='milanesa') outputs.push({nombre:'Milanesa de pata-muslo', kg:milaPatamuslo, precio:Number(cfg.precioMilaPatamuslo)||0, cat:'🍴 Preparados'});
   else outputs.push({nombre:'Pata-muslo', kg:kgPatamuslo, precio:Number(cfg.prPatamuslo)||0, cat:'🐔 Pollo'});
   outputs.push({nombre:'Alitas', kg:kgAlitas, precio:Number(cfg.prAlitas)||0, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Puchero', kg:kgPuchero, precio:Number(cfg.precioPuchero)||0, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Carcasas', kg:kgCarcasas, precio:Number(cfg.precioCarcasas)||0, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Menudos', kg:kgMenudos, precio:Number(cfg.precioMenudos)||0, cat:'🐔 Pollo'});
+  outputs.push({nombre:'Carcasa+menudos', kg:totalHuesos, precio:Number(cfg.precioCarcasas)||2000, cat:'🐔 Pollo'});
   const outs=outputs.filter(o=>o.kg>0);
 
   const guardarCfg=async()=>{setGuardandoCfg(true);try{await cfgRef.set(cfg,{merge:true});setEditando(false);mostrar('✅ Valores guardados');}catch(e){alert('Error: '+(e.message||e));}setGuardandoCfg(false);};
@@ -2242,12 +2240,10 @@ function DespieceProduccion({uid, kg, pollos}){
             {cfgRow('Pechuga','pctPechuga')}{cfgRow('Pata-muslo','pctPatamuslo')}{cfgRow('Alitas','pctAlitas')}{cfgRow('Carcasa/espinazo','pctCarcasa')}
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🔪 Milanesas (% carne y rinde)</div>
             {cfgRow('Pechuga: % carne','carnePechuga')}{cfgRow('Pechuga: rinde empanado','rindePechuga')}{cfgRow('Pata-muslo: % carne','carnePatamuslo')}{cfgRow('Pata-muslo: rinde empanado','rindePatamuslo')}
-            <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🦴 Reparto de huesos</div>
-            {cfgRow('Puchero','repPuchero')}{cfgRow('Carcasas','repCarcasas')}{cfgRow('Menudos','repMenudos')}
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>💰 Precios de venta ($/kg)</div>
             {cfgRow('Pechuga entera','prPechuga','$')}{cfgRow('Pata-muslo entero','prPatamuslo','$')}{cfgRow('Alitas','prAlitas','$')}
             {cfgRow('Milanesa de pechuga','precioMilaPechuga','$')}{cfgRow('Milanesa de pata-muslo','precioMilaPatamuslo','$')}
-            {cfgRow('Puchero','precioPuchero','$')}{cfgRow('Carcasas','precioCarcasas','$')}{cfgRow('Menudos','precioMenudos','$')}
+            {cfgRow('Carcasa+menudos','precioCarcasas','$')}
             <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',marginTop:8,padding:9}}>{guardandoCfg?'Guardando...':'💾 Guardar ajustes'}</button>
           </div>}
         </div>
