@@ -2143,7 +2143,7 @@ const CORTES_DEFAULT=[
   {n:'Carcasa+menudos', pct:10, precioRef:1000},
 ];
 
-function DespieceProduccion({uid, kg, pollos}){
+function DespieceProduccion({uid, kg, pollos, precioCajon}){
   const DESP_DEFAULT={
     pctPechuga:32, pctPatamuslo:34, pctAlitas:10, pctCarcasa:24,
     prPechuga:6000, prPatamuslo:5500, prAlitas:4000,
@@ -2178,13 +2178,14 @@ function DespieceProduccion({uid, kg, pollos}){
   const kgCarcasas=+(totalHuesos*(Number(cfg.repCarcasas)||0)/100).toFixed(2);
   const kgMenudos=+(totalHuesos*(Number(cfg.repMenudos)||0)/100).toFixed(2);
 
+  const costKg = total>0 ? +((Number(precioCajon)||0)/total).toFixed(2) : 0;
   const outputs=[];
-  if(decP==='milanesa') outputs.push({nombre:'Milanesa de pechuga', kg:milaPechuga, precio:Number(cfg.precioMilaPechuga)||0, cat:'🍴 Preparados'});
-  else outputs.push({nombre:'Pechuga', kg:kgPechuga, precio:Number(cfg.prPechuga)||0, cat:'🐔 Pollo'});
-  if(decPM==='milanesa') outputs.push({nombre:'Milanesa de pata-muslo', kg:milaPatamuslo, precio:Number(cfg.precioMilaPatamuslo)||0, cat:'🍴 Preparados'});
-  else outputs.push({nombre:'Pata-muslo', kg:kgPatamuslo, precio:Number(cfg.prPatamuslo)||0, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Alitas', kg:kgAlitas, precio:Number(cfg.prAlitas)||0, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Carcasa+menudos', kg:totalHuesos, precio:Number(cfg.precioCarcasas)||2000, cat:'🐔 Pollo'});
+  if(decP==='milanesa') outputs.push({nombre:'Milanesa de pechuga', kg:milaPechuga, precio:Number(cfg.precioMilaPechuga)||0, costo:milaPechuga>0?+(kgPechuga*costKg/milaPechuga).toFixed(2):0, cat:'🍴 Preparados'});
+  else outputs.push({nombre:'Pechuga', kg:kgPechuga, precio:Number(cfg.prPechuga)||0, costo:costKg, cat:'🐔 Pollo'});
+  if(decPM==='milanesa') outputs.push({nombre:'Milanesa de pata-muslo', kg:milaPatamuslo, precio:Number(cfg.precioMilaPatamuslo)||0, costo:milaPatamuslo>0?+(kgPatamuslo*costKg/milaPatamuslo).toFixed(2):0, cat:'🍴 Preparados'});
+  else outputs.push({nombre:'Pata-muslo', kg:kgPatamuslo, precio:Number(cfg.prPatamuslo)||0, costo:costKg, cat:'🐔 Pollo'});
+  outputs.push({nombre:'Alitas', kg:kgAlitas, precio:Number(cfg.prAlitas)||0, costo:costKg, cat:'🐔 Pollo'});
+  outputs.push({nombre:'Carcasa+menudos', kg:totalHuesos, precio:Number(cfg.precioCarcasas)||2000, costo:costKg, cat:'🐔 Pollo'});
   const outs=outputs.filter(o=>o.kg>0);
 
   const guardarCfg=async()=>{setGuardandoCfg(true);try{await cfgRef.set(cfg,{merge:true});setEditando(false);mostrar('✅ Valores guardados');}catch(e){alert('Error: '+(e.message||e));}setGuardandoCfg(false);};
@@ -2198,8 +2199,8 @@ function DespieceProduccion({uid, kg, pollos}){
         const docId='pollo-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const ref=stockCol.doc(docId);const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
-        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:0,precioVenta:o.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-        await prodCol.doc(docId).set({nombre:o.nombre,categoria:o.cat,unidad:'kg',precioVenta:o.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:o.costo||0,precioVenta:o.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await prodCol.doc(docId).set({nombre:o.nombre,categoria:o.cat,unidad:'kg',precioCosto:o.costo||0,precioVenta:o.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       mostrar(`✅ ${outs.length} productos sumados al stock`);
     }catch(e){alert('Error: '+(e.message||e));}
@@ -2482,7 +2483,7 @@ function CalculadoraCajon({uid}){
       </div>
 
       {/* ── Precios por corte / Producción ── */}
-      {modo==='produccion'?<ProduccionUnificada uid={uid} kg={totKg} pollos={tot}/>:<div className="panel">
+      {modo==='produccion'?<ProduccionUnificada uid={uid} kg={totKg} pollos={tot} precioCajon={precioCajon}/>:<div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
           <div className="ptitle" style={{margin:0}}>🏷️ Precios calculados</div>
           <button onClick={volverAutomatico}
@@ -2574,6 +2575,9 @@ function CalculadoraCajon({uid}){
 
 
 
+const VERDU_NOMBRES=['Papas','Batata','Cebolla','Cebolla de verdeo','Tomate','Tomate perita','Zanahoria','Zapallo','Zapallo anco','Zapallito','Choclo','Morrón','Ajo','Lechuga','Repollo','Brócoli','Coliflor','Berenjena','Pepino','Remolacha','Rabanito','Puerro','Chaucha','Arvejas','Espinaca','Acelga','Apio','Calabaza','Cayote','Palta','Hongos','Perejil','Banana','Manzana','Naranja','Mandarina','Pera','Frutilla','Kiwi','Mango','Sandía','Melón','Uvas','Ananá','Limón','Pomelo','Durazno','Ciruela'];
+const CONGEL_NOMBRES=['Medallones de merluza','Medallones de merluza con queso','Medallones de pollo','Milanesa de merluza','Milanesa de pollo','Nuggets de pollo','Formitas de pollo','Patitas de pollo','Bastoncitos de merluza','Palitos de mozzarella','Hamburguesas','Hamburguesas de pollo','Papas congeladas','Papas bastón','Bocaditos de pollo','Suprema de pollo','Cordon bleu','Rabas','Croquetas'];
+
 function CalculadoraCongelados({uid}){
   const [nombre,setNombre]=useState('');
   const [cajas,setCajas]=useState(1);const [kgCaja,setKgCaja]=useState(5);
@@ -2618,7 +2622,8 @@ function CalculadoraCongelados({uid}){
     <div>
       <div className="panel">
         <div className="ptitle">❄️ Calculadora de Congelados</div>
-        <Campo label="Nombre del producto *" value={nombre} onChange={setNombre} placeholder="Ej: Medallones, Nuggets, Hamburguesas..."/>
+        <Campo label="Nombre del producto *" value={nombre} onChange={setNombre} placeholder="Ej: Medallones, Nuggets, Hamburguesas..." list="congel-nombres"/>
+        <datalist id="congel-nombres">{CONGEL_NOMBRES.map(n=><option key={n} value={n}/>)}</datalist>
         <div style={{display:'flex',gap:10,marginBottom:4}}>
           {[{lbl:'Cajas',v:cajas,set:v=>setCajas(Math.max(1,v))},{lbl:'Kg por caja',v:kgCaja,set:v=>setKgCaja(Math.max(0.5,v)),step:0.5}].map(f=>(
             <div key={f.lbl} style={{flex:1}}>
@@ -2730,7 +2735,8 @@ function FormVerduleria({inicial,onGuardar,onCancelar}){
     <div>
       <Header titulo={d.id?'Editar Verdura':'Nueva Verdura'} onBack={onCancelar}/>
       <div className="app-body">
-        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Papas, Tomates, Cebollas..."/>
+        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Papas, Tomates, Cebollas..." list="verdu-nombres"/>
+        <datalist id="verdu-nombres">{VERDU_NOMBRES.map(n=><option key={n} value={n}/>)}</datalist>
         <label className="lbl">Unidad</label>
         <div className="chip-group">{UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}</div>
         <Campo label={`Cantidad actual (${d.unidad})`} value={d.cantidad} onChange={v=>set('cantidad',v)} tipo="number" placeholder="0"/>
@@ -3468,14 +3474,14 @@ function ProduccionWrap({uid}){
   </div>);
 }
 
-function ProduccionUnificada({uid,kg,pollos}){
+function ProduccionUnificada({uid,kg,pollos,precioCajon}){
   const [v,setV]=useState('despiece');
   return(<div>
     <div className="tab-bar" style={{marginBottom:12}}>
       <button onClick={()=>setV('despiece')} className={`tab-btn${v==='despiece'?' activo':''}`} style={{flex:1}}>🔪 Despiece del cajón</button>
       <button onClick={()=>setV('otros')} className={`tab-btn${v==='otros'?' activo':''}`} style={{flex:1}}>🍖 Molida / Kipe / Otros</button>
     </div>
-    {v==='despiece'?<DespieceProduccion uid={uid} kg={kg} pollos={pollos}/>:<SeccionProduccion uid={uid}/>}
+    {v==='despiece'?<DespieceProduccion uid={uid} kg={kg} pollos={pollos} precioCajon={precioCajon}/>:<SeccionProduccion uid={uid}/>}
   </div>);
 }
 
