@@ -61,6 +61,8 @@ html,body{height:100%;background:var(--bg3);font-family:-apple-system,BlinkMacSy
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:900px;background:var(--bg);border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
 .nav-btn{flex:1;margin:6px 4px;padding:7px 2px 5px;border:1px solid rgba(255,255,255,0.08);border-radius:12px;background:rgba(255,255,255,0.04);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:background .15s,border-color .15s,transform .1s;}
 .nav-btn:active{transform:scale(0.94);}
+.nav-fab{flex:0 0 52px;margin:0 4px;width:50px;height:50px;border-radius:50%;background:#25D366;color:#fff;border:3px solid var(--bg);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(37,211,102,.5);margin-top:-24px;align-self:flex-start;transition:transform .15s;}
+.nav-fab:active{transform:scale(0.92);}
 .nav-icon{font-size:19px;line-height:1;}
 .nav-label{font-size:10px;color:var(--txt2);}
 .nav-btn.activo{background:var(--green-bg);border-color:var(--green);}
@@ -1228,14 +1230,17 @@ const TABS=[
   {id:'stock',    icon:'📦', label:'Stock'},
   {id:'config',   icon:'⚙️', label:'Config'},
 ];
-function NavBar({activo,onChange}){
+function NavBar({activo,onChange,uid}){
   return(
     <nav className="nav">
       {TABS.map(t=>(
-        <button key={t.id} onClick={()=>onChange(t.id)} className={`nav-btn${activo===t.id?' activo':''}`}>
-          <span className="nav-icon">{t.icon}</span>
-          <span className="nav-label">{t.label}</span>
-        </button>
+        <React.Fragment key={t.id}>
+          <button onClick={()=>onChange(t.id)} className={`nav-btn${activo===t.id?' activo':''}`}>
+            <span className="nav-icon">{t.icon}</span>
+            <span className="nav-label">{t.label}</span>
+          </button>
+          {t.id==='pedidos'&&<BotoneraFlotante uid={uid} modoNav={true}/>}
+        </React.Fragment>
       ))}
     </nav>
   );
@@ -4766,7 +4771,7 @@ function AppWrapper(){
   return React.createElement(App);
 }
 
-function BotoneraFlotante({uid,abajo}){
+function BotoneraFlotante({uid,abajo,modoNav}){
   const [open,setOpen]=useState(false);
   const [productos,setProductos]=useState([]);
   const [clientes,setClientes]=useState([]);
@@ -4786,7 +4791,8 @@ function BotoneraFlotante({uid,abajo}){
   },[productos,stockItems]);
   return(<>
     <button onClick={()=>setOpen(true)} title="Nuevo pedido rápido"
-      style={{position:'fixed',bottom:abajo||80,right:16,zIndex:600,width:58,height:58,borderRadius:'50%',
+      className={modoNav?'nav-fab':undefined}
+      style={modoNav?undefined:{position:'fixed',bottom:abajo||80,right:16,zIndex:600,width:58,height:58,borderRadius:'50%',
         background:'#25D366',color:'#fff',border:'none',fontSize:22,cursor:'pointer',
         boxShadow:'0 4px 20px rgba(37,211,102,.5)',display:'flex',alignItems:'center',justifyContent:'center',
         transition:'transform .15s, box-shadow .15s'}}>
@@ -4937,8 +4943,7 @@ function App(){
   return(
     <div style={{paddingBottom:72}}>
       {contenido}
-      <NavBar activo={tab} onChange={setTab}/>
-      {tab!=='pedidos'&&<BotoneraFlotante uid={uid} abajo={76}/>}
+      <NavBar activo={tab} onChange={setTab} uid={uid}/>
     </div>
   );
 }
