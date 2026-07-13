@@ -3694,7 +3694,7 @@ function PantallaStock({uid}){
   if(verduForm!==null) return <FormVerduleria inicial={verduForm} onGuardar={guardarVerdu} onCancelar={()=>setVerduForm(null)}/>;
   const bajos=items.filter(i=>Number(i.cantidad)<=Number(i.stockMinimo||0));
   const filtrados=items.filter(i=>i.nombre.toLowerCase().includes(buscar.toLowerCase()));
-  const CAT_ICONS={'Pollo':'🐔','Congelados':'❄️','Verdulería':'🥦','General':'📦'};
+  const CAT_ICONS={'Pollo':'🐔','Congelados':'❄️','Verdulería':'🥦','Huevos y Lácteos':'🥚','Carne':'🥩','Frutas':'🍋','Fiambres':'🧀','Almacén':'🛒','General':'📦'};
   const porCat={};filtrados.forEach(i=>{const cat=i.categoria||'General';if(!porCat[cat])porCat[cat]=[];porCat[cat].push(i);});
   const headerAdd=sec==='stock'?()=>setForm({}):sec==='verduleria'?()=>setVerduForm({}):null;
   return(
@@ -3759,18 +3759,25 @@ function PantallaStock({uid}){
 
 function FormStock({inicial,onGuardar,onCancelar}){
   const UNIDADES=['kg','g','unidades','litros','atados','bandejas','docenas'];
-  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,...inicial});
+  const CATEGORIAS=['Pollo','Congelados','Verdulería','Huevos y Lácteos','Carne','Frutas','Fiambres','Almacén','General'];
+  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'General',precioCosto:'',precioVenta:'',...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
-  const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,cantidad:Number(d.cantidad)||0,stockMinimo:Number(d.stockMinimo)||0});};
+  const ganPctForm=Number(d.precioCosto)>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):null;
+  const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,cantidad:Number(d.cantidad)||0,stockMinimo:Number(d.stockMinimo)||0,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});};
   return(
     <div>
       <Header titulo={d.id?'Editar Item':'Nuevo Item'} onBack={onCancelar}/>
       <div className="app-body">
         <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
+        <label className="lbl">Categoría</label>
+        <div className="chip-group">{CATEGORIAS.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}</div>
         <label className="lbl">Unidad</label>
         <div className="chip-group">{UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}</div>
         <Campo label={`Cantidad actual (${d.unidad})`} value={d.cantidad} onChange={v=>set('cantidad',v)} tipo="number" placeholder="0"/>
         <Campo label={`Stock mínimo (${d.unidad})`} value={d.stockMinimo} onChange={v=>set('stockMinimo',v)} tipo="number" placeholder="0"/>
+        <Campo label={`Costo por ${d.unidad} (opcional, para ver ganancia)`} value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
+        <Campo label={`Precio de venta por ${d.unidad} (opcional)`} value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
+        {ganPctForm!==null&&<div style={{fontSize:13,color:'var(--txt2)',margin:'-8px 0 12px'}}>Ganancia: <b style={{color:ganPctForm>=30?'var(--green)':ganPctForm>=10?'var(--orange)':'var(--red)'}}>{ganPctForm}%</b></div>}
         <div style={{display:'flex',gap:8,marginTop:18}}>
           <button onClick={guardar} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>{d.id?'✓ Guardar':'+ Agregar'}</button>
           <button onClick={onCancelar} className="btn-sec" style={{padding:14}}>Cancelar</button>
