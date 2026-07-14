@@ -682,7 +682,8 @@ const NOMBRE_A_FOTO={
   'Achicoria':'preset:achicoria',
   'Carne molida':'preset:molida',
   'Carne Molida':'preset:molida',
-  'Molida':'preset:molida',
+  'Molida':'preset:molida','Molida de pollo':'preset:molida',
+  'Trozado':'preset:trozado',
   'Kipe de pollo':'preset:kipe',
   'Kipe de Pollo':'preset:kipe',
   'Kipe':'preset:kipe',
@@ -964,6 +965,7 @@ const CAT_STYLE = {
   '🐔 Pollo':          { bg:'#FFF8E1', emoji:'🐔' },
   'Pollo':             { bg:'#FFF8E1', emoji:'🐔' },
   '🥩 Carne':           { bg:'#FDEDEC', emoji:'🥩' },
+  'Carne':              { bg:'#FDEDEC', emoji:'🥩' },
   '🥦 Verduras':        { bg:'#EAF3DE', emoji:'🥦' },
   'Verdulería':         { bg:'#EAF3DE', emoji:'🥦' },
   'Verduleria':         { bg:'#EAF3DE', emoji:'🥦' },
@@ -971,7 +973,9 @@ const CAT_STYLE = {
   '🥚 Huevos y lácteos':{ bg:'#FDF2E9', emoji:'🥚' },
   'Huevos y Lácteos':  { bg:'#FDF2E9', emoji:'🥚' },
   '🧀 Fiambres':        { bg:'#FEF3E2', emoji:'🧀' },
+  'Fiambres':           { bg:'#FEF3E2', emoji:'🧀' },
   '🛒 Almacén':         { bg:'#E6F1FB', emoji:'🛒' },
+  'Almacén':            { bg:'#E6F1FB', emoji:'🛒' },
   'Congelados':         { bg:'#E8F4FE', emoji:'❄️' },
   '❄️ Congelados':     { bg:'#E8F4FE', emoji:'❄️' },
   'Otro':               { bg:'#F5F5F4', emoji:'📦' },
@@ -1245,6 +1249,12 @@ function Header({titulo,onBack,onAdd,onLogout,subtitulo,esCatalogo}){
 /* ─── MODO PC / CELULAR ─── */
 function getModo(){try{return localStorage.getItem('polleria-modo')||'movil';}catch{return 'movil';}}
 function guardarModo(m){try{localStorage.setItem('polleria-modo',m);}catch{}}
+function getCategoriasExtendidas(){try{return localStorage.getItem('polleria-cats-ext')==='1';}catch{return false;}}
+function guardarCategoriasExtendidas(v){try{localStorage.setItem('polleria-cats-ext',v?'1':'0');}catch{}}
+const CATEGORIAS_BASE=['Pollo','Verdulería','Congelados','Preparados','General'];
+const CATEGORIAS_EXTRA=['Huevos y Lácteos','Carne','Fiambres','Almacén'];
+function categoriasDisponibles(){return[...CATEGORIAS_BASE,...(getCategoriasExtendidas()?CATEGORIAS_EXTRA:[])];}
+const CATEGORIA_DISPLAY={'Pollo':'🐔 Pollo','Congelados':'❄️ Congelados','Preparados':'🍴 Preparados','Verdulería':'🥦 Verdulería','Verduleria':'🥦 Verdulería','Huevos y Lácteos':'🥚 Huevos y Lácteos','Huevos':'🥚 Huevos y Lácteos','Carne':'🥩 Carne','Fiambres':'🧀 Fiambres','Almacén':'🛒 Almacén','General':'📦 General'};
 
 /* ─── NAV BAR ─── */
 const TABS=[
@@ -1728,9 +1738,7 @@ function PantallaCatalogo({uid,subnav}){
   },[]);
 
   // Normalización de nombres de categoría (para mostrarlas con emoji)
-  const catMap={'Pollo':'🐔 Pollo','Congelados':'❄️ Congelados',
-    'Verdulería':'🥦 Verdulería','Verduleria':'🥦 Verdulería',
-    'Huevos y Lácteos':'🥚 Huevos y Lácteos','Huevos':'🥚 Huevos y Lácteos'};
+  const catMap=CATEGORIA_DISPLAY;
   // Catálogo vinculado al stock: solo aparece lo que hay cargado y con precio.
   // Aplica igual a pollo, congelados y verdulería. Si limpiás el stock, desaparece de Vender.
   const todosProductos=React.useMemo(()=>{
@@ -1821,7 +1829,7 @@ function PantallaCatalogo({uid,subnav}){
           {filtrados.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🛒</div>No hay productos.<br/>Agregá productos en <b>Stock → Precios</b> o en los calculadores de cajones y congelados.</div>}
           <div className="catalogo-grid">
             {filtrados.map(p=>{
-              const cs=catStyle(p.categoria||(p.tipo==='verduleria'?'Verdulería':p.tipo==='congelados'?'Congelados':p.tipo==='cajon'?'🐔 Pollo':undefined));
+              const cs=catStyle(p.categoria||(p.tipo==='verduleria'?'Verdulería':p.tipo==='congelados'?'Congelados':p.tipo==='cajon'?'Pollo':undefined));
               const enC=carrito.find(i=>i.prod.id===p.id);
               const esPeso=esPorPeso(p.unidad);
               const fotoData=renderFotoProducto(p.foto,cs,2.2);
@@ -1899,7 +1907,7 @@ function PantallaPrecios({uid, sinHeader=false}){
   const [stockItems,setStockItems]=useState([]);
   const [form,setForm]=useState(null);
   const [buscar,setBuscar]=useState('');
-  const CATS=['🐔 Pollo','❄️ Congelados','🥦 Verdulería','🥚 Huevos y Lácteos','🥩 Carne','🍋 Frutas','🧀 Fiambres','🛒 Almacén','Otro'];
+  const CATS=[...categoriasDisponibles(),'Otro'];
 
   useEffect(()=>{
     const u1=db.collection(`polleria/${uid}/productos`).orderBy('nombre','asc')
@@ -1918,7 +1926,7 @@ function PantallaPrecios({uid, sinHeader=false}){
     else if(id&&_col==='stock'){
       // Crear/actualizar en productos usando el mismo id
       await col.doc(id).set({
-        nombre:r.nombre,categoria:r.categoria||'❄️ Congelados',
+        nombre:r.nombre,categoria:r.categoria||'Congelados',
         unidad:r.unidad||'kg',precioCosto:data.precioCosto,
         precioVenta:data.precioVenta,foto:r.foto||'',
         updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
@@ -1939,9 +1947,7 @@ function PantallaPrecios({uid, sinHeader=false}){
   };
 
   // Combinar sin duplicar
-  const catMap={'Pollo':'🐔 Pollo','Congelados':'❄️ Congelados',
-    'Verdulería':'🥦 Verdulería','Verduleria':'🥦 Verdulería',
-    'Huevos y Lácteos':'🥚 Huevos y Lácteos','Huevos':'🥚 Huevos y Lácteos'};
+  const catMap=CATEGORIA_DISPLAY;
   const todosProductos=React.useMemo(()=>{
     const nombresEnProd=new Set(productos.map(p=>(p.nombre||'').toLowerCase().trim()));
     const stockVisibles=stockItems.filter(s=>
@@ -1983,7 +1989,7 @@ function PantallaPrecios({uid, sinHeader=false}){
             <div className="sec-title">{cat} <span style={{fontWeight:400}}>({prods.length})</span></div>
             {prods.map(p=>{
               const m=p.precioCosto>0?Math.round(((Number(p.precioVenta)-Number(p.precioCosto))/Number(p.precioCosto))*100):null;
-              const cs=catStyle(p.categoria||(p.tipo==='verduleria'?'Verdulería':p.tipo==='congelados'?'Congelados':p.tipo==='cajon'?'🐔 Pollo':undefined));
+              const cs=catStyle(p.categoria||(p.tipo==='verduleria'?'Verdulería':p.tipo==='congelados'?'Congelados':p.tipo==='cajon'?'Pollo':undefined));
               const fotoReal=getProductFoto(p);
               return(
                 <div key={p.id} className="card">
@@ -2028,12 +2034,12 @@ function PantallaPrecios({uid, sinHeader=false}){
 
 function FormProducto({inicial,onGuardar,onCancelar,categorias}){
   const UNIDADES=['kg','g','unidad','docena','litro','atado','bandeja'];
-  const [d,setD]=useState({nombre:'',categoria:'🐔 Pollo',descripcion:'',precioCosto:'',precioVenta:'',unidad:'kg',foto:'',...inicial});
+  const [d,setD]=useState({nombre:'',categoria:'Pollo',descripcion:'',precioCosto:'',precioVenta:'',unidad:'kg',foto:'',...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
   const setCategoria=cat=>{
     setD(p=>{
       // Huevos y lácteos → unidad; todo lo demás → kg (si no estaba ya personalizado)
-      const nuevaUnidad=cat==='🥚 Huevos y lácteos'?'unidad':'kg';
+      const nuevaUnidad=cat==='Huevos y Lácteos'?'unidad':'kg';
       return{...p,categoria:cat,unidad:nuevaUnidad};
     });
   };
@@ -2208,12 +2214,12 @@ function DespieceProduccion({uid, kg, pollos, precioCajon}){
 
   const costKg = total>0 ? +((Number(precioCajon)||0)/total).toFixed(2) : 0;
   const outputs=[];
-  if(decP==='milanesa') outputs.push({nombre:'Milanesa de pechuga', kg:milaPechuga, precio:Number(cfg.precioMilaPechuga)||0, costo:milaPechuga>0?+(kgPechuga*costKg/milaPechuga).toFixed(2):0, cat:'🍴 Preparados'});
-  else outputs.push({nombre:'Pechuga', kg:kgPechuga, precio:Number(cfg.prPechuga)||0, costo:costKg, cat:'🐔 Pollo'});
-  if(decPM==='milanesa') outputs.push({nombre:'Milanesa de pata-muslo', kg:milaPatamuslo, precio:Number(cfg.precioMilaPatamuslo)||0, costo:milaPatamuslo>0?+(kgPatamuslo*costKg/milaPatamuslo).toFixed(2):0, cat:'🍴 Preparados'});
-  else outputs.push({nombre:'Pata-muslo', kg:kgPatamuslo, precio:Number(cfg.prPatamuslo)||0, costo:costKg, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Alitas', kg:kgAlitas, precio:Number(cfg.prAlitas)||0, costo:costKg, cat:'🐔 Pollo'});
-  outputs.push({nombre:'Carcasa+menudos', kg:totalHuesos, precio:Number(cfg.precioCarcasas)||2000, costo:costKg, cat:'🐔 Pollo'});
+  if(decP==='milanesa') outputs.push({nombre:'Milanesa de pechuga', kg:milaPechuga, precio:Number(cfg.precioMilaPechuga)||0, costo:milaPechuga>0?+(kgPechuga*costKg/milaPechuga).toFixed(2):0, cat:'Pollo'});
+  else outputs.push({nombre:'Pechuga', kg:kgPechuga, precio:Number(cfg.prPechuga)||0, costo:costKg, cat:'Pollo'});
+  if(decPM==='milanesa') outputs.push({nombre:'Milanesa de pata-muslo', kg:milaPatamuslo, precio:Number(cfg.precioMilaPatamuslo)||0, costo:milaPatamuslo>0?+(kgPatamuslo*costKg/milaPatamuslo).toFixed(2):0, cat:'Pollo'});
+  else outputs.push({nombre:'Pata-muslo', kg:kgPatamuslo, precio:Number(cfg.prPatamuslo)||0, costo:costKg, cat:'Pollo'});
+  outputs.push({nombre:'Alitas', kg:kgAlitas, precio:Number(cfg.prAlitas)||0, costo:costKg, cat:'Pollo'});
+  outputs.push({nombre:'Carcasa+menudos', kg:totalHuesos, precio:Number(cfg.precioCarcasas)||2000, costo:costKg, cat:'Pollo'});
   const outs=outputs.filter(o=>o.kg>0);
 
   const guardarCfg=async()=>{setGuardandoCfg(true);try{await cfgRef.set(cfg,{merge:true});setEditando(false);mostrar('✅ Valores guardados');}catch(e){alert('Error: '+(e.message||e));}setGuardandoCfg(false);};
@@ -2404,7 +2410,7 @@ function CalculadoraCajon({uid}){
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         });
         await prodCol.doc(docId).set({
-          nombre:p.n,categoria:'🐔 Pollo',
+          nombre:p.n,categoria:'Pollo',
           unidad:'kg',
           precioCosto:pCosto,
           precioVenta:+pVenta.toFixed(2),
@@ -2586,7 +2592,7 @@ function CalculadoraCajon({uid}){
         <button onClick={async()=>{
           if(!confirm('¿Actualizar todos los productos 🐔 Pollo a "por kg"?'))return;
           try{
-            const snap=await db.collection(`polleria/${uid}/productos`).where('categoria','==','🐔 Pollo').get();
+            const snap=await db.collection(`polleria/${uid}/productos`).where('categoria','in',['🐔 Pollo','Pollo']).get();
             const batch=db.batch();
             snap.docs.forEach(d=>batch.update(d.ref,{unidad:'kg'}));
             await batch.commit();
@@ -2603,8 +2609,18 @@ function CalculadoraCajon({uid}){
 
 
 
-const VERDU_NOMBRES=['Papas','Batata','Cebolla','Cebolla de verdeo','Tomate','Tomate perita','Zanahoria','Zapallo','Zapallo anco','Zapallito','Choclo','Morrón','Ajo','Lechuga','Repollo','Brócoli','Coliflor','Berenjena','Pepino','Remolacha','Rabanito','Puerro','Chaucha','Arvejas','Espinaca','Acelga','Apio','Calabaza','Cayote','Palta','Hongos','Perejil','Banana','Manzana','Naranja','Mandarina','Pera','Frutilla','Kiwi','Mango','Sandía','Melón','Uvas','Ananá','Limón','Pomelo','Durazno','Ciruela'];
+const VERDU_NOMBRES=['Papas','Batata','Cebolla','Cebolla de verdeo','Tomate','Tomate perita','Zanahoria','Zapallo','Zapallo anco','Zapallito','Choclo','Morrón','Ajo','Lechuga','Repollo','Brócoli','Coliflor','Berenjena','Pepino','Remolacha','Rabanito','Puerro','Chaucha','Arvejas','Espinaca','Acelga','Apio','Calabaza','Cayote','Palta','Hongos','Perejil','Banana','Manzana','Naranja','Mandarina','Pera','Frutilla','Kiwi','Mango','Sandía','Melón','Uvas','Ananá','Limón','Pomelo','Durazno','Ciruela','Huevo','Huevos'];
 const CONGEL_NOMBRES=['Medallones de merluza','Medallones de merluza con queso','Medallones de pollo','Milanesa de merluza','Milanesa de pollo','Nuggets de pollo','Formitas de pollo','Patitas de pollo','Bastoncitos de merluza','Palitos de mozzarella','Hamburguesas','Hamburguesas de pollo','Papas congeladas','Papas bastón','Bocaditos de pollo','Suprema de pollo','Cordon bleu','Rabas','Croquetas'];
+const POLLO_NOMBRES=['Pollo entero','Pechuga','Pata-muslo','Suprema','Filet de pechuga','Milanesa de pechuga','Milanesa de pata-muslo','Alitas','Muslos','Menudos','Carcasas','Carcasa+menudos','Carcasas caldo','Molida de pollo','Trozado'];
+const HUEVOS_LACTEOS_NOMBRES=['Huevos','Leche','Manteca','Crema de leche','Queso','Queso rallado','Yogur','Dulce de leche'];
+const CARNE_NOMBRES=['Carne molida','Nalga','Cuadril','Asado','Matambre','Bife de chorizo','Falda','Osobuco','Paleta','Colita de cuadril'];
+const FIAMBRES_NOMBRES=['Jamón cocido','Jamón crudo','Salame','Mortadela','Bondiola','Queso fiambre','Panceta'];
+const ALMACEN_NOMBRES=['Aceite','Sal','Harina','Arroz','Fideos','Yerba','Azúcar','Pan rallado','Huevo en polvo','Levadura'];
+const NOMBRES_POR_CATEGORIA={
+  'Pollo':POLLO_NOMBRES,'Congelados':CONGEL_NOMBRES,'Verdulería':VERDU_NOMBRES,
+  'Huevos y Lácteos':HUEVOS_LACTEOS_NOMBRES,'Carne':CARNE_NOMBRES,
+  'Fiambres':FIAMBRES_NOMBRES,'Almacén':ALMACEN_NOMBRES,'General':[],
+};
 
 function CalculadoraCongelados({uid}){
   const [nombre,setNombre]=useState('');
@@ -2637,7 +2653,7 @@ function CalculadoraCongelados({uid}){
       });
       // Guardar también en productos (para que aparezca en el catálogo de ventas)
       await db.collection(`polleria/${uid}/productos`).doc(docId).set({
-        nombre:nombreLimpio,categoria:'❄️ Congelados',unidad:'kg',
+        nombre:nombreLimpio,categoria:'Congelados',unidad:'kg',
         precioCosto:+costoPorKg.toFixed(2),precioVenta:+precioVentaKg.toFixed(2),
         updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
       },{merge:true});
@@ -3116,7 +3132,7 @@ function SeccionDesposte({uid}){
           unidad:'kg',precioCosto:costoEntero,precioVenta,stockMinimo:0,
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         },{merge:true});
-        await prodCol.doc(docId).set({nombre:c.n,categoria:'🐔 Pollo',unidad:'kg',precioCosto:costoEntero,precioVenta,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        await prodCol.doc(docId).set({nombre:c.n,categoria:'Pollo',unidad:'kg',precioCosto:costoEntero,precioVenta,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       if(mermaKg>0.001){
         await db.collection(`polleria/${uid}/mermas`).add({
@@ -3250,8 +3266,8 @@ function SeccionProduccion({uid}){
         const ref=stockCol.doc(docId);
         const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
-        await ref.set({nombre:p.nombre,categoria:'Preparados',tipo:'produccion',cantidad:+(actual+p.kgFinal*1.10).toFixed(2),unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-        await prodCol.doc(docId).set({nombre:p.nombre,categoria:'🍴 Preparados',unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        await ref.set({nombre:p.nombre,categoria:'Pollo',tipo:'produccion',cantidad:+(actual+p.kgFinal*1.10).toFixed(2),unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await prodCol.doc(docId).set({nombre:p.nombre,categoria:'Pollo',unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       mostrar(`✅ ${productos.length} productos al stock`);
     }catch(e){alert('Error: '+e.message);}
@@ -3392,10 +3408,10 @@ function SeccionMilanesas({uid}){
   const carcasasKg=+(huesoKg*(Number(cfg.repCarcasas)||0)/100).toFixed(2);
   const menudosKg=+(huesoKg*(Number(cfg.repMenudos)||0)/100).toFixed(2);
   const outputs=[
-    {nombre:milaNombre, kg:milaKg, precio:precioMila, cat:'🍴 Preparados'},
-    {nombre:'Puchero', kg:pucheroKg, precio:Number(cfg.precioPuchero)||0, cat:'🍗 Pollo'},
-    {nombre:'Carcasas', kg:carcasasKg, precio:Number(cfg.precioCarcasas)||0, cat:'🍗 Pollo'},
-    {nombre:'Menudos', kg:menudosKg, precio:Number(cfg.precioMenudos)||0, cat:'🍗 Pollo'},
+    {nombre:milaNombre, kg:milaKg, precio:precioMila, cat:'Pollo'},
+    {nombre:'Puchero', kg:pucheroKg, precio:Number(cfg.precioPuchero)||0, cat:'Pollo'},
+    {nombre:'Carcasas', kg:carcasasKg, precio:Number(cfg.precioCarcasas)||0, cat:'Pollo'},
+    {nombre:'Menudos', kg:menudosKg, precio:Number(cfg.precioMenudos)||0, cat:'Pollo'},
   ].filter(o=>o.kg>0);
   const costoTotal=+(kgN*(parseFloat(String(costoKg).replace(',','.'))||0)).toFixed(2);
   const ventaEst=+outputs.reduce((s,o)=>s+o.kg*o.precio,0).toFixed(2);
@@ -3572,7 +3588,7 @@ function SeccionRecetas({uid}){
       const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
       const totalRinde=actual+(Number(r.rinde)||1)*n;
       await ref.set({nombre:r.nombre,categoria:'Preparados',tipo:'receta',cantidad:+totalRinde.toFixed(3),unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      await db.collection(`polleria/${uid}/productos`).doc(docId).set({nombre:r.nombre,categoria:'🍴 Preparados',unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await db.collection(`polleria/${uid}/productos`).doc(docId).set({nombre:r.nombre,categoria:'Preparados',unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       mostrar(`✅ Produjiste ${(Number(r.rinde)||1)*n} ${r.unidadRinde} de ${r.nombre}`);
     }catch(e){alert('Error: '+e.message);}
   };
@@ -3759,8 +3775,8 @@ function PantallaStock({uid}){
 
 function FormStock({inicial,onGuardar,onCancelar}){
   const UNIDADES=['kg','g','unidades','litros','atados','bandejas','docenas'];
-  const CATEGORIAS=['Pollo','Congelados','Verdulería','Huevos y Lácteos','Carne','Frutas','Fiambres','Almacén','General'];
-  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'General',precioCosto:'',precioVenta:'',...inicial});
+  const CATEGORIAS=categoriasDisponibles();
+  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'Pollo',precioCosto:'',precioVenta:'',...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
   const ganPctForm=Number(d.precioCosto)>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):null;
   const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,cantidad:Number(d.cantidad)||0,stockMinimo:Number(d.stockMinimo)||0,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});};
@@ -3768,7 +3784,8 @@ function FormStock({inicial,onGuardar,onCancelar}){
     <div>
       <Header titulo={d.id?'Editar Item':'Nuevo Item'} onBack={onCancelar}/>
       <div className="app-body">
-        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero"/>
+        <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero" list="stock-nombres"/>
+        <datalist id="stock-nombres">{(NOMBRES_POR_CATEGORIA[d.categoria]||[]).map(n=><option key={n} value={n}/>)}</datalist>
         <label className="lbl">Categoría</label>
         <div className="chip-group">{CATEGORIAS.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}</div>
         <label className="lbl">Unidad</label>
@@ -4662,7 +4679,9 @@ function PantallaConfig({onModoChange}){
   const [modo,setModoLocal]=useState(getModo);
   const [nombre,setNombre]=useState(getNombreLocal);
   const [nombreGuardado,setNombreGuardado]=useState(false);
+  const [catsExt,setCatsExt]=useState(getCategoriasExtendidas);
   const cambiarModo=m=>{setModoLocal(m);guardarModo(m);onModoChange(m);};
+  const toggleCatsExt=()=>{const v=!catsExt;setCatsExt(v);guardarCategoriasExtendidas(v);};
   const guardarNombre=()=>{
     const n=nombre.trim()||'Mi Pollería';
     guardarNombreLocal(n);
@@ -4712,6 +4731,19 @@ function PantallaConfig({onModoChange}){
               </button>
             ))}
           </div>
+        </div>
+        {/* ── Categorías de stock ── */}
+        <div className="panel">
+          <div className="ptitle">🗂️ Categorías de stock</div>
+          <p style={{fontSize:12,color:'var(--txt2)',marginBottom:12,lineHeight:1.5}}>
+            Por defecto el stock usa 3 categorías: Pollo, Verdulería y Congelados. Si además vendés lácteos, carne, fiambres o almacén, activá esta opción para que aparezcan como categorías al cargar productos.
+          </p>
+          <button onClick={toggleCatsExt} style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'12px 14px',borderRadius:'var(--radius)',border:`1px solid ${catsExt?'var(--green)':'var(--border)'}`,background:catsExt?'var(--green-bg)':'var(--bg2)',cursor:'pointer'}}>
+            <span style={{fontSize:13,fontWeight:700,color:catsExt?'var(--green)':'var(--txt)'}}>🛒 Categorías de mini súper (Lácteos, Carne, Fiambres, Almacén)</span>
+            <span style={{width:42,height:24,borderRadius:12,background:catsExt?'var(--green)':'var(--border)',position:'relative',flexShrink:0,marginLeft:10}}>
+              <span style={{position:'absolute',top:2,left:catsExt?20:2,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .15s'}}/>
+            </span>
+          </button>
         </div>
         {/* ── Tema de colores ── */}
         <div className="panel">
