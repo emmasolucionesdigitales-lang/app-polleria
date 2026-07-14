@@ -2616,8 +2616,9 @@ const HUEVOS_LACTEOS_NOMBRES=['Huevos','Leche','Manteca','Crema de leche','Queso
 const CARNE_NOMBRES=['Carne molida','Nalga','Cuadril','Asado','Matambre','Bife de chorizo','Falda','Osobuco','Paleta','Colita de cuadril'];
 const FIAMBRES_NOMBRES=['Jamón cocido','Jamón crudo','Salame','Mortadela','Bondiola','Queso fiambre','Panceta'];
 const ALMACEN_NOMBRES=['Aceite','Sal','Harina','Arroz','Fideos','Yerba','Azúcar','Pan rallado','Huevo en polvo','Levadura'];
+const PREPARADOS_NOMBRES=['Milanesa de pollo','Carne molida','Albóndigas','Kipe de pollo','Hamburguesas caseras','Nuggets caseros','Empanadas de pollo','Tarta de pollo','Pollo al spiedo','Brochettes de pollo'];
 const NOMBRES_POR_CATEGORIA={
-  'Pollo':POLLO_NOMBRES,'Congelados':CONGEL_NOMBRES,'Verdulería':VERDU_NOMBRES,
+  'Pollo':POLLO_NOMBRES,'Congelados':CONGEL_NOMBRES,'Verdulería':VERDU_NOMBRES,'Preparados':PREPARADOS_NOMBRES,
   'Huevos y Lácteos':HUEVOS_LACTEOS_NOMBRES,'Carne':CARNE_NOMBRES,
   'Fiambres':FIAMBRES_NOMBRES,'Almacén':ALMACEN_NOMBRES,'General':[],
 };
@@ -3795,18 +3796,24 @@ function PantallaStock({uid}){
 function FormStock({inicial,onGuardar,onCancelar}){
   const UNIDADES=['kg','g','unidades','litros','atados','bandejas','docenas'];
   const CATEGORIAS=categoriasDisponibles();
-  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'Pollo',precioCosto:'',precioVenta:'',...inicial});
+  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'Pollo',precioCosto:'',precioVenta:'',foto:'',...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
   const ganPctForm=Number(d.precioCosto)>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):null;
   const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,cantidad:Number(d.cantidad)||0,stockMinimo:Number(d.stockMinimo)||0,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});};
+  const handleFotoStock=async e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const base64=await comprimirImagen(file,240,0.7);
+    set('foto',base64);
+  };
   return(
     <div>
       <Header titulo={d.id?'Editar Item':'Nuevo Item'} onBack={onCancelar}/>
       <div className="app-body">
+        <label className="lbl" style={{marginTop:0}}>Categoría</label>
+        <div className="chip-group">{CATEGORIAS.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}</div>
         <Campo label="Nombre *" value={d.nombre} onChange={v=>set('nombre',v)} placeholder="Ej: Pollo entero" list="stock-nombres"/>
         <datalist id="stock-nombres">{(NOMBRES_POR_CATEGORIA[d.categoria]||[]).map(n=><option key={n} value={n}/>)}</datalist>
-        <label className="lbl">Categoría</label>
-        <div className="chip-group">{CATEGORIAS.map(c=><button key={c} onClick={()=>set('categoria',c)} className={`chip${d.categoria===c?' activo':''}`}>{c}</button>)}</div>
         <label className="lbl">Unidad</label>
         <div className="chip-group">{UNIDADES.map(u=><button key={u} onClick={()=>set('unidad',u)} className={`chip${d.unidad===u?' activo':''}`}>{u}</button>)}</div>
         <Campo label={`Cantidad actual (${d.unidad})`} value={d.cantidad} onChange={v=>set('cantidad',v)} tipo="number" placeholder="0"/>
@@ -3814,7 +3821,18 @@ function FormStock({inicial,onGuardar,onCancelar}){
         <Campo label={`Costo por ${d.unidad} (opcional, para ver ganancia)`} value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
         <Campo label={`Precio de venta por ${d.unidad} (opcional)`} value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
         {ganPctForm!==null&&<div style={{fontSize:13,color:'var(--txt2)',margin:'-8px 0 12px'}}>Ganancia: <b style={{color:ganPctForm>=30?'var(--green)':ganPctForm>=10?'var(--orange)':'var(--red)'}}>{ganPctForm}%</b></div>}
-        <div style={{display:'flex',gap:8,marginTop:18}}>
+        <label className="lbl">📷 Foto de referencia (opcional)</label>
+        <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10}}>
+          <div style={{width:48,height:48,borderRadius:'var(--radius)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,overflow:'hidden',border:'1px solid var(--border)'}}>
+            {d.foto?<img src={d.foto} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:20}}>📦</span>}
+          </div>
+          <label style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',cursor:'pointer',fontSize:12,color:'var(--txt2)'}}>
+            📁 {d.foto?'Cambiar foto':'Subir foto'}
+            <input type="file" accept="image/*" onChange={handleFotoStock} style={{display:'none'}}/>
+          </label>
+          {d.foto&&<button onClick={()=>set('foto','')} className="btn-ic" style={{fontSize:11,color:'var(--red)',flexShrink:0}}>🗑️</button>}
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:10}}>
           <button onClick={guardar} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>{d.id?'✓ Guardar':'+ Agregar'}</button>
           <button onClick={onCancelar} className="btn-sec" style={{padding:14}}>Cancelar</button>
         </div>
