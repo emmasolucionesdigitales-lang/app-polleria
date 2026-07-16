@@ -902,6 +902,14 @@ try{db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
 const auth = firebase.auth();
 // Auth anónima para reglas Firestore
 auth.signInAnonymously().catch(function(e){console.error("[Auth anónimo] FALLÓ:",e&&e.code,"-",e&&e.message,"→ Activá 'Anonymous' en Firebase → Authentication");});
+// Espera a que la sesión anónima esté lista (normalmente es instantáneo,
+// pero por las dudas) — la usa el "reclamo" de identidad más abajo.
+function esperarAuthListo(){
+  return new Promise(function(resolve){
+    if(auth.currentUser){ resolve(auth.currentUser); return; }
+    const unsub=auth.onAuthStateChanged(function(u){ if(u){ unsub(); resolve(u); } });
+  });
+}
 // Licencias — app-control-de-apps
 var pollLicApp = firebase.apps.find(function(a){return a.name==='licencias';}) ||
   firebase.initializeApp({
@@ -4868,8 +4876,24 @@ function AppWrapper(){
     if(!lic||!lic.activado)return 'activacion';
     return 'pin';
   });
+  // Vínculo de seguridad: este negocio (identificado por el dispositivo)
+  // queda atado a la sesión real de Firebase antes de dejar entrar a la
+  // app — así nadie más, aunque conozca o adivine el ID del dispositivo,
+  // puede leer o escribir estos datos. Se espera a que termine ANTES de
+  // mostrar la app (que ya arranca a pedir datos apenas se monta): si no
+  // se espera, puede haber una carrera y Firestore rechaza el primer
+  // pedido con "permisos insuficientes".
+  const entrarAlApp=async()=>{
+    try{
+      const licActual=getLicenciaPoll();
+      const deviceId=(licActual&&licActual.deviceId)||'default';
+      const user=await esperarAuthListo();
+      await db.collection('polleria').doc(deviceId).set({ownerAuthUid:user.uid},{merge:true});
+    }catch(e){ /* si falla, se reintenta solo la próxima vez que se abra la app */ }
+    setFase('app');
+  };
   if(fase==='activacion')return React.createElement(PantallaActivacionPoll,{onActivado:p=>{setFase('pin');}});
-  if(fase==='pin')return React.createElement(PantallaPinPoll,{pin:lic?.pin,onOk:()=>setFase('app')});
+  if(fase==='pin')return React.createElement(PantallaPinPoll,{pin:lic?.pin,onOk:entrarAlApp});
   return React.createElement(App);
 }
 
