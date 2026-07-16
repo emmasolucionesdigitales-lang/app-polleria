@@ -921,6 +921,10 @@ var pollLicApp = firebase.apps.find(function(a){return a.name==='licencias';}) |
     appId:"1:761424199819:web:513eeaf0e54f4e1401d48e"
   },"licencias");
 window.dbLicencias = firebase.firestore(pollLicApp);
+window.dbLicenciasReady = new Promise(function(resolve){
+  firebase.auth(pollLicApp).onAuthStateChanged(function(u){ if(u) resolve(u.uid); });
+  firebase.auth(pollLicApp).signInAnonymously().catch(function(){ resolve(null); });
+});
 
 /* ─── UTILS ─── */
 const hoy = () => new Date().toISOString().split('T')[0];
@@ -1493,7 +1497,8 @@ function PantallaActivacionPoll({onActivado}){
       if(lic.email&&lic.email.trim().toLowerCase()!==email.trim().toLowerCase()){setErr('El email no coincide con el registrado. Contactá al administrador.');setCarg(false);return;}
       if(lic.celular&&lic.celular.trim()!==celular.trim()){setErr('El celular no coincide con el registrado. Contactá al administrador.');setCarg(false);return;}
       if(String(lic.pin)!==pinIngresado.trim()){setErr('El PIN no es correcto. Revisá el que te enviaron.');setCarg(false);return;}
-      await window.dbLicencias.collection('licencias').doc(cod).update({estado:'usado',deviceId,celular:celular.trim(),email:email.trim(),negocio:negocio.trim(),aceptoTerminos:true,fechaAceptoTerminos:new Date().toISOString(),activadoEn:new Date().toISOString()});
+      const licUid = window.dbLicenciasReady ? await window.dbLicenciasReady : null;
+      await window.dbLicencias.collection('licencias').doc(cod).update({estado:'usado',deviceId,celular:celular.trim(),email:email.trim(),negocio:negocio.trim(),aceptoTerminos:true,fechaAceptoTerminos:new Date().toISOString(),activadoEn:new Date().toISOString(),activadoPorUid:licUid});
       localStorage.setItem('poll_licencia',JSON.stringify({codigo:cod,pin:lic.pin,email:email.trim(),celular:celular.trim(),negocio:negocio.trim(),negocioId:lic.negocioId||cod,deviceId,activado:true}));
       // ── Email de activación ──
       try {
