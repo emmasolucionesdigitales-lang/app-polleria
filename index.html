@@ -2175,22 +2175,23 @@ function FormProducto({inicial,onGuardar,onCancelar,categorias}){
    STOCK
 ══════════════════════════════════════ */
 const PRECIOS_MERCADO_POLLO={
-  'Pollo entero':   {min:4100,max:4800,sug:4500},
-  'Pechugas':       {min:10300,max:12800,sug:11500},
-  'Pata-muslo':     {min:4100,max:4800,sug:4500},
-  'Alas':           {min:3200,max:3900,sug:3550},
-  'Muslos':         {min:4100,max:4800,sug:4500},
-  'Carcasas':       {min:1800,max:2200,sug:2000},
-  'Filet pechuga':  {min:10300,max:12800,sug:11500},
-  'Milanesas':      {min:8000,max:10000,sug:9000},
-  'Carcasas caldo': {min:1800,max:2200,sug:2000},
+  'Pollo entero':      {min:4100,max:4800,sug:4500},
+  'Pechugas':          {min:10300,max:12800,sug:11500},
+  'Pata-muslo':        {min:4100,max:4800,sug:4500},
+  'Alas':              {min:3200,max:3900,sug:3550},
+  'Muslos':            {min:4100,max:4800,sug:4500},
+  'Carcasas':          {min:1800,max:2200,sug:2000},
+  'Menudos':           {min:2200,max:3200,sug:2800},
+  'Filet de pechuga':  {min:10300,max:12800,sug:11500},
+  'Milanesa de pollo': {min:8000,max:10000,sug:9000},
 };
 
 const CORTES_DEFAULT=[
-  {n:'Pechuga',         pct:40, precioRef:4000},
-  {n:'Pata-muslo',      pct:30, precioRef:3000},
-  {n:'Alitas',          pct:20, precioRef:2000},
-  {n:'Carcasa+menudos', pct:10, precioRef:1000},
+  {n:'Pechuga',    pct:40, precioRef:4000},
+  {n:'Pata-muslo', pct:30, precioRef:3000},
+  {n:'Alitas',     pct:20, precioRef:2000},
+  {n:'Carcasas',   pct:6,  precioRef:1000},
+  {n:'Menudos',    pct:4,  precioRef:1400},
 ];
 
 function DespieceProduccion({uid, kg, pollos, precioCajon}){
@@ -2235,7 +2236,8 @@ function DespieceProduccion({uid, kg, pollos, precioCajon}){
   if(decPM==='milanesa') outputs.push({nombre:'Milanesa de pata-muslo', kg:milaPatamuslo, precio:Number(cfg.precioMilaPatamuslo)||0, costo:milaPatamuslo>0?+(kgPatamuslo*costKg/milaPatamuslo).toFixed(2):0, cat:'Pollo'});
   else outputs.push({nombre:'Pata-muslo', kg:kgPatamuslo, precio:Number(cfg.prPatamuslo)||0, costo:costKg, cat:'Pollo'});
   outputs.push({nombre:'Alitas', kg:kgAlitas, precio:Number(cfg.prAlitas)||0, costo:costKg, cat:'Pollo'});
-  outputs.push({nombre:'Carcasa+menudos', kg:totalHuesos, precio:Number(cfg.precioCarcasas)||2000, costo:costKg, cat:'Pollo'});
+  outputs.push({nombre:'Carcasas', kg:kgCarcasas, precio:Number(cfg.precioCarcasas)||2000, costo:costKg, cat:'Pollo'});
+  outputs.push({nombre:'Menudos', kg:kgMenudos, precio:Number(cfg.precioMenudos)||2800, costo:costKg, cat:'Pollo'});
   const outs=outputs.filter(o=>o.kg>0);
 
   const guardarCfg=async()=>{setGuardandoCfg(true);try{await cfgRef.set(cfg,{merge:true});setEditando(false);mostrar('✅ Valores guardados');}catch(e){alert('Error: '+(e.message||e));}setGuardandoCfg(false);};
@@ -2296,7 +2298,7 @@ function DespieceProduccion({uid, kg, pollos, precioCajon}){
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>💰 Precios de venta ($/kg)</div>
             {cfgRow('Pechuga entera','prPechuga','$')}{cfgRow('Pata-muslo entero','prPatamuslo','$')}{cfgRow('Alitas','prAlitas','$')}
             {cfgRow('Milanesa de pechuga','precioMilaPechuga','$')}{cfgRow('Milanesa de pata-muslo','precioMilaPatamuslo','$')}
-            {cfgRow('Carcasa+menudos','precioCarcasas','$')}
+            {cfgRow('Carcasas','precioCarcasas','$')}{cfgRow('Menudos','precioMenudos','$')}
             <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',marginTop:8,padding:9}}>{guardandoCfg?'Guardando...':'💾 Guardar ajustes'}</button>
           </div>}
         </div>
@@ -2627,7 +2629,7 @@ function CalculadoraCajon({uid}){
 
 const VERDU_NOMBRES=['Papas','Batata','Cebolla','Cebolla de verdeo','Tomate','Tomate perita','Zanahoria','Zapallo','Zapallo anco','Zapallito','Choclo','Morrón','Ajo','Lechuga','Repollo','Brócoli','Coliflor','Berenjena','Pepino','Remolacha','Rabanito','Puerro','Chaucha','Arvejas','Espinaca','Acelga','Apio','Calabaza','Cayote','Palta','Hongos','Perejil','Banana','Manzana','Naranja','Mandarina','Pera','Frutilla','Kiwi','Mango','Sandía','Melón','Uvas','Ananá','Limón','Pomelo','Durazno','Ciruela','Huevos'];
 const CONGEL_NOMBRES=['Medallones de merluza','Medallones de merluza con queso','Medallones de pollo','Milanesa de merluza','Milanesa de pollo','Nuggets de pollo','Formitas de pollo','Patitas de pollo','Bastoncitos de merluza','Palitos de mozzarella','Hamburguesas','Hamburguesas de pollo','Papas congeladas','Papas bastón','Bocaditos de pollo','Suprema de pollo','Cordon bleu','Rabas','Croquetas'];
-const POLLO_NOMBRES=['Pollo entero','Pechuga','Pata-muslo','Suprema','Filet de pechuga','Milanesa de pechuga','Milanesa de pata-muslo','Alitas','Muslos','Menudos','Carcasas','Carcasa+menudos','Carcasas caldo','Molida de pollo','Trozado'];
+const POLLO_NOMBRES=['Pollo entero','Pechuga','Pata-muslo','Suprema','Filet de pechuga','Milanesa de pollo','Milanesa de pechuga','Milanesa de pata-muslo','Alitas','Muslos','Carcasas','Menudos','Molida de pollo','Trozado'];
 const HUEVOS_LACTEOS_NOMBRES=['Huevos','Leche','Manteca','Crema de leche','Queso','Queso rallado','Yogur','Dulce de leche'];
 const CARNE_NOMBRES=['Carne molida','Nalga','Cuadril','Asado','Matambre','Bife de chorizo','Falda','Osobuco','Paleta','Colita de cuadril'];
 const FIAMBRES_NOMBRES=['Jamón cocido','Jamón crudo','Salame','Mortadela','Bondiola','Queso fiambre','Panceta'];
@@ -3115,10 +3117,10 @@ function SeccionDesposte({uid}){
 
   const CORTES={
     piezas:{label:'🍗 Trozado', piezas:[
-      {n:'Pechuga',pct:0.25},{n:'Pata-muslo',pct:0.30},{n:'Alitas',pct:0.18},{n:'Muslos',pct:0.14},{n:'Carcasa+menudos',pct:0.13},
+      {n:'Pechuga',pct:0.25},{n:'Pata-muslo',pct:0.30},{n:'Alitas',pct:0.18},{n:'Muslos',pct:0.14},{n:'Carcasas',pct:0.07},{n:'Menudos',pct:0.06},
     ]},
     filet:{label:'🥩 Filet', piezas:[
-      {n:'Filet pechuga',pct:0.25},{n:'Milanesas',pct:0.22},{n:'Pata-muslo',pct:0.30},{n:'Carcasas caldo',pct:0.13},
+      {n:'Filet de pechuga',pct:0.25},{n:'Milanesa de pollo',pct:0.22},{n:'Pata-muslo',pct:0.30},{n:'Carcasas',pct:0.07},{n:'Menudos',pct:0.06},
     ]},
   };
   const M=CORTES[modo];
@@ -3215,7 +3217,7 @@ function SeccionDesposte({uid}){
 /* Envoltorio: alterna entre cargar cajón y despostar */
 /* ─── PARTE B: PRODUCCIÓN (carne limpia → milanesa/molida/albóndiga/kipe) ─── */
 function SeccionProduccion({uid,kg,pollos,precioCajon}){
-  const PROD_DEFAULT={pctAlitas:10,pctCarcasaMenudos:20,precioAlitas:4000,precioCarcasaMenudos:2000,milanesa:20,molida:0,albondiga:15,kipe:25};
+  const PROD_DEFAULT={pctAlitas:10,pctCarcasas:12,pctMenudos:8,precioAlitas:4000,precioCarcasas:2000,precioMenudos:2800,milanesa:20,molida:0,albondiga:15,kipe:25};
   const [cfg,setCfg]=useState(PROD_DEFAULT);
   const [editandoCfg,setEditandoCfg]=useState(false);
   const [guardandoCfg,setGuardandoCfg]=useState(false);
@@ -3234,10 +3236,11 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
   const total=Number(kg)||0;
   const n=Number(pollos)||0;
   // Todo lo que no es carne limpia (huesos, piel, vísceras, el ala entera) se contabiliza
-  // como subproductos vendibles: Alitas y Carcasas y menudos. Nada se pierde sin registrar.
+  // como subproductos vendibles: Alitas, Carcasas y Menudos. Nada se pierde sin registrar.
   const kgAlitas=+(total*(Number(cfg.pctAlitas)||0)/100).toFixed(2);
-  const kgCarcasaMenudos=+(total*(Number(cfg.pctCarcasaMenudos)||0)/100).toFixed(2);
-  const carneLimpiaKg=+(total-kgAlitas-kgCarcasaMenudos).toFixed(2);
+  const kgCarcasas=+(total*(Number(cfg.pctCarcasas)||0)/100).toFixed(2);
+  const kgMenudos=+(total*(Number(cfg.pctMenudos)||0)/100).toFixed(2);
+  const carneLimpiaKg=+(total-kgAlitas-kgCarcasas-kgMenudos).toFixed(2);
   const precioTotal=Number(precioCajon)||0;
   const costoKgBase=total>0&&precioTotal>0?precioTotal/total:0;
 
@@ -3257,7 +3260,8 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
   };
   const productos=[
     {nombre:'Alitas',carne:kgAlitas,rinde:0,kgFinal:kgAlitas,costoKg:costoKgBase,precio:Number(cfg.precioAlitas)||0},
-    {nombre:'Carcasas y menudos',carne:kgCarcasaMenudos,rinde:0,kgFinal:kgCarcasaMenudos,costoKg:costoKgBase,precio:Number(cfg.precioCarcasaMenudos)||0},
+    {nombre:'Carcasas',carne:kgCarcasas,rinde:0,kgFinal:kgCarcasas,costoKg:costoKgBase,precio:Number(cfg.precioCarcasas)||0},
+    {nombre:'Menudos',carne:kgMenudos,rinde:0,kgFinal:kgMenudos,costoKg:costoKgBase,precio:Number(cfg.precioMenudos)||0},
     calc('Milanesa de pollo',carneMila,cfg.milanesa),
     calc('Carne molida',carneMolida,cfg.molida),
     calc('Albóndigas',carneAlbondiga,cfg.albondiga),
@@ -3274,8 +3278,8 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
     setGuardandoCfg(true);
     try{
       await cfgRef.set({
-        pctAlitas:Number(cfg.pctAlitas)||0,pctCarcasaMenudos:Number(cfg.pctCarcasaMenudos)||0,
-        precioAlitas:Number(cfg.precioAlitas)||0,precioCarcasaMenudos:Number(cfg.precioCarcasaMenudos)||0,
+        pctAlitas:Number(cfg.pctAlitas)||0,pctCarcasas:Number(cfg.pctCarcasas)||0,pctMenudos:Number(cfg.pctMenudos)||0,
+        precioAlitas:Number(cfg.precioAlitas)||0,precioCarcasas:Number(cfg.precioCarcasas)||0,precioMenudos:Number(cfg.precioMenudos)||0,
         milanesa:Number(cfg.milanesa)||0,molida:Number(cfg.molida)||0,albondiga:Number(cfg.albondiga)||0,kipe:Number(cfg.kipe)||0,
       },{merge:true});
       setEditandoCfg(false);mostrar('✅ Rindes guardados');
@@ -3327,9 +3331,11 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
             <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:2}}>⚙️ Subproductos (hueso, piel, vísceras, alas)</div>
             <div style={{fontSize:11,color:'var(--txt2)',marginBottom:10}}>Se descuentan del cajón entero y se venden aparte. Lo que sobra es la carne limpia.</div>
             {COL('🪽 Alitas','pctAlitas')}
-            {COL('🦴 Carcasas y menudos (hueso, piel, vísceras)','pctCarcasaMenudos')}
+            {COL('🦴 Carcasas (hueso, piel)','pctCarcasas')}
+            {COL('🫀 Menudos (vísceras)','pctMenudos')}
             {COL('🪽 Precio Alitas','precioAlitas','$/kg')}
-            {COL('🦴 Precio Carcasas y menudos','precioCarcasaMenudos','$/kg')}
+            {COL('🦴 Precio Carcasas','precioCarcasas','$/kg')}
+            {COL('🫀 Precio Menudos','precioMenudos','$/kg')}
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🔪 Rinde de cada preparado (peso que suma el rebozado/pan/trigo)</div>
             {COL('🍤 Milanesa (rebozado)','milanesa')}
             {COL('🥩 Molida','molida')}
@@ -3340,7 +3346,8 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
         )}
         <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:10}}>
           <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{fontSize:13,color:'var(--txt2)'}}>🪽 Alitas</span><span style={{fontSize:14,fontWeight:700,color:'var(--txt)'}}>{kgAlitas} kg</span></div>
-          <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{fontSize:13,color:'var(--txt2)'}}>🦴 Carcasas y menudos <span style={{fontSize:10,color:'var(--txt3)'}}>(hueso, piel, vísceras)</span></span><span style={{fontSize:14,fontWeight:700,color:'var(--txt)'}}>{kgCarcasaMenudos} kg</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{fontSize:13,color:'var(--txt2)'}}>🦴 Carcasas <span style={{fontSize:10,color:'var(--txt3)'}}>(hueso, piel)</span></span><span style={{fontSize:14,fontWeight:700,color:'var(--txt)'}}>{kgCarcasas} kg</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{fontSize:13,color:'var(--txt2)'}}>🫀 Menudos <span style={{fontSize:10,color:'var(--txt3)'}}>(vísceras)</span></span><span style={{fontSize:14,fontWeight:700,color:'var(--txt)'}}>{kgMenudos} kg</span></div>
         </div>
         <div className="suma-band">
           <span style={{fontSize:13,color:'var(--txt2)'}}>Carne limpia disponible</span>
