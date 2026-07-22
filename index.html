@@ -2315,19 +2315,22 @@ function DespieceProduccion({uid, kg, pollos, precioCajon}){
 function CalculadoraCajon({uid}){
   const [cajones,setCajones]=useState(1);
   const [kgCajon,setKgCajon]=useState(20);
-  const [nPollos,setNPollos]=useState('');
-  const [modo,setModo]=useState('completo');
+  const [nPollos,setNPollos]=useState(8);
   const [precioCajon,setPrecioCajon]=useState('');
   const [preciosVenta,setPreciosVenta]=useState({});
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
   const [rendimientoPct,setRendimientoPct]=useState(90);
   const [margenObj,setMargenObj]=useState(30);
-  // Config editable (precargada): cortes del trozado + precio del pollo entero
+  // Config editable (precargada): cortes del despiece + precio del pollo entero
   const [cortesCfg,setCortesCfg]=useState(CORTES_DEFAULT);
   const [precioEntero,setPrecioEntero]=useState(4400);
   const [editandoCfg,setEditandoCfg]=useState(false);
   const [guardandoCfg,setGuardandoCfg]=useState(false);
+  // Distribución por unidades (cuántos pollos van a cada uso)
+  const [asigEntero,setAsigEntero]=useState('');
+  const [asigDespiece,setAsigDespiece]=useState('');
+  const [asigProduccion,setAsigProduccion]=useState('');
   const cfgRef=db.collection(`polleria/${uid}/config`).doc('cajon');
   useEffect(()=>{
     cfgRef.get().then(snap=>{
@@ -2339,38 +2342,48 @@ function CalculadoraCajon({uid}){
     }).catch(()=>{});
   },[]);
 
-  const tot=parseInt(nPollos)||0;
-  const totKg=+(Number(kgCajon)||20).toFixed(2);
+  const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+
+  // ── Compra: cajones × pollos por cajón (medio cajón = 0.5, un cajón y medio = 1.5, etc.) ──
+  const nCajones=Math.max(0.5,Number(cajones)||1);
+  const tot=Math.round((parseInt(nPollos)||0)*nCajones);
+  const totKg=+((Number(kgCajon)||20)*nCajones).toFixed(2);
   const rendimientoKg=+(totKg*rendimientoPct/100).toFixed(2);
   const kgPromedio=tot>0?+(totKg/tot).toFixed(2):null;
-  const precioTotalPagado=Number(precioCajon)*cajones||0;
+  const kgPromedioVend=tot>0?+(rendimientoKg/tot).toFixed(3):0;
+  const precioTotalPagado=Number(precioCajon)*nCajones||0;
   const costoPorKg=rendimientoKg>0&&precioTotalPagado>0?precioTotalPagado/rendimientoKg:0;
 
-  const MODOS={
-    completo:{label:'🐔 Entero', piezas:[
-      {n:'Pollo entero', kgEst:rendimientoKg, precioRef:Number(precioEntero)||0},
-    ]},
-    piezas:{label:'🍗 Trozado', piezas:cortesCfg.map(c=>({
-      n:c.n,
-      kgEst:+(rendimientoKg*(Number(c.pct)||0)/100).toFixed(2),
-      precioRef:Number(c.precioRef)||0,
-    }))},
-    produccion:{label:'🍴 Producción', piezas:[]},
-  };
-  const M=MODOS[modo];
-  const conRef=tot>0;
+  // ── Distribución por unidades (pollos) entre venta entera / despiece / producción ──
+  const nEntero=parseInt(asigEntero)||0;
+  const nDespiece=parseInt(asigDespiece)||0;
+  const nProduccion=parseInt(asigProduccion)||0;
+  const asignados=nEntero+nDespiece+nProduccion;
+  const sinAsignar=tot-asignados;
+  const kgEntero=+(nEntero*kgPromedioVend).toFixed(2);
+  const kgDespiece=+(nDespiece*kgPromedioVend).toFixed(2);
+  const kgProduccion=+(nProduccion*kgPromedioVend).toFixed(2);
+  const costoEnteroTotal=+(costoPorKg*kgEntero).toFixed(2);
+  const costoDespieceTotal=+(costoPorKg*kgDespiece).toFixed(2);
+  const costoProduccionTotal=+(costoPorKg*kgProduccion).toFixed(2);
 
-  // ── COSTEO POR VALOR ──────────────────────────────────────────────
-  // Cada corte vale distinto (la carcasa NO es el filet). Repartimos el costo
-  // del cajón según el valor de cada corte, no por kilo parejo. Los valores
-  // de referencia (porcentajes y precios) los edita el usuario y quedan guardados.
-  const refValor=n=>{const p=M.piezas.find(x=>x.n===n);return p?(Number(p.precioRef)||0):0;};
-  const valorTotalCajon=M.piezas.reduce((s,p)=>s+p.kgEst*refValor(p.n),0);
-  const costoKgCorte=n=>(precioTotalPagado>0&&valorTotalCajon>0)?(precioTotalPagado*refValor(n)/valorTotalCajon):0;
-  const precioAuto=n=>Math.round(costoKgCorte(n)*(1+(Number(margenObj)||0)/100)); // precio = costo + margen
-  const getPv=n=>preciosVenta[n]!==undefined?Number(preciosVenta[n]):precioAuto(n); // editado a mano, o automático
+  // ── Despiece: reparte los kg asignados según los % de corte configurados ──
+  const piezasDespiece=cortesCfg.map(c=>({
+    n:c.n,
+    kgEst:+(kgDespiece*(Number(c.pct)||0)/100).toFixed(2),
+    precioRef:Number(c.precioRef)||0,
+  }));
+  const refValor=n=>{const p=piezasDespiece.find(x=>x.n===n);return p?(Number(p.precioRef)||0):0;};
+  const valorTotalDespiece=piezasDespiece.reduce((s,p)=>s+p.kgEst*refValor(p.n),0);
+  const costoKgCorte=n=>(costoDespieceTotal>0&&valorTotalDespiece>0)?(costoDespieceTotal*refValor(n)/valorTotalDespiece):0;
+  const precioAuto=n=>Math.round(costoKgCorte(n)*(1+(Number(margenObj)||0)/100));
+  const getPv=n=>preciosVenta[n]!==undefined?Number(preciosVenta[n]):precioAuto(n);
   const setPv=(n,v)=>setPreciosVenta(p=>({...p,[n]:v}));
   const volverAutomatico=()=>{setPreciosVenta({});mostrarToast('↺ Precios automáticos restablecidos');};
+  const ingresoPieza=p=>+(p.kgEst*getPv(p.n)).toFixed(2);
+  const totalIngresoDespiece=piezasDespiece.reduce((s,p)=>s+ingresoPieza(p),0);
+  const gananciaDespiece=totalIngresoDespiece-costoDespieceTotal;
+  const gananciaDespiecePct=costoDespieceTotal>0?+((gananciaDespiece/costoDespieceTotal)*100).toFixed(1):0;
 
   // Editar y guardar la configuración de cortes
   const setCorte=(idx,k,v)=>setCortesCfg(cs=>cs.map((c,i)=>i===idx?{...c,[k]:v}:c));
@@ -2389,11 +2402,59 @@ function CalculadoraCajon({uid}){
     setGuardandoCfg(false);
   };
 
-  // Cálculos financieros
-  const ingresoPieza=p=>+(p.kgEst*getPv(p.n)).toFixed(2);
-  const totalIngreso=M.piezas.reduce((s,p)=>s+ingresoPieza(p),0);
-  const gananciaTotal=totalIngreso-precioTotalPagado;
-  const gananciaPct=precioTotalPagado>0?+((gananciaTotal/precioTotalPagado)*100).toFixed(1):0;
+  const agregarEnteroAlStock=async()=>{
+    if(kgEntero<=0)return alert('Asigná pollos para venta entera');
+    if(!precioCajon||Number(precioCajon)<=0)return alert('Ingresá el precio pagado por cajón');
+    setGuardando(true);
+    try{
+      const stockCol=db.collection(`polleria/${uid}/stock`);
+      const prodCol=db.collection(`polleria/${uid}/productos`);
+      const docId='pollo-'+'Pollo entero'.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s/]+/g,'-');
+      const pCosto=kgEntero>0?+(costoEnteroTotal/kgEntero).toFixed(2):0;
+      const stockRef=stockCol.doc(docId);
+      const snap=await stockRef.get();
+      const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
+      await stockRef.set({
+        nombre:'Pollo entero',categoria:'Pollo',tipo:'cajon',
+        cantidad:+(cantActual+kgEntero).toFixed(2),
+        unidad:'kg',precioCosto:pCosto,precioVenta:Number(precioEntero)||0,stockMinimo:0,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      await prodCol.doc(docId).set({nombre:'Pollo entero',categoria:'Pollo',unidad:'kg',precioCosto:pCosto,precioVenta:Number(precioEntero)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      mostrarToast(`✅ ${nEntero} pollo(s) entero(s) sumados al stock`);
+      setAsigEntero('');
+    }catch(e){alert('Error: '+e.message);}
+    setGuardando(false);
+  };
+
+  const agregarDespieceAlStock=async()=>{
+    if(kgDespiece<=0)return alert('Asigná pollos para despiece');
+    if(!precioCajon||Number(precioCajon)<=0)return alert('Ingresá el precio pagado por cajón');
+    setGuardando(true);
+    try{
+      const stockCol=db.collection(`polleria/${uid}/stock`);
+      const prodCol=db.collection(`polleria/${uid}/productos`);
+      for(const p of piezasDespiece){
+        if(p.kgEst<=0)continue;
+        const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s/]+/g,'-');
+        const pVenta=getPv(p.n);
+        const pCosto=+costoKgCorte(p.n).toFixed(2);
+        const stockRef=stockCol.doc(docId);
+        const snap=await stockRef.get();
+        const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
+        await stockRef.set({
+          nombre:p.n,categoria:'Pollo',tipo:'cajon',
+          cantidad:+(cantActual+p.kgEst*1.10).toFixed(2),
+          unidad:'kg',precioCosto:pCosto,precioVenta:+pVenta.toFixed(2),stockMinimo:0,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        await prodCol.doc(docId).set({nombre:p.n,categoria:'Pollo',unidad:'kg',precioCosto:pCosto,precioVenta:+pVenta.toFixed(2),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      mostrarToast(`✅ Despiece de ${nDespiece} pollo(s) sumado al stock`);
+      setAsigDespiece('');
+    }catch(e){alert('Error: '+e.message);}
+    setGuardando(false);
+  };
 
   // Badge comparación con mercado
   const badgeMercado=(n,pv)=>{
@@ -2403,46 +2464,10 @@ function CalculadoraCajon({uid}){
     return <span style={{fontSize:10,background:'var(--green-bg)',color:'var(--green)',borderRadius:4,padding:'1px 5px',marginLeft:5,fontWeight:700}}>✓ en mercado</span>;
   };
 
-  const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
-
-  const agregarAlStock=async()=>{
-    if(!precioCajon||Number(precioCajon)<=0)return alert('Ingresá el precio pagado por cajón');
-    setGuardando(true);
-    try{
-      const stockCol=db.collection(`polleria/${uid}/stock`);
-      const prodCol=db.collection(`polleria/${uid}/productos`);
-      for(const p of M.piezas){
-        const docId='pollo-'+p.n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
-        const pVenta=getPv(p.n);
-        const pCosto=+costoKgCorte(p.n).toFixed(2);
-        const stockRef=stockCol.doc(docId);
-        const snap=await stockRef.get();
-        const cantActual=snap.exists?(Number(snap.data().cantidad)||0):0;
-        await stockRef.set({
-          nombre:p.n,categoria:'Pollo',tipo:'cajon',
-          cantidad:+(cantActual+p.kgEst*1.10).toFixed(2),
-          unidad:'kg',
-          precioCosto:pCosto,
-          precioVenta:+pVenta.toFixed(2),
-          stockMinimo:0,
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-        });
-        await prodCol.doc(docId).set({
-          nombre:p.n,categoria:'Pollo',
-          unidad:'kg',
-          precioCosto:pCosto,
-          precioVenta:+pVenta.toFixed(2),
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-        },{merge:true});
-      }
-      mostrarToast(`✅ ${M.piezas.length} cortes publicados al catálogo`);
-    }catch(e){alert('Error: '+e.message);}
-    setGuardando(false);
-  };
-
   return(
     <div>
-      {/* ── Panel básico ── */}
+      <Toast msg={toastMsg}/>
+      {/* ── Panel de compra ── */}
       <div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
           <div className="ptitle" style={{margin:0}}>🧮 Calculadora de Cajón</div>
@@ -2450,7 +2475,7 @@ function CalculadoraCajon({uid}){
         </div>
         {editandoCfg&&(
           <div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:'12px',marginBottom:14}}>
-            <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:2}}>⚙️ Cortes y precios de referencia</div>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:2}}>⚙️ Cortes y precios de referencia (despiece)</div>
             <div style={{fontSize:11,color:'var(--txt2)',marginBottom:10}}>Ajustá cuánto rinde cada corte (%) y su valor ($/kg). Esto define cómo se reparte el costo.</div>
             <div style={{display:'flex',gap:6,fontSize:10,color:'var(--txt3)',fontWeight:700,padding:'0 2px 4px'}}>
               <span style={{flex:1}}>CORTE</span><span style={{width:54,textAlign:'center'}}>%</span><span style={{width:78,textAlign:'center'}}>$/kg</span>
@@ -2466,30 +2491,37 @@ function CalculadoraCajon({uid}){
               <span>Suma de %</span><span>{sumaPct}% {sumaPct===100?'✓':'(debería dar 100)'}</span>
             </div>
             <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:10}}>
-              <span style={{flex:1,fontSize:13,color:'var(--txt)',fontWeight:500}}>🐔 Pollo entero</span>
+              <span style={{flex:1,fontSize:13,color:'var(--txt)',fontWeight:500}}>🐔 Precio pollo entero ($/kg)</span>
               <span style={{width:54,textAlign:'center',fontSize:11,color:'var(--txt3)'}}>—</span>
               <input type="number" min={0} step={100} value={precioEntero} onChange={e=>setPrecioEntero(e.target.value)} className="inp" style={{width:78,textAlign:'center',padding:'5px 4px',fontSize:13}}/>
             </div>
             <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',padding:10,fontSize:13}}>{guardandoCfg?'Guardando...':'💾 Guardar configuración'}</button>
           </div>
         )}
-        <div style={{display:'flex',gap:10,marginBottom:10}}>
+        <div style={{display:'flex',gap:8,marginBottom:10}}>
           <div style={{flex:1}}>
-            <label className="lbl" style={{marginTop:0}}>📦 Kg del cajón</label>
+            <label className="lbl" style={{marginTop:0}}>📦 Kg por cajón</label>
             <input type="number" min={1} step={0.5} value={kgCajon}
               onChange={e=>setKgCajon(Math.max(1,Number(e.target.value)))}
-              className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+              className="inp" style={{textAlign:'center',fontWeight:700,fontSize:20,marginTop:4}}/>
           </div>
           <div style={{flex:1}}>
-            <label className="lbl" style={{marginTop:0}}>🐔 N° de pollos</label>
-            <input type="number" min={1} max={40} value={nPollos}
+            <label className="lbl" style={{marginTop:0}}>🐔 Pollos/cajón</label>
+            <input type="number" min={1} max={20} value={nPollos}
               onChange={e=>setNPollos(e.target.value)}
-              placeholder="6 a 10" className="inp" style={{textAlign:'center',fontWeight:700,fontSize:24,marginTop:4}}/>
+              placeholder="Ej: 8" className="inp" style={{textAlign:'center',fontWeight:700,fontSize:20,marginTop:4}}/>
+          </div>
+          <div style={{flex:1}}>
+            <label className="lbl" style={{marginTop:0}}>🛒 Cajones</label>
+            <input type="number" min={0.5} step={0.5} value={cajones}
+              onChange={e=>setCajones(Math.max(0.5,Number(e.target.value)))}
+              className="inp" style={{textAlign:'center',fontWeight:700,fontSize:20,marginTop:4}}/>
           </div>
         </div>
+        <div style={{fontSize:11,color:'var(--txt3)',marginBottom:6}}>Tip: para medio cajón poné 0.5 · para uno y medio, 1.5.</div>
         <div className="suma-band" style={{marginBottom:6}}>
-          <span style={{fontSize:13,color:'var(--txt2)'}}>Cajón de {totKg} kg{tot>0?` · ${tot} pollos`:''}</span>
-          <span style={{fontSize:16,fontWeight:700,color:'var(--txt)'}}>{tot>0?`~${kgPromedio} kg/pollo`:'20 kg fijos'}</span>
+          <span style={{fontSize:13,color:'var(--txt2)'}}>Compra total: {totKg} kg{tot>0?` · ${tot} pollos`:''}</span>
+          <span style={{fontSize:16,fontWeight:700,color:'var(--txt)'}}>{tot>0?`~${kgPromedio} kg/pollo`:''}</span>
         </div>
         <div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
@@ -2509,7 +2541,7 @@ function CalculadoraCajon({uid}){
             className="inp" placeholder="0" style={{fontWeight:700,fontSize:22,marginTop:4}}/>
           {costoPorKg>0&&<div style={{fontSize:12,color:'var(--txt2)',marginTop:6}}>
             Costo: <b style={{color:'var(--txt)'}}>{formatPeso(costoPorKg)}/kg</b>
-            {' · '}Total: <b style={{color:'var(--red)'}}>{formatPeso(precioTotalPagado)}</b>
+            {' · '}Total ({nCajones} cajón/es): <b style={{color:'var(--red)'}}>{formatPeso(precioTotalPagado)}</b>
           </div>}
           <div style={{display:'flex',gap:6,marginTop:8}}>
             <span style={{fontSize:11,color:'var(--txt3)',alignSelf:'center'}}>¿Subió el cajón?</span>
@@ -2518,15 +2550,30 @@ function CalculadoraCajon({uid}){
             <button onClick={()=>setPrecioCajon(String(Math.round((Number(precioCajon)||0)*1.15)))} disabled={!precioCajon} style={{flex:1,fontSize:12,padding:'5px',borderRadius:'var(--radius)',border:'1px solid var(--orange)',background:'var(--orange-bg)',color:'var(--orange)',fontWeight:700,cursor:'pointer'}}>+15%</button>
           </div>
         </div>
-        <label className="lbl">¿Para qué vas a usar el cajón?</label>
-        <div className="chip-group" style={{marginBottom:12}}>
-          {Object.entries(MODOS).map(([k,v])=>(
-            <button key={k} onClick={()=>setModo(k)} className={`chip${modo===k?' activo':''}`}>{v.label}</button>
-          ))}
+
+        <label className="lbl">📋 ¿Cuántos de los {tot || '—'} pollos van a cada uso?</label>
+        <div style={{fontSize:11,color:'var(--txt2)',marginBottom:8}}>Repartilos por unidad. {kgPromedioVend>0?`Cada pollo rinde ~${kgPromedioVend} kg vendibles.`:''}</div>
+        {[
+          {lbl:'🐔 Venta pollo entero',lbl2:'(sin procesar)', val:asigEntero, set:setAsigEntero, kg:kgEntero},
+          {lbl:'🔪 Despiece',lbl2:'(cortes)', val:asigDespiece, set:setAsigDespiece, kg:kgDespiece},
+          {lbl:'🍴 Producción',lbl2:'(molida/kipe/albóndiga)', val:asigProduccion, set:setAsigProduccion, kg:kgProduccion},
+        ].map((r,i)=>(
+          <div key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,color:'var(--txt)'}}>{r.lbl}</div>
+              <div style={{fontSize:10,color:'var(--txt3)'}}>{r.lbl2}</div>
+            </div>
+            <input type="number" min={0} value={r.val} onChange={e=>r.set(e.target.value)} placeholder="0" className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'6px 4px'}}/>
+            <span style={{width:80,textAlign:'right',fontSize:11,color:'var(--txt2)'}}>{r.kg} kg</span>
+          </div>
+        ))}
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:12,fontWeight:700,color:sinAsignar<0?'var(--red)':sinAsignar===0?'var(--green)':'var(--orange)',marginTop:2}}>
+          <span>{sinAsignar<0?'⚠️ Te pasaste de la cantidad comprada':'Sin asignar'}</span>
+          <span>{sinAsignar} pollo(s)</span>
         </div>
-        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px'}}>
-          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 ¿Cuánto querés ganar?</label>
-          <div style={{fontSize:11,color:'var(--txt2)',marginBottom:8}}>Los precios de cada corte se calculan solos con este margen.</div>
+
+        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginTop:12}}>
+          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 Margen objetivo (para el despiece)</label>
           <div style={{display:'flex',gap:6,alignItems:'center'}}>
             {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:1}}>{m}%</button>))}
             <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:70,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
@@ -2534,18 +2581,35 @@ function CalculadoraCajon({uid}){
         </div>
       </div>
 
-      {/* ── Precios por corte / Producción ── */}
-      {modo==='produccion'?<ProduccionUnificada uid={uid} kg={totKg} pollos={tot} precioCajon={precioCajon}/>:<div className="panel">
+      {/* ── Venta pollo entero ── */}
+      {kgEntero>0&&<div className="panel">
+        <div className="ptitle">🐔 Pollo entero · {nEntero} pollo(s) · {kgEntero} kg</div>
+        <div style={{display:'flex',gap:8,alignItems:'flex-end',marginBottom:10}}>
+          <div style={{flex:1}}>
+            <label style={{fontSize:11,color:'var(--txt2)',display:'block',marginBottom:3}}>Precio de venta ($/kg){badgeMercado('Pollo entero',Number(precioEntero))}</label>
+            <input type="number" min={0} step={100} value={precioEntero} onChange={e=>setPrecioEntero(e.target.value)} className="inp" style={{fontWeight:700,fontSize:18}}/>
+          </div>
+          <div style={{textAlign:'right',minWidth:100,paddingBottom:2}}>
+            <div style={{fontSize:11,color:'var(--txt2)'}}>Costo asignado</div>
+            <div style={{fontWeight:700,fontSize:16,color:'var(--txt)'}}>{formatPeso(costoEnteroTotal)}</div>
+          </div>
+        </div>
+        <button onClick={agregarEnteroAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full" style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
+          {guardando?'⏳ Guardando...':'✅ Sumar al stock'}
+        </button>
+      </div>}
+
+      {/* ── Despiece ── */}
+      {kgDespiece>0&&<div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-          <div className="ptitle" style={{margin:0}}>🏷️ Precios calculados</div>
+          <div className="ptitle" style={{margin:0}}>🔪 Despiece · {nDespiece} pollo(s) · {kgDespiece} kg</div>
           <button onClick={volverAutomatico}
             style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--txt2)',cursor:'pointer',fontWeight:600}}>
             ↺ Automáticos
           </button>
         </div>
-        <div style={{fontSize:11,color:'var(--txt2)',marginBottom:12}}>Cada corte con su precio según cuánto vale (la carcasa más barata, el filet más caro). Podés editar cualquiera.</div>
-
-        {M.piezas.map(p=>{
+        <div style={{fontSize:11,color:'var(--txt2)',marginBottom:12}}>Cada corte con su precio según cuánto vale. Podés editar cualquiera.</div>
+        {piezasDespiece.map(p=>{
           const pv=getPv(p.n);
           const costoCorte=costoKgCorte(p.n);
           const sub=ingresoPieza(p);
@@ -2579,19 +2643,16 @@ function CalculadoraCajon({uid}){
             </div>
           );
         })}
-
-        {/* Resumen financiero del cajón */}
-        {precioTotalPagado>0&&(
-          <div style={{background:gananciaTotal>=0?'var(--green-bg)':'var(--red-bg)',borderRadius:'var(--radius)',padding:14,marginBottom:12,border:`1px solid ${gananciaTotal>=0?'var(--green)':'var(--red)'}`}}>
-            <div style={{fontWeight:700,fontSize:13,color:gananciaTotal>=0?'var(--green)':'var(--red)',marginBottom:8}}>
-              📊 Resumen del cajón
+        {costoDespieceTotal>0&&(
+          <div style={{background:gananciaDespiece>=0?'var(--green-bg)':'var(--red-bg)',borderRadius:'var(--radius)',padding:14,marginBottom:12,border:`1px solid ${gananciaDespiece>=0?'var(--green)':'var(--red)'}`}}>
+            <div style={{fontWeight:700,fontSize:13,color:gananciaDespiece>=0?'var(--green)':'var(--red)',marginBottom:8}}>
+              📊 Resumen del despiece
             </div>
             {[
-              {lbl:'📦 Kg brutos → vendibles', val:`${totKg}kg → ${rendimientoKg}kg (${rendimientoPct}%)`, c:'var(--orange)'},
-              {lbl:'💸 Costo total',    val:formatPeso(precioTotalPagado),  c:'var(--red)'},
+              {lbl:'💸 Costo asignado',    val:formatPeso(costoDespieceTotal),  c:'var(--red)'},
               {lbl:'📊 Costo promedio/kg', val:formatPeso(costoPorKg)+'/kg', c:'var(--orange)'},
-              {lbl:'💰 Ingreso estimado',  val:formatPeso(totalIngreso),        c:'var(--blue)'},
-              {lbl:'✨ Ganancia',       val:`${formatPeso(gananciaTotal)} (${gananciaPct}%)`, c:gananciaTotal>=0?'var(--green)':'var(--red)'},
+              {lbl:'💰 Ingreso estimado',  val:formatPeso(totalIngresoDespiece),        c:'var(--blue)'},
+              {lbl:'✨ Ganancia',       val:`${formatPeso(gananciaDespiece)} (${gananciaDespiecePct}%)`, c:gananciaDespiece>=0?'var(--green)':'var(--red)'},
             ].map(r=>(
               <div key={r.lbl} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(128,128,128,0.2)'}}>
                 <span style={{fontSize:13,color:'var(--txt2)'}}>{r.lbl}</span>
@@ -2600,13 +2661,18 @@ function CalculadoraCajon({uid}){
             ))}
           </div>
         )}
-
-        <button onClick={agregarAlStock}
+        <button onClick={agregarDespieceAlStock}
           disabled={guardando||!precioCajon||Number(precioCajon)<=0}
           className="btn-full"
           style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
-          {guardando?'⏳ Guardando...':'✅ Agregar al Inventario y Catálogo'}
+          {guardando?'⏳ Guardando...':'✅ Sumar despiece al stock'}
         </button>
+      </div>}
+
+      {/* ── Producción (molida / kipe / albóndiga / milanesa) ── */}
+      {kgProduccion>0&&<SeccionProduccion uid={uid} kg={kgProduccion} pollos={nProduccion} precioCajon={costoProduccionTotal}/>}
+
+      <div className="panel">
         <button onClick={async()=>{
           if(!confirm('¿Actualizar todos los productos 🐔 Pollo a "por kg"?'))return;
           try{
@@ -2616,16 +2682,13 @@ function CalculadoraCajon({uid}){
             await batch.commit();
             mostrarToast(`✅ ${snap.size} productos corregidos → kg`);
           }catch(e){alert('Error: '+e.message);}
-        }} className="btn-full" style={{background:'var(--orange)',marginTop:6,fontSize:13}}>
+        }} className="btn-full" style={{background:'var(--orange)',fontSize:13}}>
           🔧 Corregir productos existentes → kg
         </button>
-      </div>}
-      <Toast msg={toastMsg}/>
+      </div>
     </div>
   );
 }
-
-
 
 const VERDU_NOMBRES=['Papas','Batata','Cebolla','Cebolla de verdeo','Tomate','Tomate perita','Zanahoria','Zapallo','Zapallo anco','Zapallito','Choclo','Morrón','Ajo','Lechuga','Repollo','Brócoli','Coliflor','Berenjena','Pepino','Remolacha','Rabanito','Puerro','Chaucha','Arvejas','Espinaca','Acelga','Apio','Calabaza','Cayote','Palta','Hongos','Perejil','Banana','Manzana','Naranja','Mandarina','Pera','Frutilla','Kiwi','Mango','Sandía','Melón','Uvas','Ananá','Limón','Pomelo','Durazno','Ciruela','Huevos'];
 const CONGEL_NOMBRES=['Medallones de merluza','Medallones de merluza con queso','Medallones de pollo','Milanesa de merluza','Milanesa de pollo','Nuggets de pollo','Formitas de pollo','Patitas de pollo','Bastoncitos de merluza','Palitos de mozzarella','Hamburguesas','Hamburguesas de pollo','Papas congeladas','Papas bastón','Bocaditos de pollo','Suprema de pollo','Cordon bleu','Rabas','Croquetas'];
