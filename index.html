@@ -934,8 +934,6 @@ const ahora = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute
 const fechaCorta = () => new Date().toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
 
 /* ─── VENCIMIENTOS ─── */
-// Días de vida útil por categoría (por defecto). El usuario puede ajustarlos
-// desde Stock → ⏰ Vencimientos; queda guardado en polleria/{uid}/config/vencimientos.
 const VENCIMIENTO_DIAS_DEFAULT={
   'Pollo':3,'Carne':3,'Preparados':2,'Huevos y Lácteos':10,'Verdulería':5,
   'Fiambres':15,'Congelados':90,'Almacén':180,'General':30,
@@ -951,6 +949,24 @@ const badgeVencimiento = fechaISO => {
   if(d===0) return <span className="pill pill-red">⚠️ Vence hoy</span>;
   if(d===1) return <span className="pill pill-orange">⚠️ Vence mañana</span>;
   return null;
+};
+// Semáforo: verde recién cargado → amarillo al último tercio de vida útil → rojo el día que vence (o vencido).
+const colorVenc = (fechaISO,categoria) => {
+  const d=diasHastaVenc(fechaISO);
+  if(d===null) return null;
+  if(d<=0) return 'rojo';
+  const totalDias=diasVencCategoria(categoria||'General');
+  const umbralAmarillo=Math.max(1,Math.round(totalDias/3));
+  if(d<=umbralAmarillo) return 'amarillo';
+  return 'verde';
+};
+const DOT_VENC_COLOR={verde:'var(--green)',amarillo:'#eab308',rojo:'var(--red)'};
+const dotVenc = (fechaISO,categoria,size=10) => {
+  const c=colorVenc(fechaISO,categoria);
+  if(!c) return null;
+  const d=diasHastaVenc(fechaISO);
+  const titulo=c==='rojo'?(d<0?`Vencido hace ${Math.abs(d)} día(s)`:'Vence hoy'):c==='amarillo'?`Vence en ${d} día(s)`:`Vence en ${d} día(s)`;
+  return <span title={titulo} style={{display:'inline-block',width:size,height:size,borderRadius:'50%',background:DOT_VENC_COLOR[c],flexShrink:0,border:'1px solid rgba(0,0,0,.15)'}}/>;
 };
 
 /* ─── #4 DESCUENTO DE STOCK AL VENDER + #5 CONSUMO FIFO DE LOTES ─── */
@@ -1778,7 +1794,7 @@ function PantallaCatalogo({uid,subnav}){
   // Catálogo vinculado al stock: solo aparece lo que hay cargado y con precio.
   // Aplica igual a pollo, congelados y verdulería. Si limpiás el stock, desaparece de Vender.
   const todosProductos=React.useMemo(()=>{
-    const norm=p=>({...p, categoria:catMap[p.categoria]||p.categoria||'📦 Otros'});
+    const norm=p=>({...p, categoriaOriginal:p.categoria, categoria:catMap[p.categoria]||p.categoria||'📦 Otros'});
     return stockItems
       .filter(s=>(Number(s.precioVenta)||0)>0 && (Number(s.cantidad)||0)>0)
       .map(norm)
@@ -1883,7 +1899,10 @@ function PantallaCatalogo({uid,subnav}){
                     {enC&&<div className="prod-badge">{enC.cantidad}{esPeso?p.unidad||'kg':''}</div>}
                   </div>
                   <div className="prod-card-info">
-                    <div className="prod-card-nombre">{p.nombre}</div>
+                    <div className="prod-card-nombre" style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span>{p.nombre}</span>
+                      {dotVenc(p.vencimiento,p.categoriaOriginal,9)}
+                    </div>
                     <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
                     <div style={{fontSize:11,color:'var(--green)',fontWeight:600,margin:'1px 0 2px'}}>📦 {(Number(p.cantidad)||0)} {p.unidad||'kg'} en stock</div>
                     <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
@@ -2570,7 +2589,7 @@ function CalculadoraCajon({uid}){
         {[
           {lbl:'🐔 Venta pollo entero',lbl2:'(sin procesar)', val:asigEntero, set:setAsigEntero, kg:kgEntero},
           {lbl:'🔪 Despiece',lbl2:'(cortes)', val:asigDespiece, set:setAsigDespiece, kg:kgDespiece},
-          {lbl:'🍴 Producción',lbl2:'(molida/kipe/albóndiga)', val:asigProduccion, set:setAsigProduccion, kg:kgProduccion},
+          {lbl:'🍴 Producción',lbl2:'(molida/kipe/albóndiga/milanesa)', val:asigProduccion, set:setAsigProduccion, kg:kgProduccion},
         ].map((r,i)=>(
           <div key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
             <div style={{flex:1}}>
@@ -2587,7 +2606,7 @@ function CalculadoraCajon({uid}){
         </div>
 
         <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginTop:12}}>
-          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 Margen objetivo (para el despiece)</label>
+          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 Margen objetivo (para despiece y producción)</label>
           <div style={{display:'flex',gap:6,alignItems:'center'}}>
             {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:1}}>{m}%</button>))}
             <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:70,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
@@ -2595,8 +2614,8 @@ function CalculadoraCajon({uid}){
         </div>
       </div>
 
-      {kgEntero>0&&<div className="panel">
-        <div className="ptitle">🐔 Pollo entero · {nEntero} pollo(s) · {kgEntero} kg</div>
+      {kgEntero>0&&<div className="panel" style={{background:'var(--blue-bg)',border:'2px solid var(--blue)'}}>
+        <div className="ptitle" style={{fontSize:19,fontWeight:800,color:'var(--blue)'}}>🐔 Pollo entero · {nEntero} pollo(s) · {kgEntero} kg</div>
         <div style={{display:'flex',gap:8,alignItems:'flex-end',marginBottom:10}}>
           <div style={{flex:1}}>
             <label style={{fontSize:11,color:'var(--txt2)',display:'block',marginBottom:3}}>Precio de venta ($/kg){badgeMercado('Pollo entero',Number(precioEntero))}</label>
@@ -2607,14 +2626,14 @@ function CalculadoraCajon({uid}){
             <div style={{fontWeight:700,fontSize:16,color:'var(--txt)'}}>{formatPeso(costoEnteroTotal)}</div>
           </div>
         </div>
-        <button onClick={agregarEnteroAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full" style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
+        <button onClick={agregarEnteroAlStock} disabled={guardando||!precioCajon||Number(precioCajon)<=0} className="btn-full" style={{background:'var(--blue)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Sumar al stock'}
         </button>
       </div>}
 
-      {kgDespiece>0&&<div className="panel">
+      {kgDespiece>0&&<div className="panel" style={{background:'var(--orange-bg)',border:'2px solid var(--orange)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-          <div className="ptitle" style={{margin:0}}>🔪 Despiece · {nDespiece} pollo(s) · {kgDespiece} kg</div>
+          <div className="ptitle" style={{margin:0,fontSize:19,fontWeight:800,color:'var(--orange)'}}>🔪 Despiece · {nDespiece} pollo(s) · {kgDespiece} kg</div>
           <button onClick={volverAutomatico}
             style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--txt2)',cursor:'pointer',fontWeight:600}}>
             ↺ Automáticos
@@ -2676,7 +2695,7 @@ function CalculadoraCajon({uid}){
         <button onClick={agregarDespieceAlStock}
           disabled={guardando||!precioCajon||Number(precioCajon)<=0}
           className="btn-full"
-          style={{background:'var(--green)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
+          style={{background:'var(--orange)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Sumar despiece al stock'}
         </button>
       </div>}
@@ -3292,12 +3311,14 @@ function SeccionDesposte({uid}){
 /* Envoltorio: alterna entre cargar cajón y despostar */
 /* ─── PARTE B: PRODUCCIÓN (carne limpia → milanesa/molida/albóndiga/kipe) ─── */
 function SeccionProduccion({uid,kg,pollos,precioCajon}){
-  const PROD_DEFAULT={pctAlitas:10,pctCarcasas:12,pctMenudos:8,precioAlitas:4000,precioCarcasas:2000,precioMenudos:2800,milanesa:20,molida:0,albondiga:15,kipe:25};
+  const PROD_DEFAULT={pctAlitas:10,pctCarcasas:12,pctMenudos:8,precioAlitas:4000,precioCarcasas:2000,precioMenudos:2800,milanesa:20,molida:0,albondiga:15,kipe:25,pctPechugaDeMila:50,milanesaPatamuslo:15};
   const [cfg,setCfg]=useState(PROD_DEFAULT);
   const [editandoCfg,setEditandoCfg]=useState(false);
   const [guardandoCfg,setGuardandoCfg]=useState(false);
   const [margenObj,setMargenObj]=useState(30);
   const [allocMila,setAllocMila]=useState(60);
+  const [decPechuga,setDecPechuga]=useState('milanesa');
+  const [decPatamuslo,setDecPatamuslo]=useState('milanesa');
   const [repMolida,setRepMolida]=useState(40);
   const [repAlbondiga,setRepAlbondiga]=useState(30);
   const [repKipe,setRepKipe]=useState(30);
@@ -3321,6 +3342,8 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
 
   const carneMila=+(carneLimpiaKg*(Number(allocMila)||0)/100).toFixed(2);
   const carneMoler=+(carneLimpiaKg-carneMila).toFixed(2);
+  const carnePechuga=+(carneMila*(Number(cfg.pctPechugaDeMila)||0)/100).toFixed(2);
+  const carnePatamuslo=+(carneMila-carnePechuga).toFixed(2);
   const sumaExtrasPct=extras.reduce((s,e)=>s+(Number(e.pct)||0),0);
   const sumaRep=(Number(repMolida)||0)+(Number(repAlbondiga)||0)+(Number(repKipe)||0)+sumaExtrasPct;
   const carneMolida=+(carneMoler*(Number(repMolida)||0)/100).toFixed(2);
@@ -3333,11 +3356,13 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
     const precio=Math.round(costoKg*(1+(Number(margenObj)||0)/100));
     return {nombre,carne,rinde:Number(rinde)||0,kgFinal,costoKg,precio};
   };
+  const crudo=(nombre,carne)=>({nombre,carne,rinde:0,kgFinal:carne,costoKg:costoKgBase,precio:Math.round(costoKgBase*(1+(Number(margenObj)||0)/100))});
   const productos=[
     {nombre:'Alitas',carne:kgAlitas,rinde:0,kgFinal:kgAlitas,costoKg:costoKgBase,precio:Number(cfg.precioAlitas)||0},
     {nombre:'Carcasas',carne:kgCarcasas,rinde:0,kgFinal:kgCarcasas,costoKg:costoKgBase,precio:Number(cfg.precioCarcasas)||0},
     {nombre:'Menudos',carne:kgMenudos,rinde:0,kgFinal:kgMenudos,costoKg:costoKgBase,precio:Number(cfg.precioMenudos)||0},
-    calc('Milanesa de pollo',carneMila,cfg.milanesa),
+    decPechuga==='milanesa'?calc('Milanesa de pechuga',carnePechuga,cfg.milanesa):crudo('Filet de pechuga',carnePechuga),
+    decPatamuslo==='milanesa'?calc('Milanesa de pata-muslo',carnePatamuslo,cfg.milanesaPatamuslo):crudo('Pata-muslo',carnePatamuslo),
     calc('Carne molida',carneMolida,cfg.molida),
     calc('Albóndigas',carneAlbondiga,cfg.albondiga),
     calc('Kipe de pollo',carneKipe,cfg.kipe),
@@ -3355,7 +3380,8 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
       await cfgRef.set({
         pctAlitas:Number(cfg.pctAlitas)||0,pctCarcasas:Number(cfg.pctCarcasas)||0,pctMenudos:Number(cfg.pctMenudos)||0,
         precioAlitas:Number(cfg.precioAlitas)||0,precioCarcasas:Number(cfg.precioCarcasas)||0,precioMenudos:Number(cfg.precioMenudos)||0,
-        milanesa:Number(cfg.milanesa)||0,molida:Number(cfg.molida)||0,albondiga:Number(cfg.albondiga)||0,kipe:Number(cfg.kipe)||0,
+        milanesa:Number(cfg.milanesa)||0,milanesaPatamuslo:Number(cfg.milanesaPatamuslo)||0,molida:Number(cfg.molida)||0,albondiga:Number(cfg.albondiga)||0,kipe:Number(cfg.kipe)||0,
+        pctPechugaDeMila:Number(cfg.pctPechugaDeMila)||0,
       },{merge:true});
       setEditandoCfg(false);mostrar('✅ Rindes guardados');
     }catch(e){alert('Error: '+e.message);}
@@ -3371,7 +3397,7 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
       const prodCol=db.collection(`polleria/${uid}/productos`);
       for(const p of productos){
         if(p.kgFinal<=0)continue;
-        const docId='pollo-'+p.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
+        const docId='pollo-'+p.nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s/]+/g,'-');
         const ref=stockCol.doc(docId);
         const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
@@ -3390,15 +3416,15 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
       <span style={{fontSize:11,color:'var(--txt3)',width:14}}>{suf}</span>
     </div>
   );
+  const DecBtn2=({val,cur,set,children})=>(<button onClick={()=>set(val)} className={`chip${cur===val?' activo':''}`} style={{flex:1,fontSize:12}}>{children}</button>);
 
   return(
     <div>
       <Toast msg={toastMsg}/>
       {total<=0 && <div className="panel" style={{textAlign:'center',color:'var(--txt2)',fontSize:13}}>👆 Poné los kg y el precio del cajón en la pestaña "Cajones" para ver la producción.</div>}
-      {total>0 && <>
-      <div className="panel">
+      {total>0 && <div className="panel" style={{background:'var(--green-bg)',border:'2px solid var(--green)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-          <div className="ptitle" style={{margin:0}}>🍴 Producción · {total} kg{n>0?` (${n} pollos)`:''}</div>
+          <div className="ptitle" style={{margin:0,fontSize:19,fontWeight:800,color:'var(--green)'}}>🍴 Producción · {total} kg{n>0?` (${n} pollos)`:''}</div>
           <button onClick={()=>setEditandoCfg(v=>!v)} style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:editandoCfg?'var(--blue-bg)':'var(--bg2)',color:editandoCfg?'var(--blue)':'var(--txt2)',cursor:'pointer',fontWeight:600}}>⚙️ Rindes</button>
         </div>
         {editandoCfg&&(
@@ -3412,7 +3438,8 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
             {COL('🦴 Precio Carcasas','precioCarcasas','$/kg')}
             {COL('🫀 Precio Menudos','precioMenudos','$/kg')}
             <div style={{fontSize:12,fontWeight:700,color:'var(--txt2)',margin:'12px 0 8px'}}>🔪 Rinde de cada preparado (peso que suma el rebozado/pan/trigo)</div>
-            {COL('🍤 Milanesa (rebozado)','milanesa')}
+            {COL('🍤 Milanesa de pechuga (rebozado)','milanesa')}
+            {COL('🍤 Milanesa de pata-muslo (rebozado)','milanesaPatamuslo')}
             {COL('🥩 Molida','molida')}
             {COL('🧆 Albóndiga (pan)','albondiga')}
             {COL('🥟 Kipe (trigo)','kipe')}
@@ -3424,72 +3451,91 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
           <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{fontSize:13,color:'var(--txt2)'}}>🦴 Carcasas <span style={{fontSize:10,color:'var(--txt3)'}}>(hueso, piel)</span></span><span style={{fontSize:14,fontWeight:700,color:'var(--txt)'}}>{kgCarcasas} kg</span></div>
           <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}><span style={{fontSize:13,color:'var(--txt2)'}}>🫀 Menudos <span style={{fontSize:10,color:'var(--txt3)'}}>(vísceras)</span></span><span style={{fontSize:14,fontWeight:700,color:'var(--txt)'}}>{kgMenudos} kg</span></div>
         </div>
-        <div className="suma-band">
+        <div className="suma-band" style={{marginBottom:14}}>
           <span style={{fontSize:13,color:'var(--txt2)'}}>Carne limpia disponible</span>
           <span style={{fontSize:20,fontWeight:700,color:'var(--txt)'}}>{carneLimpiaKg} kg</span>
         </div>
-      </div>
 
-      <div className="panel">
-        <div className="ptitle">✂️ ¿Qué vas a producir con la carne limpia?</div>
-        <label className="lbl" style={{marginTop:0}}>De la carne limpia, ¿cuánto a milanesa?</label>
-        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
-          <input type="number" min={0} max={100} value={allocMila} onChange={e=>setAllocMila(Math.min(100,Math.max(0,Number(e.target.value))))} className="inp" style={{width:70,textAlign:'center',fontWeight:700}}/>
-          <span style={{fontSize:12,color:'var(--txt3)'}}>%</span>
-          <span style={{fontSize:12,color:'var(--txt2)',marginLeft:'auto'}}>🍤 {carneMila} kg a milanesa · 🥩 {carneMoler} kg a moler</span>
-        </div>
-        <label className="lbl">De lo que va a moler, repartí:</label>
-        <div style={{display:'flex',gap:6,fontSize:10,color:'var(--txt3)',fontWeight:700,padding:'0 2px 4px'}}>
-          <span style={{flex:1}}>PRODUCTO</span><span style={{width:54,textAlign:'center'}}>%</span><span style={{width:70,textAlign:'right'}}>carne</span>
-        </div>
-        {[['🥩 Molida',repMolida,setRepMolida,carneMolida],['🧆 Albóndiga',repAlbondiga,setRepAlbondiga,carneAlbondiga],['🥟 Kipe',repKipe,setRepKipe,carneKipe]].map(([lbl,val,setter,kgVal],i)=>(
-          <div key={i} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
-            <span style={{flex:1,fontSize:13,color:'var(--txt)'}}>{lbl}</span>
-            <input type="number" min={0} value={val} onChange={e=>setter(Math.max(0,Number(e.target.value)))} className="inp" style={{width:54,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
-            <span style={{width:70,textAlign:'right',fontSize:12,color:'var(--txt2)'}}>{kgVal} kg</span>
+        <div style={{borderTop:'1px dashed var(--border)',paddingTop:14,marginBottom:4}}>
+          <div className="ptitle" style={{fontSize:15}}>✂️ ¿Qué vas a producir con la carne limpia?</div>
+          <label className="lbl" style={{marginTop:0}}>De la carne limpia, ¿cuánto a milanesa (pechuga + pata-muslo)?</label>
+          <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+            <input type="number" min={0} max={100} value={allocMila} onChange={e=>setAllocMila(Math.min(100,Math.max(0,Number(e.target.value))))} className="inp" style={{width:70,textAlign:'center',fontWeight:700}}/>
+            <span style={{fontSize:12,color:'var(--txt3)'}}>%</span>
+            <span style={{fontSize:12,color:'var(--txt2)',marginLeft:'auto'}}>🍤 {carneMila} kg a milanesa · 🥩 {carneMoler} kg a moler</span>
           </div>
-        ))}
-        {extras.map(e=>(
-          <div key={e.id} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
-            <input value={e.nombre} onChange={ev=>setExtra(e.id,'nombre',ev.target.value)} placeholder="Nombre del producto" className="inp" style={{flex:1,padding:'5px 8px',fontSize:13}}/>
-            <input type="number" min={0} value={e.pct} onChange={ev=>setExtra(e.id,'pct',Math.max(0,Number(ev.target.value)))} className="inp" style={{width:54,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
-            <span style={{width:70,textAlign:'right',fontSize:12,color:'var(--txt2)'}}>{(+(carneMoler*(Number(e.pct)||0)/100).toFixed(2))} kg</span>
-            <button onClick={()=>quitarExtra(e.id)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16,flexShrink:0}}>✕</button>
-          </div>
-        ))}
-        <button onClick={agregarExtra} className="btn-sec" style={{width:'100%',marginTop:4,marginBottom:4,fontSize:13}}>✏️ Agregar producto</button>
-        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:sumaRep===100?'var(--green)':'var(--orange)',fontWeight:700,marginTop:2}}>
-          <span>Suma</span><span>{sumaRep}% {sumaRep===100?'✓':'(debería dar 100)'}</span>
-        </div>
-      </div>
 
-      <div className="panel">
-        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
-          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 ¿Cuánto querés ganar?</label>
-          <div style={{display:'flex',gap:6,alignItems:'center',marginTop:6}}>
-            {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:1}}>{m}%</button>))}
-            <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
-          </div>
-        </div>
-        <div className="ptitle">🏷️ Te salen estos productos</div>
-        {productos.length===0&&<div style={{fontSize:13,color:'var(--txt3)',padding:'10px 0'}}>Cargá el precio del cajón (pestaña Cajones) para ver el resultado.</div>}
-        {productos.map(p=>(
-          <div key={p.nombre} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:500,color:'var(--txt)'}}>{p.nombre}</div>
-              <div style={{fontSize:11,color:'var(--txt2)'}}>{p.kgFinal} kg{p.costoKg>0?` · costo ${formatPeso(p.costoKg)}/kg`:''}</div>
+          <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:10,marginBottom:10}}>
+            <label className="lbl" style={{marginTop:0}}>De esa milanesa, ¿cuánto es pechuga?</label>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:10}}>
+              <input type="number" min={0} max={100} value={cfg.pctPechugaDeMila} onChange={e=>setCfgK('pctPechugaDeMila',Math.min(100,Math.max(0,Number(e.target.value))))} className="inp" style={{width:70,textAlign:'center',fontWeight:700}}/>
+              <span style={{fontSize:12,color:'var(--txt3)'}}>%</span>
+              <span style={{fontSize:12,color:'var(--txt2)',marginLeft:'auto'}}>🐔 {carnePechuga} kg pechuga · 🍗 {carnePatamuslo} kg pata-muslo</span>
             </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontSize:16,fontWeight:700,color:'var(--green)'}}>{formatPeso(p.precio)}</div>
-              <div style={{fontSize:10,color:'var(--txt3)'}}>por kg</div>
+            <label className="lbl">🐔 Pechuga, ¿filet crudo o milanesa?</label>
+            <div className="chip-group" style={{marginBottom:10}}>
+              <DecBtn2 val="filet" cur={decPechuga} set={setDecPechuga}>🥩 Filet</DecBtn2>
+              <DecBtn2 val="milanesa" cur={decPechuga} set={setDecPechuga}>🍤 Milanesa</DecBtn2>
+            </div>
+            <label className="lbl">🍗 Pata-muslo, ¿crudo o milanesa?</label>
+            <div className="chip-group">
+              <DecBtn2 val="crudo" cur={decPatamuslo} set={setDecPatamuslo}>🍗 Crudo</DecBtn2>
+              <DecBtn2 val="milanesa" cur={decPatamuslo} set={setDecPatamuslo}>🍤 Milanesa</DecBtn2>
             </div>
           </div>
-        ))}
-        <button onClick={producir} disabled={guardando||precioTotal<=0} className="btn-full" style={{background:'var(--green)',marginTop:12,opacity:precioTotal<=0?0.4:1}}>
-          {guardando?'⏳ Mandando...':'📦 Mandar todo al stock'}
-        </button>
-      </div>
-      </>}
+
+          <label className="lbl">De lo que va a moler, repartí:</label>
+          <div style={{display:'flex',gap:6,fontSize:10,color:'var(--txt3)',fontWeight:700,padding:'0 2px 4px'}}>
+            <span style={{flex:1}}>PRODUCTO</span><span style={{width:54,textAlign:'center'}}>%</span><span style={{width:70,textAlign:'right'}}>carne</span>
+          </div>
+          {[['🥩 Molida',repMolida,setRepMolida,carneMolida],['🧆 Albóndiga',repAlbondiga,setRepAlbondiga,carneAlbondiga],['🥟 Kipe',repKipe,setRepKipe,carneKipe]].map(([lbl,val,setter,kgVal],i)=>(
+            <div key={i} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+              <span style={{flex:1,fontSize:13,color:'var(--txt)'}}>{lbl}</span>
+              <input type="number" min={0} value={val} onChange={e=>setter(Math.max(0,Number(e.target.value)))} className="inp" style={{width:54,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
+              <span style={{width:70,textAlign:'right',fontSize:12,color:'var(--txt2)'}}>{kgVal} kg</span>
+            </div>
+          ))}
+          {extras.map(e=>(
+            <div key={e.id} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+              <input value={e.nombre} onChange={ev=>setExtra(e.id,'nombre',ev.target.value)} placeholder="Nombre del producto" className="inp" style={{flex:1,padding:'5px 8px',fontSize:13}}/>
+              <input type="number" min={0} value={e.pct} onChange={ev=>setExtra(e.id,'pct',Math.max(0,Number(ev.target.value)))} className="inp" style={{width:54,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
+              <span style={{width:70,textAlign:'right',fontSize:12,color:'var(--txt2)'}}>{(+(carneMoler*(Number(e.pct)||0)/100).toFixed(2))} kg</span>
+              <button onClick={()=>quitarExtra(e.id)} style={{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:16,flexShrink:0}}>✕</button>
+            </div>
+          ))}
+          <button onClick={agregarExtra} className="btn-sec" style={{width:'100%',marginTop:4,marginBottom:4,fontSize:13}}>✏️ Agregar producto</button>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:sumaRep===100?'var(--green)':'var(--orange)',fontWeight:700,marginTop:2}}>
+            <span>Suma</span><span>{sumaRep}% {sumaRep===100?'✓':'(debería dar 100)'}</span>
+          </div>
+        </div>
+
+        <div style={{borderTop:'1px dashed var(--border)',paddingTop:14,marginTop:14}}>
+          <div style={{background:'var(--bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
+            <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 ¿Cuánto querés ganar?</label>
+            <div style={{display:'flex',gap:6,alignItems:'center',marginTop:6}}>
+              {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:1}}>{m}%</button>))}
+              <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
+            </div>
+          </div>
+          <div className="ptitle" style={{fontSize:15}}>🏷️ Te salen estos productos</div>
+          {productos.length===0&&<div style={{fontSize:13,color:'var(--txt3)',padding:'10px 0'}}>Cargá el precio del cajón (pestaña Cajones) para ver el resultado.</div>}
+          {productos.map(p=>(
+            <div key={p.nombre} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:500,color:'var(--txt)'}}>{p.nombre}</div>
+                <div style={{fontSize:11,color:'var(--txt2)'}}>{p.kgFinal} kg{p.costoKg>0?` · costo ${formatPeso(p.costoKg)}/kg`:''}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:16,fontWeight:700,color:'var(--green)'}}>{formatPeso(p.precio)}</div>
+                <div style={{fontSize:10,color:'var(--txt3)'}}>por kg</div>
+              </div>
+            </div>
+          ))}
+          <button onClick={producir} disabled={guardando||precioTotal<=0} className="btn-full" style={{background:'var(--green)',marginTop:12,opacity:precioTotal<=0?0.4:1}}>
+            {guardando?'⏳ Mandando...':'📦 Mandar todo al stock'}
+          </button>
+        </div>
+      </div>}
     </div>
   );
 }
@@ -3856,7 +3902,7 @@ function PantallaStock({uid}){
         {sec==='stock'&&<>
           <button onClick={()=>setEditandoVenc(v=>!v)} className="btn-sec" style={{width:'100%',marginBottom:10,padding:8,fontSize:12}}>⏰ Días de vencimiento por categoría</button>
           {editandoVenc&&<div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:12,marginBottom:12}}>
-            <div style={{fontSize:11,color:'var(--txt2)',marginBottom:10}}>Cuántos días dura cada categoría desde que entra al stock. Se avisa cuando falta 1 día o menos.</div>
+            <div style={{fontSize:11,color:'var(--txt2)',marginBottom:10}}>Cuántos días dura cada categoría desde que entra al stock. Rojo = vence hoy o ya venció. Amarillo = último tercio de esos días.</div>
             {Object.keys(VENCIMIENTO_DIAS_DEFAULT).map(cat=>(
               <div key={cat} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
                 <span style={{flex:1,fontSize:13,color:'var(--txt)'}}>{CAT_ICONS[cat]||'📦'} {cat}</span>
@@ -3877,17 +3923,19 @@ function PantallaStock({uid}){
               {catItems.map(item=>{
                 const bajo=Number(item.cantidad)<=Number(item.stockMinimo||0);
                 const ganPct=item.precioCosto>0&&item.precioVenta>0?Math.round(((item.precioVenta-item.precioCosto)/item.precioCosto)*100):null;
-                const diasV=diasHastaVenc(item.vencimiento);
-                const porVencer=diasV!==null&&diasV<=1;
+                const cVenc=colorVenc(item.vencimiento,item.categoria);
                 return(
-                  <div key={item.id} className="card" style={{borderColor:porVencer?'var(--red)':bajo?'var(--orange)':'var(--border)'}}>
+                  <div key={item.id} className="card" style={{borderColor:cVenc==='rojo'?'var(--red)':bajo?'var(--orange)':'var(--border)'}}>
                     <div className="card-body">
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                         <div>
                           <div className="card-name">{item.nombre}</div>
                           {item.precioCosto>0&&<div className="card-sub">Costo: {formatPeso(item.precioCosto)}/{item.unidad} · Venta: {formatPeso(item.precioVenta)}/{item.unidad}</div>}
                           {item.stockMinimo>0&&<div className="card-sub">Mínimo: {item.stockMinimo} {item.unidad}</div>}
-                          {item.vencimiento&&<div className="card-sub">Vence: {formatFecha(item.vencimiento)}</div>}
+                          {item.vencimiento&&<div style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:5,padding:'3px 8px',borderRadius:6,background:'var(--bg2)',border:'1px solid var(--border)'}}>
+                            {dotVenc(item.vencimiento,item.categoria)}
+                            <span style={{fontSize:12,color:'var(--txt2)',fontWeight:600}}>{formatFecha(item.vencimiento)}</span>
+                          </div>}
                           <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:4}}>
                             {ganPct!==null&&<span className={ganPct>=30?'pill pill-green':ganPct>=10?'pill pill-orange':'pill pill-red'} style={{display:'inline-block'}}>Ganancia: {ganPct}%</span>}
                             {badgeVencimiento(item.vencimiento)}
