@@ -933,6 +933,26 @@ const formatPeso = n => '$'+Number(n||0).toLocaleString('es-AR',{minimumFraction
 const ahora = () => new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false});
 const fechaCorta = () => new Date().toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
 
+/* ─── VENCIMIENTOS ─── */
+// Días de vida útil por categoría (por defecto). El usuario puede ajustarlos
+// desde Stock → ⏰ Vencimientos; queda guardado en polleria/{uid}/config/vencimientos.
+const VENCIMIENTO_DIAS_DEFAULT={
+  'Pollo':3,'Carne':3,'Preparados':2,'Huevos y Lácteos':10,'Verdulería':5,
+  'Fiambres':15,'Congelados':90,'Almacén':180,'General':30,
+};
+let VENC_CFG={...VENCIMIENTO_DIAS_DEFAULT};
+const diasVencCategoria = categoria => Number(VENC_CFG[categoria])||Number(VENCIMIENTO_DIAS_DEFAULT[categoria])||30;
+const calcularVencimiento = categoria => { const d=new Date(); d.setDate(d.getDate()+diasVencCategoria(categoria)); return d.toISOString().split('T')[0]; };
+const diasHastaVenc = fechaISO => { if(!fechaISO) return null; const h=new Date(); h.setHours(0,0,0,0); const f=new Date(fechaISO+'T00:00:00'); return Math.round((f-h)/86400000); };
+const badgeVencimiento = fechaISO => {
+  const d=diasHastaVenc(fechaISO);
+  if(d===null) return null;
+  if(d<0) return <span className="pill pill-red">🔴 Vencido hace {Math.abs(d)} día{Math.abs(d)===1?'':'s'}</span>;
+  if(d===0) return <span className="pill pill-red">⚠️ Vence hoy</span>;
+  if(d===1) return <span className="pill pill-orange">⚠️ Vence mañana</span>;
+  return null;
+};
+
 /* ─── #4 DESCUENTO DE STOCK AL VENDER + #5 CONSUMO FIFO DE LOTES ─── */
 // Resta del inventario lo que se vendió. Si el producto no está en stock, lo ignora (no rompe la venta).
 async function descontarStockVenta(uid, items){
@@ -2251,7 +2271,7 @@ function DespieceProduccion({uid, kg, pollos, precioCajon}){
         const docId='pollo-'+o.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s/]+/g,'-');
         const ref=stockCol.doc(docId);const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
-        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:o.costo||0,precioVenta:o.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:o.costo||0,precioVenta:o.precio,stockMinimo:0,vencimiento:calcularVencimiento(o.cat),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
         await prodCol.doc(docId).set({nombre:o.nombre,categoria:o.cat,unidad:'kg',precioCosto:o.costo||0,precioVenta:o.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       mostrar(`✅ ${outs.length} productos sumados al stock`);
@@ -2322,12 +2342,10 @@ function CalculadoraCajon({uid}){
   const [toastMsg,setToastMsg]=useState('');
   const [rendimientoPct,setRendimientoPct]=useState(90);
   const [margenObj,setMargenObj]=useState(30);
-  // Config editable (precargada): cortes del despiece + precio del pollo entero
   const [cortesCfg,setCortesCfg]=useState(CORTES_DEFAULT);
   const [precioEntero,setPrecioEntero]=useState(4400);
   const [editandoCfg,setEditandoCfg]=useState(false);
   const [guardandoCfg,setGuardandoCfg]=useState(false);
-  // Distribución por unidades (cuántos pollos van a cada uso)
   const [asigEntero,setAsigEntero]=useState('');
   const [asigDespiece,setAsigDespiece]=useState('');
   const [asigProduccion,setAsigProduccion]=useState('');
@@ -2344,7 +2362,6 @@ function CalculadoraCajon({uid}){
 
   const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
 
-  // ── Compra: cajones × pollos por cajón (medio cajón = 0.5, un cajón y medio = 1.5, etc.) ──
   const nCajones=Math.max(0.5,Number(cajones)||1);
   const tot=Math.round((parseInt(nPollos)||0)*nCajones);
   const totKg=+((Number(kgCajon)||20)*nCajones).toFixed(2);
@@ -2354,7 +2371,6 @@ function CalculadoraCajon({uid}){
   const precioTotalPagado=Number(precioCajon)*nCajones||0;
   const costoPorKg=rendimientoKg>0&&precioTotalPagado>0?precioTotalPagado/rendimientoKg:0;
 
-  // ── Distribución por unidades (pollos) entre venta entera / despiece / producción ──
   const nEntero=parseInt(asigEntero)||0;
   const nDespiece=parseInt(asigDespiece)||0;
   const nProduccion=parseInt(asigProduccion)||0;
@@ -2367,7 +2383,6 @@ function CalculadoraCajon({uid}){
   const costoDespieceTotal=+(costoPorKg*kgDespiece).toFixed(2);
   const costoProduccionTotal=+(costoPorKg*kgProduccion).toFixed(2);
 
-  // ── Despiece: reparte los kg asignados según los % de corte configurados ──
   const piezasDespiece=cortesCfg.map(c=>({
     n:c.n,
     kgEst:+(kgDespiece*(Number(c.pct)||0)/100).toFixed(2),
@@ -2385,7 +2400,6 @@ function CalculadoraCajon({uid}){
   const gananciaDespiece=totalIngresoDespiece-costoDespieceTotal;
   const gananciaDespiecePct=costoDespieceTotal>0?+((gananciaDespiece/costoDespieceTotal)*100).toFixed(1):0;
 
-  // Editar y guardar la configuración de cortes
   const setCorte=(idx,k,v)=>setCortesCfg(cs=>cs.map((c,i)=>i===idx?{...c,[k]:v}:c));
   const sumaPct=cortesCfg.reduce((s,c)=>s+(Number(c.pct)||0),0);
   const guardarCfg=async()=>{
@@ -2418,6 +2432,7 @@ function CalculadoraCajon({uid}){
         nombre:'Pollo entero',categoria:'Pollo',tipo:'cajon',
         cantidad:+(cantActual+kgEntero).toFixed(2),
         unidad:'kg',precioCosto:pCosto,precioVenta:Number(precioEntero)||0,stockMinimo:0,
+        vencimiento:calcularVencimiento('Pollo'),
         updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
       });
       await prodCol.doc(docId).set({nombre:'Pollo entero',categoria:'Pollo',unidad:'kg',precioCosto:pCosto,precioVenta:Number(precioEntero)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
@@ -2446,6 +2461,7 @@ function CalculadoraCajon({uid}){
           nombre:p.n,categoria:'Pollo',tipo:'cajon',
           cantidad:+(cantActual+p.kgEst*1.10).toFixed(2),
           unidad:'kg',precioCosto:pCosto,precioVenta:+pVenta.toFixed(2),stockMinimo:0,
+          vencimiento:calcularVencimiento('Pollo'),
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         });
         await prodCol.doc(docId).set({nombre:p.n,categoria:'Pollo',unidad:'kg',precioCosto:pCosto,precioVenta:+pVenta.toFixed(2),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
@@ -2456,7 +2472,6 @@ function CalculadoraCajon({uid}){
     setGuardando(false);
   };
 
-  // Badge comparación con mercado
   const badgeMercado=(n,pv)=>{
     const r=PRECIOS_MERCADO_POLLO[n]; if(!r||!pv) return null;
     if(pv<r.min) return <span style={{fontSize:10,background:'var(--orange-bg)',color:'var(--orange)',borderRadius:4,padding:'1px 5px',marginLeft:5,fontWeight:700}}>↓ bajo mercado</span>;
@@ -2467,7 +2482,6 @@ function CalculadoraCajon({uid}){
   return(
     <div>
       <Toast msg={toastMsg}/>
-      {/* ── Panel de compra ── */}
       <div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
           <div className="ptitle" style={{margin:0}}>🧮 Calculadora de Cajón</div>
@@ -2581,7 +2595,6 @@ function CalculadoraCajon({uid}){
         </div>
       </div>
 
-      {/* ── Venta pollo entero ── */}
       {kgEntero>0&&<div className="panel">
         <div className="ptitle">🐔 Pollo entero · {nEntero} pollo(s) · {kgEntero} kg</div>
         <div style={{display:'flex',gap:8,alignItems:'flex-end',marginBottom:10}}>
@@ -2599,7 +2612,6 @@ function CalculadoraCajon({uid}){
         </button>
       </div>}
 
-      {/* ── Despiece ── */}
       {kgDespiece>0&&<div className="panel">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
           <div className="ptitle" style={{margin:0}}>🔪 Despiece · {nDespiece} pollo(s) · {kgDespiece} kg</div>
@@ -2669,7 +2681,6 @@ function CalculadoraCajon({uid}){
         </button>
       </div>}
 
-      {/* ── Producción (molida / kipe / albóndiga / milanesa) ── */}
       {kgProduccion>0&&<SeccionProduccion uid={uid} kg={kgProduccion} pollos={nProduccion} precioCajon={costoProduccionTotal}/>}
 
       <div className="panel">
@@ -2731,7 +2742,7 @@ function CalculadoraCongelados({uid}){
         cantidad:+(cantActual+totKg).toFixed(2),unidad:'kg',cajas,kgPorCaja:kgCaja,
         precioCaja:Number(precioCaja),precioCosto:+costoPorKg.toFixed(2),
         precioVenta:+precioVentaKg.toFixed(2),porcGanancia:Number(porcGanancia),
-        stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        stockMinimo:0,vencimiento:calcularVencimiento('Congelados'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
       });
       // Guardar también en productos (para que aparezca en el catálogo de ventas)
       await db.collection(`polleria/${uid}/productos`).doc(docId).set({
@@ -2850,7 +2861,7 @@ function SeccionVerduleria({items,onAgregar,onEditar,onEliminar,onAjustar}){
 
 function FormVerduleria({inicial,onGuardar,onCancelar}){
   const UNIDADES=['kg','unidades','atados','bandejas','litros','g'];
-  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',precioCosto:'',precioVenta:'',stockMinimo:0,...inicial});
+  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',precioCosto:'',precioVenta:'',stockMinimo:0,vencimiento:calcularVencimiento('Verdulería'),...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
   const ganPct=Number(d.precioCosto)>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):null;
   const guardar=()=>{
@@ -2869,6 +2880,7 @@ function FormVerduleria({inicial,onGuardar,onCancelar}){
         <Campo label={`Stock mínimo (${d.unidad})`} value={d.stockMinimo} onChange={v=>set('stockMinimo',v)} tipo="number" placeholder="0"/>
         <Campo label="💸 Precio de costo ($)" value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
         <Campo label="💰 Precio de venta ($)" value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
+        <Campo label="⏰ Vencimiento (sugerido, editable)" value={d.vencimiento} onChange={v=>set('vencimiento',v)} tipo="date"/>
         {ganPct!==null&&(
           <div style={{background:ganPct>=0?'var(--green-bg)':'var(--red-bg)',border:`1px solid ${ganPct>=0?'var(--green)':'var(--red)'}`,borderRadius:'var(--radius)',padding:'10px 14px',marginTop:4,display:'flex',justifyContent:'space-between'}}>
             <span style={{fontSize:13,color:'var(--txt2)'}}>Ganancia:</span>
@@ -3363,7 +3375,7 @@ function SeccionProduccion({uid,kg,pollos,precioCajon}){
         const ref=stockCol.doc(docId);
         const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
-        await ref.set({nombre:p.nombre,categoria:'Pollo',tipo:'produccion',cantidad:+(actual+p.kgFinal).toFixed(2),unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await ref.set({nombre:p.nombre,categoria:'Pollo',tipo:'produccion',cantidad:+(actual+p.kgFinal).toFixed(2),unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,stockMinimo:0,vencimiento:calcularVencimiento('Pollo'),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
         await prodCol.doc(docId).set({nombre:p.nombre,categoria:'Pollo',unidad:'kg',precioCosto:p.costoKg,precioVenta:p.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       mostrar(`✅ ${productos.length} productos al stock`);
@@ -3542,7 +3554,7 @@ function SeccionMilanesas({uid}){
         const snap=await ref.get();
         const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
         const costo=o.nombre.indexOf('Milanesa')===0?costoMilaKg:0;
-        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:costo,precioVenta:o.precio,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await ref.set({nombre:o.nombre,categoria:o.cat,tipo:'produccion',cantidad:+(actual+o.kg).toFixed(2),unidad:'kg',precioCosto:costo,precioVenta:o.precio,stockMinimo:0,vencimiento:calcularVencimiento(o.cat),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
         await prodCol.doc(docId).set({nombre:o.nombre,categoria:o.cat,unidad:'kg',precioCosto:costo,precioVenta:o.precio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       mostrar(`✅ ${outputs.length} productos sumados al stock`);
@@ -3693,7 +3705,7 @@ function SeccionRecetas({uid}){
       const snap=await ref.get();
       const actual=snap.exists?(Number(snap.data().cantidad)||0):0;
       const totalRinde=actual+(Number(r.rinde)||1)*n;
-      await ref.set({nombre:r.nombre,categoria:'Preparados',tipo:'receta',cantidad:+totalRinde.toFixed(3),unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,stockMinimo:0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await ref.set({nombre:r.nombre,categoria:'Preparados',tipo:'receta',cantidad:+totalRinde.toFixed(3),unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,stockMinimo:0,vencimiento:calcularVencimiento('Preparados'),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       await db.collection(`polleria/${uid}/productos`).doc(docId).set({nombre:r.nombre,categoria:'Preparados',unidad:r.unidadRinde||'unidad',precioCosto:costoUnitTerm,precioVenta:Number(r.precioVenta)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       mostrar(`✅ Produjiste ${(Number(r.rinde)||1)*n} ${r.unidadRinde} de ${r.nombre}`);
     }catch(e){alert('Error: '+e.message);}
@@ -3806,12 +3818,24 @@ function SeccionRecetas({uid}){
 function PantallaStock({uid}){
   const [items,setItems]=useState([]);const [form,setForm]=useState(null);const [verduForm,setVerduForm]=useState(null);
   const [buscar,setBuscar]=useState('');const [sec,setSec]=useState('stock');
+  const [editandoVenc,setEditandoVenc]=useState(false);
+  const [diasVencLocal,setDiasVencLocal]=useState(VENC_CFG);
+  const [guardandoVenc,setGuardandoVenc]=useState(false);
   const col=db.collection(`polleria/${uid}/stock`);
   useEffect(()=>col.orderBy('nombre','asc').onSnapshot(snap=>setItems(snap.docs.map(d=>({id:d.id,...d.data()})))),[]);
   const guardar=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add(r);setForm(null);};
   const guardarVerdu=async d=>{const{id,...r}=d;if(id)await col.doc(id).update(r);else await col.add({...r,tipo:'verduleria',categoria:'Verdulería'});setVerduForm(null);};
   const eliminar=async id=>{if(!confirm('¿Eliminar?'))return;await col.doc(id).delete();};
   const ajustar=async(id,delta)=>{const i=items.find(x=>x.id===id);if(!i)return;await col.doc(id).update({cantidad:Math.max(0,(Number(i.cantidad)||0)+delta)});};
+  const guardarDiasVenc=async()=>{
+    setGuardandoVenc(true);
+    try{
+      await db.collection(`polleria/${uid}/config`).doc('vencimientos').set({dias:diasVencLocal},{merge:true});
+      VENC_CFG={...VENCIMIENTO_DIAS_DEFAULT,...diasVencLocal};
+      setEditandoVenc(false);
+    }catch(e){alert('Error: '+e.message);}
+    setGuardandoVenc(false);
+  };
   if(form!==null) return <FormStock inicial={form} onGuardar={guardar} onCancelar={()=>setForm(null)}/>;
   if(verduForm!==null) return <FormVerduleria inicial={verduForm} onGuardar={guardarVerdu} onCancelar={()=>setVerduForm(null)}/>;
   const bajos=items.filter(i=>Number(i.cantidad)<=Number(i.stockMinimo||0));
@@ -3830,6 +3854,20 @@ function PantallaStock({uid}){
         </div>
         {headerAdd&&<button onClick={headerAdd} className="btn-pri" style={{width:'100%',marginBottom:12,padding:10,fontSize:14}}>+ Agregar {sec==='verduleria'?'verdura':'ítem'}</button>}
         {sec==='stock'&&<>
+          <button onClick={()=>setEditandoVenc(v=>!v)} className="btn-sec" style={{width:'100%',marginBottom:10,padding:8,fontSize:12}}>⏰ Días de vencimiento por categoría</button>
+          {editandoVenc&&<div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:12,marginBottom:12}}>
+            <div style={{fontSize:11,color:'var(--txt2)',marginBottom:10}}>Cuántos días dura cada categoría desde que entra al stock. Se avisa cuando falta 1 día o menos.</div>
+            {Object.keys(VENCIMIENTO_DIAS_DEFAULT).map(cat=>(
+              <div key={cat} style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+                <span style={{flex:1,fontSize:13,color:'var(--txt)'}}>{CAT_ICONS[cat]||'📦'} {cat}</span>
+                <input type="number" min={0} value={diasVencLocal[cat]??VENCIMIENTO_DIAS_DEFAULT[cat]}
+                  onChange={e=>setDiasVencLocal(v=>({...v,[cat]:e.target.value}))}
+                  className="inp" style={{width:64,textAlign:'center',padding:'5px 4px',fontSize:13,fontWeight:700}}/>
+                <span style={{fontSize:11,color:'var(--txt3)',width:26}}>días</span>
+              </div>
+            ))}
+            <button onClick={guardarDiasVenc} disabled={guardandoVenc} className="btn-pri" style={{width:'100%',padding:9,fontSize:13,marginTop:4}}>{guardandoVenc?'Guardando...':'💾 Guardar'}</button>
+          </div>}
           {bajos.length>0&&<div style={{background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 14px',marginBottom:10}}><b style={{color:'var(--orange)',fontSize:13}}>⚠️ Stock bajo: </b><span style={{fontSize:13,color:'var(--txt2)'}}>{bajos.map(i=>i.nombre).join(', ')}</span></div>}
           <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="🔍 Buscar..." className="search" style={{marginBottom:12}}/>
           {filtrados.length===0&&items.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>📦</div>No hay stock<br/><button onClick={()=>setForm({})} className="btn-pri" style={{marginTop:16}}>+ Agregar</button></div>}
@@ -3839,15 +3877,21 @@ function PantallaStock({uid}){
               {catItems.map(item=>{
                 const bajo=Number(item.cantidad)<=Number(item.stockMinimo||0);
                 const ganPct=item.precioCosto>0&&item.precioVenta>0?Math.round(((item.precioVenta-item.precioCosto)/item.precioCosto)*100):null;
+                const diasV=diasHastaVenc(item.vencimiento);
+                const porVencer=diasV!==null&&diasV<=1;
                 return(
-                  <div key={item.id} className="card" style={{borderColor:bajo?'var(--orange)':'var(--border)'}}>
+                  <div key={item.id} className="card" style={{borderColor:porVencer?'var(--red)':bajo?'var(--orange)':'var(--border)'}}>
                     <div className="card-body">
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                         <div>
                           <div className="card-name">{item.nombre}</div>
                           {item.precioCosto>0&&<div className="card-sub">Costo: {formatPeso(item.precioCosto)}/{item.unidad} · Venta: {formatPeso(item.precioVenta)}/{item.unidad}</div>}
                           {item.stockMinimo>0&&<div className="card-sub">Mínimo: {item.stockMinimo} {item.unidad}</div>}
-                          {ganPct!==null&&<span className={ganPct>=30?'pill pill-green':ganPct>=10?'pill pill-orange':'pill pill-red'} style={{marginTop:4,display:'inline-block'}}>Ganancia: {ganPct}%</span>}
+                          {item.vencimiento&&<div className="card-sub">Vence: {formatFecha(item.vencimiento)}</div>}
+                          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:4}}>
+                            {ganPct!==null&&<span className={ganPct>=30?'pill pill-green':ganPct>=10?'pill pill-orange':'pill pill-red'} style={{display:'inline-block'}}>Ganancia: {ganPct}%</span>}
+                            {badgeVencimiento(item.vencimiento)}
+                          </div>
                         </div>
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
                           <button onClick={()=>ajustar(item.id,-1)} style={{width:32,height:32,borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',cursor:'pointer',fontSize:18,color:'var(--txt)'}}>−</button>
@@ -3882,8 +3926,10 @@ function PantallaStock({uid}){
 function FormStock({inicial,onGuardar,onCancelar}){
   const UNIDADES=['kg','g','unidades','litros','atados','bandejas','docenas'];
   const CATEGORIAS=categoriasDisponibles();
-  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'Pollo',precioCosto:'',precioVenta:'',foto:'',...inicial});
+  const [d,setD]=useState({nombre:'',cantidad:0,unidad:'kg',stockMinimo:0,categoria:'Pollo',precioCosto:'',precioVenta:'',foto:'',vencimiento:calcularVencimiento('Pollo'),...inicial});
   const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const esNuevo=!inicial||!inicial.id;
+  useEffect(()=>{ if(esNuevo) set('vencimiento', calcularVencimiento(d.categoria)); },[d.categoria]);
   const ganPctForm=Number(d.precioCosto)>0&&Number(d.precioVenta)>0?Math.round(((Number(d.precioVenta)-Number(d.precioCosto))/Number(d.precioCosto))*100):null;
   const guardar=()=>{if(!d.nombre.trim())return alert('El nombre es obligatorio');onGuardar({...d,cantidad:Number(d.cantidad)||0,stockMinimo:Number(d.stockMinimo)||0,precioCosto:Number(d.precioCosto)||0,precioVenta:Number(d.precioVenta)||0});};
   const handleFotoStock=async e=>{
@@ -3907,6 +3953,7 @@ function FormStock({inicial,onGuardar,onCancelar}){
         <Campo label={`Costo por ${d.unidad} (opcional, para ver ganancia)`} value={d.precioCosto} onChange={v=>set('precioCosto',v)} tipo="number" placeholder="0"/>
         <Campo label={`Precio de venta por ${d.unidad} (opcional)`} value={d.precioVenta} onChange={v=>set('precioVenta',v)} tipo="number" placeholder="0"/>
         {ganPctForm!==null&&<div style={{fontSize:13,color:'var(--txt2)',margin:'-8px 0 12px'}}>Ganancia: <b style={{color:ganPctForm>=30?'var(--green)':ganPctForm>=10?'var(--orange)':'var(--red)'}}>{ganPctForm}%</b></div>}
+        <Campo label="⏰ Vencimiento (sugerido según categoría, editable)" value={d.vencimiento} onChange={v=>set('vencimiento',v)} tipo="date"/>
         <label className="lbl">📷 Foto de referencia (opcional)</label>
         <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10}}>
           <div style={{width:48,height:48,borderRadius:'var(--radius)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,overflow:'hidden',border:'1px solid var(--border)'}}>
@@ -5120,6 +5167,12 @@ function App(){
   useEffect(()=>{
     aplicarTema(getTema());
   },[]);
+  useEffect(()=>{
+    const unsub=db.collection(`polleria/${uid}/config`).doc('vencimientos').onSnapshot(snap=>{
+      if(snap.exists){const d=snap.data(); if(d&&d.dias)VENC_CFG={...VENCIMIENTO_DIAS_DEFAULT,...d.dias};}
+    },()=>{});
+    return ()=>unsub();
+  },[uid]);
   const pantallas={
     catalogo:<VenderCaja uid={uid}/>,
     pedidos: <PedidosClientes uid={uid}/>,
