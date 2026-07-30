@@ -3344,7 +3344,7 @@ const PROD_PRESETS=[
   {key:'albondiga',    label:'🍡 Albóndiga (preparada)',    nombreStock:'Albóndiga'},
   {key:'kipe',         label:'🌾 Kipe (preparado)',         nombreStock:'Kipe'},
 ];
-const PROD_SUB_DEFAULT={pctAlitas:10,pctCarcasaMenudos:20,precioAlitas:4000,precioCarcasaMenudos:2000};
+const PROD_SUB_DEFAULT={pctAlitas:10,pctCarcasaMenudos:20,precioAlitas:4000,precioCarcasaMenudos:2000,rendPechuga:75,rendPatamuslo:70};
 
 function docIdPollo(nombre){
   return 'pollo-'+nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s/]+/g,'-');
@@ -3436,6 +3436,35 @@ function SeccionProduccion({uid,kg,pollos,precioCajon,margenObj}){
   const kgAlitas=+(kgTotal*(Number(cfg.pctAlitas)||0)/100).toFixed(2);
   const kgCarcasaMenudos=+(kgTotal*(Number(cfg.pctCarcasaMenudos)||0)/100).toFixed(2);
 
+  const cantPechuga=stockPechuga?(Number(stockPechuga.cantidad)||0):0;
+  const cantPatamuslo=stockPatamuslo?(Number(stockPatamuslo.cantidad)||0):0;
+  const rendPechuga=Number(cfg.rendPechuga)||75;
+  const rendPatamuslo=Number(cfg.rendPatamuslo)||70;
+  const carneLimpiaPechuga=+(cantPechuga*rendPechuga/100).toFixed(2);
+  const huesoPechuga=+(cantPechuga-carneLimpiaPechuga).toFixed(2);
+  const carneLimpiaPatamuslo=+(cantPatamuslo*rendPatamuslo/100).toFixed(2);
+  const huesoPatamuslo=+(cantPatamuslo-carneLimpiaPatamuslo).toFixed(2);
+  const [sumandoHueso,setSumandoHueso]=useState(false);
+  const sumarHuesoACarcasas=async()=>{
+    const totalHueso=+(huesoPechuga+huesoPatamuslo).toFixed(2);
+    if(totalHueso<=0)return;
+    setSumandoHueso(true);
+    try{
+      const stockCol=db.collection(`polleria/${uid}/stock`);
+      const prodCol=db.collection(`polleria/${uid}/productos`);
+      const docId=docIdPollo('Carcasas');
+      const ref=stockCol.doc(docId);
+      const snap=await ref.get();
+      const cant=snap.exists?(Number(snap.data().cantidad)||0):0;
+      const precioVentaPrevio=snap.exists?(Number(snap.data().precioVenta)||0):(Number(cfg.precioCarcasaMenudos)||0);
+      const precioCostoPrevio=snap.exists?(Number(snap.data().precioCosto)||0):0;
+      await ref.set({nombre:'Carcasas',categoria:'Pollo',tipo:'produccion',cantidad:+(cant+totalHueso).toFixed(2),unidad:'kg',precioCosto:precioCostoPrevio,precioVenta:precioVentaPrevio,stockMinimo:0,vencimiento:calcularVencimiento('Pollo'),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await prodCol.doc(docId).set({nombre:'Carcasas',categoria:'Pollo',unidad:'kg',precioCosto:precioCostoPrevio,precioVenta:precioVentaPrevio,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      mostrarToast(`✅ ${totalHueso} kg de hueso/piel sumados a Carcasas`);
+    }catch(e){alert('Error: '+e.message);}
+    setSumandoHueso(false);
+  };
+
   const mandarSubproductos=async()=>{
     if(kgAlitas<=0&&kgCarcasaMenudos<=0)return;
     setSubGuardando(true);
@@ -3464,17 +3493,40 @@ function SeccionProduccion({uid,kg,pollos,precioCajon,margenObj}){
     <div>
       <Toast msg={toastMsg}/>
 
-      <div style={{display:'flex',gap:8,marginBottom:14}}>
+      <div style={{display:'flex',gap:8,marginBottom:8}}>
         <div style={{flex:1,background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:'10px 12px'}}>
           <div style={{fontSize:11,color:'var(--blue)',fontWeight:700}}>🥩 Pechuga disponible ahora en stock</div>
-          <div style={{fontSize:20,fontWeight:800,color:'var(--txt)'}}>{stockPechuga?(Number(stockPechuga.cantidad)||0):'…'} kg</div>
+          <div style={{fontSize:20,fontWeight:800,color:'var(--txt)'}}>{stockPechuga?cantPechuga:'…'} kg</div>
+          {stockPechuga&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:2}}>≈ {carneLimpiaPechuga} kg carne limpia + {huesoPechuga} kg hueso/piel ({rendPechuga}%)</div>}
         </div>
         <div style={{flex:1,background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 12px'}}>
           <div style={{fontSize:11,color:'var(--orange)',fontWeight:700}}>🍗 Pata-muslo disponible ahora en stock</div>
-          <div style={{fontSize:20,fontWeight:800,color:'var(--txt)'}}>{stockPatamuslo?(Number(stockPatamuslo.cantidad)||0):'…'} kg</div>
+          <div style={{fontSize:20,fontWeight:800,color:'var(--txt)'}}>{stockPatamuslo?cantPatamuslo:'…'} kg</div>
+          {stockPatamuslo&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:2}}>≈ {carneLimpiaPatamuslo} kg carne limpia + {huesoPatamuslo} kg hueso/piel ({rendPatamuslo}%)</div>}
         </div>
       </div>
-      <div style={{fontSize:10,color:'var(--txt3)',marginTop:-8,marginBottom:14}}>Referencia de lo que ya tenés cortado en stock (de hoy o de otro día). Lo de abajo se descuenta de los {kgTotal} kg asignados a Producción en este cajón.</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <div style={{fontSize:10,color:'var(--txt3)'}}>Referencia de lo que ya tenés cortado en stock. No se descuenta de acá; lo de abajo sale de los {kgTotal} kg asignados a Producción en este cajón.</div>
+        <button onClick={()=>setEditandoCfg(v=>!v)} style={{fontSize:11,padding:'4px 8px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:editandoCfg?'var(--blue-bg)':'var(--bg2)',color:editandoCfg?'var(--blue)':'var(--txt2)',cursor:'pointer',fontWeight:600,flexShrink:0,marginLeft:8}}>⚙️</button>
+      </div>
+      {(huesoPechuga>0||huesoPatamuslo>0)&&(
+        <button onClick={sumarHuesoACarcasas} disabled={sumandoHueso} className="btn-full" style={{background:'var(--txt2)',fontSize:12,padding:9,marginBottom:14}}>
+          {sumandoHueso?'⏳ Guardando...':`🦴 Sumar ${(+(huesoPechuga+huesoPatamuslo).toFixed(2))} kg de hueso/piel a Carcasas`}
+        </button>
+      )}
+      {editandoCfg&&(
+        <div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:10,marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:6}}>% de carne limpia al deshuesar</div>
+          {[['rendPechuga','Pechuga'],['rendPatamuslo','Pata-muslo']].map(([k,lbl])=>(
+            <div key={k} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+              <span style={{flex:1,fontSize:12,color:'var(--txt)'}}>{lbl}</span>
+              <input type="number" min={0} max={100} value={cfg[k]} onChange={e=>setCfg(c=>({...c,[k]:e.target.value}))} className="inp" style={{width:70,textAlign:'center',padding:'5px 4px'}}/>
+              <span style={{fontSize:11,color:'var(--txt3)'}}>%</span>
+            </div>
+          ))}
+          <button onClick={guardarCfg} disabled={guardandoCfg} className="btn-pri" style={{width:'100%',padding:8,fontSize:12,marginTop:4}}>{guardandoCfg?'Guardando...':'💾 Guardar'}</button>
+        </div>
+      )}
 
       <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
         <div style={{display:'flex',justifyContent:'space-between'}}>
