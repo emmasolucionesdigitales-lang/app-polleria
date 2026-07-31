@@ -1625,7 +1625,7 @@ function PantallaPinPoll({pin,onOk}){
   const teclas=[1,2,3,4,5,6,7,8,9,'','0','⌫'];
   React.useEffect(()=>{bioDisponible().then(setBioAvail);},[]);
   const pinCorrecto=()=>{setErr('');if(bioAvail&&!bioReg)setPedirBio(true);else onOk();};
-  const activarHuella=async()=>{setBioMsg('📱 Seguí las instrucciones de tu teléfono...');const ok=await bioRegistrar();if(ok){setBioReg(true);setPedirBio(false);onOk();}else{setBioMsg('No se pudo activar. Entrás igual con el PIN.');setTimeout(()=>{setPedirBio(false);onOk();},1600);}};
+  const activarHuella=async()=>{setBioMsg('📱 Seguí las instrucciones de tu teléfono...');const ok=await bioRegistrar();if(ok){setBioReg(true);onOk();}else{setBioMsg('No se pudo activar. Entrás igual con el PIN.');setTimeout(()=>{onOk();},1600);}};
   const entrarConHuella=async()=>{setBioMsg('👆 Esperando tu huella...');const ok=await bioAutenticar();if(ok)onOk();else setBioMsg('No se reconoció. Probá de nuevo o entrá con el PIN.');};
   const desactivarHuella=()=>{bioDesactivar();setBioReg(false);setBioMsg('Huella desactivada.');};
   const cont=(...kids)=>React.createElement('div',{style:{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:18,background:'#1a0a00',padding:20}},...kids);
@@ -1635,7 +1635,7 @@ function PantallaPinPoll({pin,onOk}){
     React.createElement('p',{style:{color:'rgba(255,255,255,0.7)',fontSize:14,margin:0,textAlign:'center',maxWidth:300,lineHeight:1.5}},'La próxima vez entrás con la huella en vez de escribir el PIN. Usa la huella o cara que ya tenés en tu teléfono.'),
     bioMsg&&React.createElement('p',{style:{color:'#fcd34d',fontSize:13,margin:0,textAlign:'center'}},bioMsg),
     React.createElement('button',{onClick:activarHuella,style:{background:'#f97316',color:'#fff',border:'none',borderRadius:12,padding:'14px 28px',fontSize:16,fontWeight:700,cursor:'pointer',width:280}},'👆 Sí, activar huella'),
-    React.createElement('button',{onClick:()=>{setPedirBio(false);onOk();},style:{background:'transparent',color:'rgba(255,255,255,0.6)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:12,padding:'12px 28px',fontSize:14,cursor:'pointer',width:280}},'Ahora no')
+    React.createElement('button',{onClick:()=>{onOk();},style:{background:'transparent',color:'rgba(255,255,255,0.6)',border:'1px solid rgba(255,255,255,0.2)',borderRadius:12,padding:'12px 28px',fontSize:14,cursor:'pointer',width:280}},'Ahora no')
   );
   return cont(
     React.createElement('div',{style:{fontSize:48}},'🍗'),
@@ -2390,6 +2390,7 @@ function CalculadoraCajon({uid}){
   const [guardandoCfg,setGuardandoCfg]=useState(false);
   const [asigEntero,setAsigEntero]=useState('');
   const [asigDespiece,setAsigDespiece]=useState('');
+  const [asigProduccion,setAsigProduccion]=useState('');
   const cfgRef=db.collection(`polleria/${uid}/config`).doc('cajon');
   useEffect(()=>{
     cfgRef.get().then(snap=>{
@@ -2416,7 +2417,8 @@ function CalculadoraCajon({uid}){
 
   const nEntero=parseInt(asigEntero)||0;
   const nDespiece=parseInt(asigDespiece)||0;
-  const asignados=nEntero+nDespiece;
+  const nProduccion=parseInt(asigProduccion)||0;
+  const asignados=nEntero+nDespiece+nProduccion;
   const sinAsignar=tot-asignados;
   const kgEntero=+(nEntero*kgPromedioVend).toFixed(2);
   const kgDespiece=+(nDespiece*kgPromedioVend).toFixed(2);
@@ -2611,6 +2613,7 @@ function CalculadoraCajon({uid}){
         {[
           {lbl:'🐔 Venta pollo entero',lbl2:'(sin procesar)', val:asigEntero, set:setAsigEntero, kg:kgEntero},
           {lbl:'🔪 Despiece',lbl2:'(cortes: pechuga, pata-muslo, alitas, carcasas, menudos)', val:asigDespiece, set:setAsigDespiece, kg:kgDespiece},
+          {lbl:'🍴 Producción',lbl2:'(milanesa, filet, molida, albóndiga, kipe)', val:asigProduccion, set:setAsigProduccion, kg:null},
         ].map((r,i)=>(
           <div key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
             <div style={{flex:1}}>
@@ -2618,7 +2621,7 @@ function CalculadoraCajon({uid}){
               <div style={{fontSize:10,color:'var(--txt3)'}}>{r.lbl2}</div>
             </div>
             <input type="number" min={0} value={r.val} onChange={e=>r.set(e.target.value)} placeholder="0" className="inp" style={{width:64,textAlign:'center',fontWeight:700,padding:'6px 4px'}}/>
-            <span style={{width:80,textAlign:'right',fontSize:11,color:'var(--txt2)'}}>{r.kg} kg</span>
+            <span style={{width:80,textAlign:'right',fontSize:11,color:'var(--txt2)'}}>{r.kg!=null?`${r.kg} kg`:''}</span>
           </div>
         ))}
         <div style={{display:'flex',justifyContent:'space-between',fontSize:12,fontWeight:700,color:sinAsignar<0?'var(--red)':sinAsignar===0?'var(--green)':'var(--orange)',marginTop:6}}>
@@ -2724,7 +2727,7 @@ function CalculadoraCajon({uid}){
         </button>
       </div>}
 
-      <SeccionProduccion uid={uid}/>
+      {nProduccion>0&&<SeccionProduccion uid={uid}/>}
 
       <div className="panel">
         <button onClick={async()=>{
