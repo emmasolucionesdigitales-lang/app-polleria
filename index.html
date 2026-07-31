@@ -2722,8 +2722,9 @@ function CalculadoraCajon({uid}){
           style={{background:'var(--orange)',opacity:(!precioCajon||Number(precioCajon)<=0)?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Sumar despiece al stock'}
         </button>
-        <div style={{fontSize:11,color:'var(--txt2)',marginTop:10}}>💡 Para hacer milanesas, filet, molida, albóndigas o kipe: una vez que el despiece esté en stock, andá a la pestaña <b>🍴 Producción</b>.</div>
       </div>}
+
+      <SeccionProduccion uid={uid}/>
 
       <div className="panel">
         <button onClick={async()=>{
@@ -2744,14 +2745,7 @@ function CalculadoraCajon({uid}){
 }
 
 function SeccionPollo({uid}){
-  const [v,setV]=useState('cajon');
-  return(<div>
-    <div className="tab-bar" style={{marginBottom:12}}>
-      <button onClick={()=>setV('cajon')} className={`tab-btn${v==='cajon'?' activo':''}`} style={{flex:1}}>🧮 Comprar cajón</button>
-      <button onClick={()=>setV('produccion')} className={`tab-btn${v==='produccion'?' activo':''}`} style={{flex:1}}>🍴 Producción</button>
-    </div>
-    {v==='cajon'?<CalculadoraCajon uid={uid}/>:<SeccionProduccion uid={uid}/>}
-  </div>);
+  return <CalculadoraCajon uid={uid}/>;
 }
 
 const VERDU_NOMBRES=['Papas','Batata','Cebolla','Cebolla de verdeo','Tomate','Tomate perita','Zanahoria','Zapallo','Zapallo anco','Zapallito','Choclo','Morrón','Ajo','Lechuga','Repollo','Brócoli','Coliflor','Berenjena','Pepino','Remolacha','Rabanito','Puerro','Chaucha','Arvejas','Espinaca','Acelga','Apio','Calabaza','Cayote','Palta','Hongos','Perejil','Banana','Manzana','Naranja','Mandarina','Pera','Frutilla','Kiwi','Mango','Sandía','Melón','Uvas','Ananá','Limón','Pomelo','Durazno','Ciruela','Huevos'];
