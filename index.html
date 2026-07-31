@@ -1785,6 +1785,7 @@ function PantallaCatalogo({uid,subnav}){
   const [productos,setProductos]=useState([]);
   const [stockItems,setStockItems]=useState([]);
   const [clientes,setClientes]=useState([]);
+  const [promos,setPromos]=useState([]);
   const [buscar,setBuscar]=useState('');
   const [catFiltro,setCatFiltro]=useState('Todos');
   const [carrito,setCarrito]=useState([]);
@@ -1800,7 +1801,9 @@ function PantallaCatalogo({uid,subnav}){
       .onSnapshot(s=>setStockItems(s.docs.map(d=>({id:d.id,...d.data()}))));
     const u3=db.collection(`polleria/${uid}/clientes`).orderBy('nombre','asc')
       .onSnapshot(s=>setClientes(s.docs.map(d=>({id:d.id,...d.data()}))));
-    return()=>{u1();u2();u3();};
+    const u4=db.collection(`polleria/${uid}/promociones`).where('activa','==',true)
+      .onSnapshot(s=>setPromos(s.docs.map(d=>({id:d.id,...d.data()}))));
+    return()=>{u1();u2();u3();u4();};
   },[]);
 
   // Normalización de nombres de categoría (para mostrarlas con emoji)
@@ -1808,12 +1811,19 @@ function PantallaCatalogo({uid,subnav}){
   // Catálogo vinculado al stock: solo aparece lo que hay cargado y con precio.
   // Aplica igual a pollo, congelados y verdulería. Si limpiás el stock, desaparece de Vender.
   const todosProductos=React.useMemo(()=>{
-    const norm=p=>({...p, categoriaOriginal:p.categoria, categoria:catMap[p.categoria]||p.categoria||'📦 Otros'});
+    const norm=p=>{
+      const promo=promos.find(pr=>pr.productoId===p.id);
+      const precioOriginal=Number(p.precioVenta)||0;
+      return {...p, categoriaOriginal:p.categoria, categoria:catMap[p.categoria]||p.categoria||'📦 Otros',
+        precioOriginal:promo?precioOriginal:null,
+        precioVenta:promo?Number(promo.precioPromo)||precioOriginal:precioOriginal,
+        promoTipo:promo?promo.tipo:null};
+    };
     return stockItems
       .filter(s=>(Number(s.precioVenta)||0)>0 && (Number(s.cantidad)||0)>0)
       .map(norm)
       .sort((a,b)=>(a.categoria||'').localeCompare(b.categoria||'')||(a.nombre||'').localeCompare(b.nombre||''));
-  },[stockItems]);
+  },[stockItems,promos]);
 
   const mostrarToast=msg=>{setToast(msg);setTimeout(()=>setToast(''),2200);};
 
@@ -1915,8 +1925,9 @@ function PantallaCatalogo({uid,subnav}){
                   <div className="prod-card-info">
                     <div className="prod-card-nombre">{p.nombre}{dotVenc(p.vencimiento,p.categoriaOriginal,9)}</div>
                     <div className="prod-card-unidad">por {p.unidad||'kg'}</div>
+                    {p.precioOriginal!=null&&<span style={{fontSize:10,fontWeight:700,color:p.promoTipo==='liquidacion'?'var(--red)':'var(--green)',background:p.promoTipo==='liquidacion'?'var(--red-bg)':'var(--green-bg)',borderRadius:4,padding:'1px 6px',display:'inline-block',marginBottom:2}}>{p.promoTipo==='liquidacion'?'🔥 Liquidación':'🏷️ Oferta'}</span>}
                     <div style={{fontSize:11,color:'var(--green)',fontWeight:600,margin:'1px 0 2px'}}>📦 {(Number(p.cantidad)||0)} {p.unidad||'kg'} en stock</div>
-                    <div className="prod-card-precio">{formatPeso(p.precioVenta||0)}</div>
+                    <div className="prod-card-precio">{p.precioOriginal!=null&&<span style={{fontSize:12,color:'var(--txt3)',textDecoration:'line-through',fontWeight:400,marginRight:5}}>{formatPeso(p.precioOriginal)}</span>}{formatPeso(p.precioVenta||0)}</div>
                     <button className="prod-card-btn" style={{background:enC?'var(--green)':'var(--txt)'}}>
                       {enC?(esPeso?`⚖️ ${enC.cantidad} ${p.unidad||'kg'}`:`🛒 ${enC.cantidad} unid.`):(esPeso?'⚖️ Ingresar peso':'+ Agregar')}
                     </button>
@@ -3771,7 +3782,7 @@ function PantallaStock({uid}){
       <Header titulo="Stock / Inventario" onAdd={headerAdd}/>
       <div className="app-body">
         <div className="tab-bar" style={{overflowX:'auto'}}>
-          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
+          {[{k:'stock',lbl:'📦 Inventario'},{k:'cajon',lbl:'🐔 Cajones'},{k:'congelados',lbl:'❄️ Congelados'},{k:'verduleria',lbl:'🥦 Verdulería'},{k:'promos',lbl:'🏷️ Promos'},{k:'precios',lbl:'💰 Precios'}].map(s=>(
             <button key={s.k} onClick={()=>setSec(s.k)} className={`tab-btn${sec===s.k?' activo':''}`} style={{flexShrink:0,whiteSpace:'nowrap'}}>{s.lbl}</button>
           ))}
         </div>
@@ -3836,8 +3847,108 @@ function PantallaStock({uid}){
         {sec==='mermas'&&<SeccionMermas uid={uid} stockItems={items}/>}
         {sec==='recetas'&&<SeccionRecetas uid={uid}/>}
         {sec==='proveedores'&&<SeccionProveedores uid={uid}/>}
+        {sec==='promos'&&<SeccionPromociones uid={uid} items={items}/>}
         {sec==='precios'&&<PantallaPrecios uid={uid} sinHeader={true}/>}
       </div>
+    </div>
+  );
+}
+
+/* ─── PROMOCIONES / LIQUIDACIONES ─── */
+function SeccionPromociones({uid,items}){
+  const [promos,setPromos]=useState([]);
+  const [form,setForm]=useState(null);
+  const [guardando,setGuardando]=useState(false);
+  const [toastMsg,setToastMsg]=useState('');
+  const col=db.collection(`polleria/${uid}/promociones`);
+  useEffect(()=>col.orderBy('createdAt','desc').onSnapshot(s=>setPromos(s.docs.map(d=>({id:d.id,...d.data()})))),[]);
+  const mostrarToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(''),2500);};
+
+  const disponibles=items.filter(i=>(Number(i.precioVenta)||0)>0);
+
+  const abrirNuevo=()=>setForm({productoId:'',nombre:'',precioOriginal:0,precioPromo:'',tipo:'promocion',activa:true});
+  const elegirProducto=id=>{
+    const it=items.find(i=>i.id===id);
+    setForm(f=>({...f,productoId:id,nombre:it?it.nombre:'',precioOriginal:it?(Number(it.precioVenta)||0):0}));
+  };
+
+  const guardar=async()=>{
+    if(!form.productoId)return alert('Elegí un producto');
+    if(!form.precioPromo||Number(form.precioPromo)<=0)return alert('Ingresá el precio promocional');
+    if(Number(form.precioPromo)>=Number(form.precioOriginal))return alert('El precio promocional debe ser menor al precio actual');
+    setGuardando(true);
+    try{
+      const {id,...r}=form;
+      const data={...r,precioOriginal:Number(form.precioOriginal)||0,precioPromo:Number(form.precioPromo)||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+      if(id)await col.doc(id).update(data);
+      else await col.add({...data,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+      setForm(null);
+      mostrarToast('✅ Promoción guardada');
+    }catch(e){alert('Error: '+e.message);}
+    setGuardando(false);
+  };
+
+  const toggleActiva=async(p)=>{await col.doc(p.id).update({activa:!p.activa});};
+  const eliminar=async id=>{if(!confirm('¿Eliminar esta promoción?'))return;await col.doc(id).delete();};
+
+  if(form!==null){
+    const descPct=form.precioOriginal>0&&form.precioPromo?Math.round((1-Number(form.precioPromo)/Number(form.precioOriginal))*100):null;
+    return(
+      <div>
+        <Toast msg={toastMsg}/>
+        <div className="panel">
+          <div className="ptitle" style={{marginBottom:10}}>{form.id?'✏️ Editar promoción':'🏷️ Nueva promoción'}</div>
+          <label className="lbl" style={{marginTop:0}}>Producto</label>
+          <select value={form.productoId} onChange={e=>elegirProducto(e.target.value)} className="inp" style={{marginBottom:10,fontWeight:600}} disabled={!!form.id}>
+            <option value="">Elegí un producto...</option>
+            {disponibles.map(i=>(<option key={i.id} value={i.id}>{i.nombre} — {formatPeso(i.precioVenta)}/{i.unidad}</option>))}
+          </select>
+
+          <label className="lbl">Tipo</label>
+          <div className="chip-group" style={{marginBottom:10}}>
+            <button onClick={()=>setForm(f=>({...f,tipo:'promocion'}))} className={`chip${form.tipo==='promocion'?' activo':''}`}>🏷️ Promoción</button>
+            <button onClick={()=>setForm(f=>({...f,tipo:'liquidacion'}))} className={`chip${form.tipo==='liquidacion'?' activo':''}`}>🔥 Liquidación</button>
+          </div>
+
+          {form.productoId&&<div style={{fontSize:12,color:'var(--txt2)',marginBottom:8}}>Precio actual: <b style={{color:'var(--txt)'}}>{formatPeso(form.precioOriginal)}</b></div>}
+          <Campo label="Precio promocional ($)" value={form.precioPromo} onChange={v=>setForm(f=>({...f,precioPromo:v}))} tipo="number" placeholder="0"/>
+          {descPct!==null&&descPct>0&&<div style={{fontSize:13,color:'var(--green)',fontWeight:700,margin:'-6px 0 12px'}}>≈ {descPct}% de descuento</div>}
+
+          <div style={{display:'flex',gap:8,marginTop:14}}>
+            <button onClick={guardar} disabled={guardando} className="btn-pri" style={{flex:1,padding:14,fontSize:15}}>{guardando?'Guardando...':(form.id?'✓ Guardar':'+ Crear promoción')}</button>
+            <button onClick={()=>setForm(null)} className="btn-sec" style={{padding:14}}>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div>
+      <Toast msg={toastMsg}/>
+      <button onClick={abrirNuevo} className="btn-pri" style={{width:'100%',marginBottom:12,padding:10,fontSize:14}}>+ Nueva promoción / liquidación</button>
+      {promos.length===0&&<div className="empty"><div style={{fontSize:48,marginBottom:12}}>🏷️</div>No hay promociones cargadas</div>}
+      {promos.map(p=>{
+        const descPct=p.precioOriginal>0?Math.round((1-Number(p.precioPromo)/Number(p.precioOriginal))*100):0;
+        return(
+          <div key={p.id} className="card" style={{borderColor:p.activa?(p.tipo==='liquidacion'?'var(--red)':'var(--green)'):'var(--border)',opacity:p.activa?1:0.5}}>
+            <div className="card-body">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div className="card-name">{p.tipo==='liquidacion'?'🔥':'🏷️'} {p.nombre}</div>
+                  <div className="card-sub"><span style={{textDecoration:'line-through'}}>{formatPeso(p.precioOriginal)}</span> → <b style={{color:'var(--green)'}}>{formatPeso(p.precioPromo)}</b> ({descPct}% off)</div>
+                  <span className={p.activa?'pill pill-green':'pill pill-gray'} style={{marginTop:4,display:'inline-block'}}>{p.activa?'Activa':'Pausada'}</span>
+                </div>
+              </div>
+              <div className="card-actions">
+                <button onClick={()=>toggleActiva(p)} className="btn-ic">{p.activa?'⏸️ Pausar':'▶️ Activar'}</button>
+                <button onClick={()=>setForm(p)} className="btn-ic">✏️ Editar</button>
+                <button onClick={()=>eliminar(p.id)} className="btn-ic" style={{color:'var(--red)'}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
