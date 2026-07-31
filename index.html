@@ -2727,7 +2727,7 @@ function CalculadoraCajon({uid}){
         </button>
       </div>}
 
-      {nProduccion>0&&<SeccionProduccion uid={uid}/>}
+      {nProduccion>0&&<SeccionProduccion uid={uid} margenObj={margenObj}/>}
 
       <div className="panel">
         <button onClick={async()=>{
@@ -3356,14 +3356,11 @@ function docIdPollo(nombre){
   return 'pollo-'+nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[\s/]+/g,'-');
 }
 
-function SeccionProduccion({uid}){
+function SeccionProduccion({uid,margenObj}){
   const [stockPechuga,setStockPechuga]=useState(null);
   const [stockPatamuslo,setStockPatamuslo]=useState(null);
-  const [presetKey,setPresetKey]=useState(PROD_PRESETS[0].key);
-  const [corteManual,setCorteManual]=useState('Pechuga');
-  const [kgUsar,setKgUsar]=useState('');
-  const [precioManual,setPrecioManual]=useState(null);
-  const [margenObj,setMargenObj]=useState(30);
+  const [kgPorProducto,setKgPorProducto]=useState({});
+  const [corteSeleccion,setCorteSeleccion]=useState({molida:'Pechuga',albondiga:'Pechuga',kipe:'Pechuga'});
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
   const [historial,setHistorial]=useState([]);
@@ -3371,6 +3368,7 @@ function SeccionProduccion({uid}){
   const [editandoCfg,setEditandoCfg]=useState(false);
   const [guardandoCfg,setGuardandoCfg]=useState(false);
   const cfgRef=db.collection(`polleria/${uid}/config`).doc('produccion');
+  const margen=Number(margenObj)||30;
 
   useEffect(()=>{
     cfgRef.get().then(snap=>{if(snap.exists)setCfg(c=>({...c,...snap.data()}));}).catch(()=>{});
@@ -3396,26 +3394,32 @@ function SeccionProduccion({uid}){
   const huesoPechuga=+(cantPechuga-carneLimpiaPechuga).toFixed(2);
   const carneLimpiaPatamuslo=+(cantPatamuslo*rendPatamuslo/100).toFixed(2);
   const huesoPatamuslo=+(cantPatamuslo-carneLimpiaPatamuslo).toFixed(2);
+  const costoKgPechuga=stockPechuga?(Number(stockPechuga.precioCosto)||0):0;
+  const costoKgPatamuslo=stockPatamuslo?(Number(stockPatamuslo.precioCosto)||0):0;
 
-  const preset=PROD_PRESETS.find(p=>p.key===presetKey)||PROD_PRESETS[0];
-  const corteActivo=preset.corteFijo?preset.corte:corteManual;
-  const esPechuga=corteActivo==='Pechuga';
-  const rendActivo=esPechuga?rendPechuga:rendPatamuslo;
-  const stockCorte=esPechuga?stockPechuga:stockPatamuslo;
-  const cantRawCorte=esPechuga?cantPechuga:cantPatamuslo;
-  const carneLimpiaDisponible=esPechuga?carneLimpiaPechuga:carneLimpiaPatamuslo;
-  const costoKgRaw=stockCorte?(Number(stockCorte.precioCosto)||0):0;
+  const setKg=(key,v)=>setKgPorProducto(p=>({...p,[key]:v}));
+  const setCorte=(key,c)=>setCorteSeleccion(p=>({...p,[key]:c}));
 
-  const kgN=Math.max(0,Number(kgUsar)||0);
-  const excede=kgN>carneLimpiaDisponible;
-  const kgCrudoUsado=rendActivo>0?+(kgN/(rendActivo/100)).toFixed(3):0;
-  const kgHuesoGenerado=+(kgCrudoUsado-kgN).toFixed(3);
-  const costoTotal=+(kgCrudoUsado*costoKgRaw).toFixed(2);
-  const costoKgLimpio=kgN>0?+(costoTotal/kgN).toFixed(2):0;
-  const precioAuto=costoKgLimpio>0?Math.round(costoKgLimpio*(1+(Number(margenObj)||0)/100)):0;
-  const precioEfectivo=precioManual!==null?Number(precioManual):precioAuto;
+  const filas=PROD_PRESETS.map(preset=>{
+    const corteActivo=preset.corteFijo?preset.corte:(corteSeleccion[preset.key]||'Pechuga');
+    const esPechuga=corteActivo==='Pechuga';
+    const rendActivo=esPechuga?rendPechuga:rendPatamuslo;
+    const costoKgRaw=esPechuga?costoKgPechuga:costoKgPatamuslo;
+    const kgN=Math.max(0,Number(kgPorProducto[preset.key])||0);
+    const kgCrudoUsado=rendActivo>0?+(kgN/(rendActivo/100)).toFixed(3):0;
+    const kgHuesoGenerado=+(kgCrudoUsado-kgN).toFixed(3);
+    const costoTotal=+(kgCrudoUsado*costoKgRaw).toFixed(2);
+    const costoKgLimpio=kgN>0?+(costoTotal/kgN).toFixed(2):0;
+    const precioAuto=costoKgLimpio>0?Math.round(costoKgLimpio*(1+margen/100)):0;
+    return{...preset,corteActivo,esPechuga,rendActivo,costoKgRaw,kgN,kgCrudoUsado,kgHuesoGenerado,costoTotal,costoKgLimpio,precioAuto};
+  });
 
-  const cambiarPreset=k=>{setPresetKey(k);setKgUsar('');setPrecioManual(null);};
+  const kgAsignadoPechuga=+filas.filter(f=>f.esPechuga).reduce((s,f)=>s+f.kgN,0).toFixed(2);
+  const kgAsignadoPatamuslo=+filas.filter(f=>!f.esPechuga).reduce((s,f)=>s+f.kgN,0).toFixed(2);
+  const excedePechuga=kgAsignadoPechuga>carneLimpiaPechuga;
+  const excedePatamuslo=kgAsignadoPatamuslo>carneLimpiaPatamuslo;
+  const hayAlgoCargado=filas.some(f=>f.kgN>0);
+  const puedeEnviar=hayAlgoCargado&&!excedePechuga&&!excedePatamuslo;
 
   const guardarCfg=async()=>{
     setGuardandoCfg(true);
@@ -3427,43 +3431,51 @@ function SeccionProduccion({uid}){
     setGuardandoCfg(false);
   };
 
-  const enviarAlStock=async()=>{
-    if(kgN<=0)return alert('Ingresá cuántos kg vas a usar');
-    if(excede)return alert(`No hay suficiente ${corteActivo} limpia disponible. Disponible: ${carneLimpiaDisponible} kg`);
+  const enviarTodoAlStock=async()=>{
+    if(!puedeEnviar)return;
     setGuardando(true);
     try{
       const stockCol=db.collection(`polleria/${uid}/stock`);
       const prodCol=db.collection(`polleria/${uid}/productos`);
-      // 1) Descontar el crudo usado del corte de origen
-      const origenRef=stockCol.doc(docIdPollo(corteActivo));
-      const origenSnap=await origenRef.get();
-      const cantOrigen=origenSnap.exists?(Number(origenSnap.data().cantidad)||0):0;
-      await origenRef.set({cantidad:+(cantOrigen-kgCrudoUsado).toFixed(2),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      // 2) Sumar el hueso/piel generado a Carcasas
-      if(kgHuesoGenerado>0){
+      const activas=filas.filter(f=>f.kgN>0);
+
+      // 1) Descontar el crudo usado de cada corte de origen (agrupado)
+      const crudoPorCorte={Pechuga:0,'Pata-muslo':0};
+      const huesoTotal=activas.reduce((s,f)=>{crudoPorCorte[f.corteActivo]+=f.kgCrudoUsado;return s+f.kgHuesoGenerado;},0);
+      for(const corte of CORTES_ORIGEN){
+        if(crudoPorCorte[corte]<=0)continue;
+        const ref=stockCol.doc(docIdPollo(corte));
+        const snap=await ref.get();
+        const cant=snap.exists?(Number(snap.data().cantidad)||0):0;
+        await ref.set({cantidad:+(cant-crudoPorCorte[corte]).toFixed(2),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      // 2) Sumar el hueso/piel total generado a Carcasas
+      if(huesoTotal>0){
         const carcasasRef=stockCol.doc(docIdPollo('Carcasas'));
         const carcasasSnap=await carcasasRef.get();
         const cantCarcasas=carcasasSnap.exists?(Number(carcasasSnap.data().cantidad)||0):0;
         const precioVentaCarcasas=carcasasSnap.exists?(Number(carcasasSnap.data().precioVenta)||0):2000;
-        await carcasasRef.set({nombre:'Carcasas',categoria:'Pollo',tipo:'produccion',cantidad:+(cantCarcasas+kgHuesoGenerado).toFixed(2),unidad:'kg',precioVenta:precioVentaCarcasas,stockMinimo:0,vencimiento:calcularVencimiento('Pollo'),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        await carcasasRef.set({nombre:'Carcasas',categoria:'Pollo',tipo:'produccion',cantidad:+(cantCarcasas+huesoTotal).toFixed(2),unidad:'kg',precioVenta:precioVentaCarcasas,stockMinimo:0,vencimiento:calcularVencimiento('Pollo'),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
         await prodCol.doc(docIdPollo('Carcasas')).set({nombre:'Carcasas',categoria:'Pollo',unidad:'kg',precioVenta:precioVentaCarcasas,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
-      // 3) Sumar el producto elaborado
-      const destId=docIdPollo(preset.nombreStock);
-      const destRef=stockCol.doc(destId);
-      const destSnap=await destRef.get();
-      const cantDest=destSnap.exists?(Number(destSnap.data().cantidad)||0):0;
-      await destRef.set({
-        nombre:preset.nombreStock,categoria:'Pollo',tipo:'produccion',
-        cantidad:+(cantDest+kgN).toFixed(2),
-        unidad:'kg',precioCosto:costoKgLimpio,precioVenta:precioEfectivo||0,stockMinimo:0,
-        vencimiento:calcularVencimiento('Pollo'),
-        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-      },{merge:true});
-      await prodCol.doc(destId).set({nombre:preset.nombreStock,categoria:'Pollo',unidad:'kg',precioCosto:costoKgLimpio,precioVenta:precioEfectivo||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-      setHistorial(h=>[{nombre:preset.nombreStock,kg:kgN,corte:corteActivo,hueso:kgHuesoGenerado,hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})},...h].slice(0,8));
-      mostrarToast(`✅ ${kgN} kg de ${preset.nombreStock} sumados al stock`);
-      setKgUsar('');setPrecioManual(null);
+      // 3) Sumar cada producto elaborado
+      for(const f of activas){
+        const destId=docIdPollo(f.nombreStock);
+        const destRef=stockCol.doc(destId);
+        const destSnap=await destRef.get();
+        const cantDest=destSnap.exists?(Number(destSnap.data().cantidad)||0):0;
+        await destRef.set({
+          nombre:f.nombreStock,categoria:'Pollo',tipo:'produccion',
+          cantidad:+(cantDest+f.kgN).toFixed(2),
+          unidad:'kg',precioCosto:f.costoKgLimpio,precioVenta:f.precioAuto||0,stockMinimo:0,
+          vencimiento:calcularVencimiento('Pollo'),
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        },{merge:true});
+        await prodCol.doc(destId).set({nombre:f.nombreStock,categoria:'Pollo',unidad:'kg',precioCosto:f.costoKgLimpio,precioVenta:f.precioAuto||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      }
+      setHistorial(h=>[...activas.map(f=>({nombre:f.nombreStock,kg:f.kgN,corte:f.corteActivo,hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})})),...h].slice(0,10));
+      mostrarToast(`✅ ${activas.length} producto(s) sumados al stock`);
+      setKgPorProducto({});
     }catch(e){alert('Error: '+e.message);}
     setGuardando(false);
   };
@@ -3476,7 +3488,7 @@ function SeccionProduccion({uid}){
           <div className="ptitle" style={{margin:0}}>🍴 Producción</div>
           <button onClick={()=>setEditandoCfg(v=>!v)} style={{fontSize:11,padding:'5px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:editandoCfg?'var(--blue-bg)':'var(--bg2)',color:editandoCfg?'var(--blue)':'var(--txt2)',cursor:'pointer',fontWeight:600}}>⚙️ % deshuesado</button>
         </div>
-        <div style={{fontSize:11,color:'var(--txt2)',marginBottom:12}}>Convertí lo que ya tenés en Stock (pechuga o pata-muslo, de hoy o de cualquier día) en milanesa, filet, molida, albóndiga o kipe. El hueso/piel que se descarta se suma solo a Carcasas.</div>
+        <div style={{fontSize:11,color:'var(--txt2)',marginBottom:12}}>Convertí la pechuga o pata-muslo que tengas en stock en milanesa, filet, molida, albóndiga o kipe. Cargá cantidad en los productos que quieras hacer y mandalos todos juntos.</div>
 
         {editandoCfg&&(
           <div style={{background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:10,marginBottom:14}}>
@@ -3493,76 +3505,45 @@ function SeccionProduccion({uid}){
         )}
 
         <div style={{display:'flex',gap:8,marginBottom:14}}>
-          <div style={{flex:1,background:'var(--blue-bg)',border:'1px solid var(--blue)',borderRadius:'var(--radius)',padding:'10px 12px'}}>
+          <div style={{flex:1,background:'var(--blue-bg)',border:`1px solid ${excedePechuga?'var(--red)':'var(--blue)'}`,borderRadius:'var(--radius)',padding:'10px 12px'}}>
             <div style={{fontSize:11,color:'var(--blue)',fontWeight:700}}>🥩 Pechuga en stock</div>
             <div style={{fontSize:20,fontWeight:800,color:'var(--txt)'}}>{stockPechuga?cantPechuga:'…'} kg</div>
             {stockPechuga&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:2}}>≈ {carneLimpiaPechuga} kg limpia + {huesoPechuga} kg hueso ({rendPechuga}%)</div>}
+            {kgAsignadoPechuga>0&&<div style={{fontSize:11,fontWeight:700,marginTop:4,color:excedePechuga?'var(--red)':'var(--green)'}}>{excedePechuga?'⚠️ ':''}Asignado: {kgAsignadoPechuga} / {carneLimpiaPechuga} kg</div>}
           </div>
-          <div style={{flex:1,background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:'var(--radius)',padding:'10px 12px'}}>
+          <div style={{flex:1,background:'var(--orange-bg)',border:`1px solid ${excedePatamuslo?'var(--red)':'var(--orange)'}`,borderRadius:'var(--radius)',padding:'10px 12px'}}>
             <div style={{fontSize:11,color:'var(--orange)',fontWeight:700}}>🍗 Pata-muslo en stock</div>
             <div style={{fontSize:20,fontWeight:800,color:'var(--txt)'}}>{stockPatamuslo?cantPatamuslo:'…'} kg</div>
             {stockPatamuslo&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:2}}>≈ {carneLimpiaPatamuslo} kg limpia + {huesoPatamuslo} kg hueso ({rendPatamuslo}%)</div>}
+            {kgAsignadoPatamuslo>0&&<div style={{fontSize:11,fontWeight:700,marginTop:4,color:excedePatamuslo?'var(--red)':'var(--green)'}}>{excedePatamuslo?'⚠️ ':''}Asignado: {kgAsignadoPatamuslo} / {carneLimpiaPatamuslo} kg</div>}
           </div>
         </div>
 
-        <label className="lbl" style={{marginTop:0}}>¿Qué querés producir?</label>
-        <select value={presetKey} onChange={e=>cambiarPreset(e.target.value)} className="inp" style={{marginBottom:10,fontWeight:600}}>
-          {PROD_PRESETS.map(p=>(<option key={p.key} value={p.key}>{p.label}</option>))}
-        </select>
-
-        {!preset.corteFijo&&(
-          <div style={{marginBottom:10}}>
-            <label className="lbl" style={{marginTop:0}}>¿De qué corte sale?</label>
-            <div style={{display:'flex',gap:6}}>
-              {CORTES_ORIGEN.map(c=>(
-                <button key={c} onClick={()=>{setCorteManual(c);setKgUsar('');setPrecioManual(null);}} className={`chip${corteManual===c?' activo':''}`} style={{flex:1}}>{c}</button>
-              ))}
+        {filas.map(f=>(
+          <div key={f.key} style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <span style={{fontWeight:700,fontSize:13,color:'var(--txt)'}}>{f.label}</span>
+              {!f.corteFijo&&(
+                <div style={{display:'flex',gap:4}}>
+                  {CORTES_ORIGEN.map(c=>(
+                    <button key={c} onClick={()=>setCorte(f.key,c)} className={`chip${f.corteActivo===c?' activo':''}`} style={{fontSize:11,padding:'3px 8px'}}>{c}</button>
+                  ))}
+                </div>
+              )}
+              {f.corteFijo&&<span style={{fontSize:10,color:'var(--txt3)'}}>{f.corte}</span>}
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input type="number" min={0} step={0.1} value={kgPorProducto[f.key]||''} onChange={e=>setKg(f.key,e.target.value)}
+                placeholder="0 kg" className="inp" style={{flex:1,fontWeight:700,padding:'6px 8px'}}/>
+              <span style={{fontSize:11,color:'var(--txt3)',minWidth:70,textAlign:'right'}}>{f.kgN>0?`${formatPeso(f.precioAuto)}/kg`:''}</span>
             </div>
           </div>
-        )}
-        {preset.corteFijo&&<div style={{fontSize:11,color:'var(--txt3)',marginBottom:10}}>Corte de origen: <b style={{color:'var(--txt2)'}}>{corteActivo}</b></div>}
+        ))}
 
-        <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-            <label className="lbl" style={{marginTop:0}}>Kg de {corteActivo} limpia a usar</label>
-            <span style={{fontSize:11,color:excede?'var(--red)':'var(--txt3)',fontWeight:excede?700:400}}>disp: {carneLimpiaDisponible} kg</span>
-          </div>
-          <input type="number" min={0} step={0.1} value={kgUsar} onChange={e=>setKgUsar(e.target.value)}
-            placeholder="0" className="inp" style={{fontWeight:700,fontSize:20,borderColor:excede?'var(--red)':undefined}}/>
-          {excede&&<div style={{fontSize:11,color:'var(--red)',marginTop:4,fontWeight:600}}>⚠️ Superás la carne limpia disponible de {corteActivo}</div>}
-          {kgN>0&&!excede&&<div style={{fontSize:11,color:'var(--txt3)',marginTop:4}}>≈ {kgCrudoUsado} kg crudos ({corteActivo}) · genera {kgHuesoGenerado} kg de hueso/piel → Carcasas</div>}
-        </div>
+        <div style={{fontSize:11,color:'var(--txt3)',marginBottom:10}}>Precio de venta automático con {margen}% de margen (el mismo definido arriba en el cajón).</div>
 
-        <div style={{background:'var(--green-bg)',border:'1px solid var(--green)',borderRadius:'var(--radius)',padding:'10px 12px',marginBottom:12}}>
-          <label className="lbl" style={{marginTop:0,color:'var(--green)',fontWeight:700,fontSize:12}}>🎯 Margen objetivo</label>
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            {[30,40,50].map(m=>(<button key={m} onClick={()=>setMargenObj(m)} className={`chip${margenObj===m?' activo':''}`} style={{flex:1}}>{m}%</button>))}
-            <input type="number" min={0} value={margenObj} onChange={e=>setMargenObj(Math.max(0,Number(e.target.value)))} className="inp" style={{width:70,textAlign:'center',fontWeight:700,padding:'5px 6px'}}/>
-          </div>
-        </div>
-
-        {kgN>0&&(
-          <div style={{background:'var(--bg2)',borderRadius:'var(--radius)',padding:12,marginBottom:12}}>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}>
-              <span style={{fontSize:13,color:'var(--txt2)'}}>Costo total asignado</span>
-              <span style={{fontWeight:700,color:'var(--red)'}}>{formatPeso(costoTotal)}</span>
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0'}}>
-              <span style={{fontSize:13,color:'var(--txt2)'}}>Costo por kg (carne limpia)</span>
-              <span style={{fontWeight:700,color:'var(--txt)'}}>{formatPeso(costoKgLimpio)}/kg</span>
-            </div>
-            <div style={{display:'flex',gap:8,alignItems:'flex-end',marginTop:6}}>
-              <div style={{flex:1}}>
-                <label style={{fontSize:11,color:'var(--txt2)',display:'block',marginBottom:3}}>Precio de venta ($/kg) {precioManual===null&&<span style={{fontSize:10,color:'var(--txt3)'}}>(auto, {margenObj}%)</span>}</label>
-                <input type="number" min={0} step={100} value={precioEfectivo} onChange={e=>setPrecioManual(e.target.value)} className="inp" style={{fontWeight:700,fontSize:18}}/>
-              </div>
-              {precioManual!==null&&<button onClick={()=>setPrecioManual(null)} style={{fontSize:11,padding:'8px 10px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg2)',color:'var(--txt2)',cursor:'pointer',fontWeight:600}}>↺</button>}
-            </div>
-          </div>
-        )}
-
-        <button onClick={enviarAlStock} disabled={guardando||kgN<=0||excede} className="btn-full" style={{background:'var(--green)',opacity:(kgN<=0||excede)?0.4:1}}>
-          {guardando?'⏳ Guardando...':`✅ Mandar ${preset.label.replace(/^[^\s]+\s/,'')} al stock`}
+        <button onClick={enviarTodoAlStock} disabled={guardando||!puedeEnviar} className="btn-full" style={{background:'var(--green)',opacity:!puedeEnviar?0.4:1}}>
+          {guardando?'⏳ Guardando...':'✅ Mandar producción al stock'}
         </button>
       </div>
 
@@ -3571,7 +3552,7 @@ function SeccionProduccion({uid}){
           <div className="ptitle" style={{fontSize:14,marginBottom:8}}>🕓 Producido en esta sesión</div>
           {historial.map((h,i)=>(
             <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'6px 0',borderBottom:i<historial.length-1?'1px solid var(--border)':'none'}}>
-              <span style={{color:'var(--txt)'}}>{h.nombre} <span style={{color:'var(--txt3)',fontSize:11}}>({h.corte}{h.hueso>0?` · +${h.hueso}kg hueso`:''})</span></span>
+              <span style={{color:'var(--txt)'}}>{h.nombre} <span style={{color:'var(--txt3)',fontSize:11}}>({h.corte})</span></span>
               <span style={{color:'var(--txt2)'}}>{h.kg} kg · {h.hora}</span>
             </div>
           ))}
@@ -3581,7 +3562,7 @@ function SeccionProduccion({uid}){
   );
 }
 
-/* ─── #7 RECETAS COMPUESTAS ─── *//* ─── #7 RECETAS COMPUESTAS ─── */
+/* ─── #7 RECETAS COMPUESTAS ─── */
 function SeccionRecetas({uid}){
   const [recetas,setRecetas]=useState([]);
   const [stockItems,setStockItems]=useState([]);
