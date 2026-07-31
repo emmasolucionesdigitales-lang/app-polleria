@@ -2728,21 +2728,6 @@ function CalculadoraCajon({uid}){
       </div>}
 
       {nProduccion>0&&<SeccionProduccion uid={uid} margenObj={margenObj}/>}
-
-      <div className="panel">
-        <button onClick={async()=>{
-          if(!confirm('¿Actualizar todos los productos 🐔 Pollo a "por kg"?'))return;
-          try{
-            const snap=await db.collection(`polleria/${uid}/productos`).where('categoria','in',['🐔 Pollo','Pollo']).get();
-            const batch=db.batch();
-            snap.docs.forEach(d=>batch.update(d.ref,{unidad:'kg'}));
-            await batch.commit();
-            mostrarToast(`✅ ${snap.size} productos corregidos → kg`);
-          }catch(e){alert('Error: '+e.message);}
-        }} className="btn-full" style={{background:'var(--orange)',fontSize:13}}>
-          🔧 Corregir productos existentes → kg
-        </button>
-      </div>
     </div>
   );
 }
@@ -3360,6 +3345,7 @@ function SeccionProduccion({uid,margenObj}){
   const [stockPechuga,setStockPechuga]=useState(null);
   const [stockPatamuslo,setStockPatamuslo]=useState(null);
   const [kgPorProducto,setKgPorProducto]=useState({});
+  const [precioManualPorProducto,setPrecioManualPorProducto]=useState({});
   const [corteSeleccion,setCorteSeleccion]=useState({molida:'Pechuga',albondiga:'Pechuga',kipe:'Pechuga'});
   const [guardando,setGuardando]=useState(false);
   const [toastMsg,setToastMsg]=useState('');
@@ -3390,15 +3376,16 @@ function SeccionProduccion({uid,margenObj}){
   const rendPatamuslo=Number(cfg.rendPatamuslo)||70;
   const cantPechuga=stockPechuga?(Number(stockPechuga.cantidad)||0):0;
   const cantPatamuslo=stockPatamuslo?(Number(stockPatamuslo.cantidad)||0):0;
-  const carneLimpiaPechuga=+(cantPechuga*rendPechuga/100).toFixed(2);
+  const carneLimpiaPechuga=Math.floor(cantPechuga*rendPechuga/100);
   const huesoPechuga=+(cantPechuga-carneLimpiaPechuga).toFixed(2);
-  const carneLimpiaPatamuslo=+(cantPatamuslo*rendPatamuslo/100).toFixed(2);
+  const carneLimpiaPatamuslo=Math.floor(cantPatamuslo*rendPatamuslo/100);
   const huesoPatamuslo=+(cantPatamuslo-carneLimpiaPatamuslo).toFixed(2);
   const costoKgPechuga=stockPechuga?(Number(stockPechuga.precioCosto)||0):0;
   const costoKgPatamuslo=stockPatamuslo?(Number(stockPatamuslo.precioCosto)||0):0;
 
   const setKg=(key,v)=>setKgPorProducto(p=>({...p,[key]:v}));
   const setCorte=(key,c)=>setCorteSeleccion(p=>({...p,[key]:c}));
+  const setPrecioManual=(key,v)=>setPrecioManualPorProducto(p=>({...p,[key]:v}));
 
   const filas=PROD_PRESETS.map(preset=>{
     const corteActivo=preset.corteFijo?preset.corte:(corteSeleccion[preset.key]||'Pechuga');
@@ -3408,10 +3395,14 @@ function SeccionProduccion({uid,margenObj}){
     const kgN=Math.max(0,Number(kgPorProducto[preset.key])||0);
     const kgCrudoUsado=rendActivo>0?+(kgN/(rendActivo/100)).toFixed(3):0;
     const kgHuesoGenerado=+(kgCrudoUsado-kgN).toFixed(3);
-    const costoTotal=+(kgCrudoUsado*costoKgRaw).toFixed(2);
-    const costoKgLimpio=kgN>0?+(costoTotal/kgN).toFixed(2):0;
-    const precioAuto=costoKgLimpio>0?Math.round(costoKgLimpio*(1+margen/100)):0;
-    return{...preset,corteActivo,esPechuga,rendActivo,costoKgRaw,kgN,kgCrudoUsado,kgHuesoGenerado,costoTotal,costoKgLimpio,precioAuto};
+    // Costo por kg de carne limpia: depende solo del corte y el % de rendimiento, no de cuánto vayas a producir.
+    const costoKgLimpio=rendActivo>0?+(costoKgRaw/(rendActivo/100)).toFixed(2):0;
+    const costoTotal=+(costoKgLimpio*kgN).toFixed(2);
+    const precioAuto=costoKgLimpio>0?Math.floor(costoKgLimpio*(1+margen/100)):0;
+    const manual=precioManualPorProducto[preset.key];
+    const precioEditado=manual!==undefined&&manual!=='';
+    const precioEfectivo=precioEditado?Math.floor(Number(manual)||0):precioAuto;
+    return{...preset,corteActivo,esPechuga,rendActivo,costoKgRaw,kgN,kgCrudoUsado,kgHuesoGenerado,costoTotal,costoKgLimpio,precioAuto,precioEfectivo,precioEditado};
   });
 
   const kgAsignadoPechuga=+filas.filter(f=>f.esPechuga).reduce((s,f)=>s+f.kgN,0).toFixed(2);
@@ -3467,11 +3458,11 @@ function SeccionProduccion({uid,margenObj}){
         await destRef.set({
           nombre:f.nombreStock,categoria:'Pollo',tipo:'produccion',
           cantidad:+(cantDest+f.kgN).toFixed(2),
-          unidad:'kg',precioCosto:f.costoKgLimpio,precioVenta:f.precioAuto||0,stockMinimo:0,
+          unidad:'kg',precioCosto:f.costoKgLimpio,precioVenta:f.precioEfectivo||0,stockMinimo:0,
           vencimiento:calcularVencimiento('Pollo'),
           updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         },{merge:true});
-        await prodCol.doc(destId).set({nombre:f.nombreStock,categoria:'Pollo',unidad:'kg',precioCosto:f.costoKgLimpio,precioVenta:f.precioAuto||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        await prodCol.doc(destId).set({nombre:f.nombreStock,categoria:'Pollo',unidad:'kg',precioCosto:f.costoKgLimpio,precioVenta:f.precioEfectivo||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       }
       setHistorial(h=>[...activas.map(f=>({nombre:f.nombreStock,kg:f.kgN,corte:f.corteActivo,hora:new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})})),...h].slice(0,10));
       mostrarToast(`✅ ${activas.length} producto(s) sumados al stock`);
@@ -3533,14 +3524,22 @@ function SeccionProduccion({uid,margenObj}){
               {f.corteFijo&&<span style={{fontSize:10,color:'var(--txt3)'}}>{f.corte}</span>}
             </div>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <input type="number" min={0} step={0.1} value={kgPorProducto[f.key]||''} onChange={e=>setKg(f.key,e.target.value)}
-                placeholder="0 kg" className="inp" style={{flex:1,fontWeight:700,padding:'6px 8px'}}/>
-              <span style={{fontSize:11,color:'var(--txt3)',minWidth:70,textAlign:'right'}}>{f.kgN>0?`${formatPeso(f.precioAuto)}/kg`:''}</span>
+              <div style={{flex:1}}>
+                <label style={{fontSize:10,color:'var(--txt3)',display:'block',marginBottom:2}}>Kg a producir</label>
+                <input type="number" min={0} step={0.1} value={kgPorProducto[f.key]||''} onChange={e=>setKg(f.key,e.target.value)}
+                  placeholder="0 kg" className="inp" style={{fontWeight:700,padding:'6px 8px'}}/>
+              </div>
+              <div style={{width:100}}>
+                <label style={{fontSize:10,color:'var(--txt3)',display:'block',marginBottom:2}}>Precio $/kg{!f.precioEditado&&<span style={{color:'var(--txt3)'}}> (auto)</span>}</label>
+                <input type="number" min={0} step={50} value={precioManualPorProducto[f.key]!==undefined?precioManualPorProducto[f.key]:f.precioAuto} onChange={e=>setPrecioManual(f.key,e.target.value)}
+                  className="inp" style={{fontWeight:700,padding:'6px 8px',color:f.precioEditado?'var(--orange)':'var(--txt)'}}/>
+              </div>
+              {f.precioEditado&&<button onClick={()=>setPrecioManual(f.key,undefined)} title="Volver al automático" style={{alignSelf:'flex-end',fontSize:11,padding:'7px 8px',borderRadius:'var(--radius)',border:'1px solid var(--border)',background:'var(--bg)',color:'var(--txt2)',cursor:'pointer'}}>↺</button>}
             </div>
           </div>
         ))}
 
-        <div style={{fontSize:11,color:'var(--txt3)',marginBottom:10}}>Precio de venta automático con {margen}% de margen (el mismo definido arriba en el cajón).</div>
+        <div style={{fontSize:11,color:'var(--txt3)',marginBottom:10}}>Precio automático con {margen}% de margen (el mismo definido arriba en el cajón). Podés editarlo por producto.</div>
 
         <button onClick={enviarTodoAlStock} disabled={guardando||!puedeEnviar} className="btn-full" style={{background:'var(--green)',opacity:!puedeEnviar?0.4:1}}>
           {guardando?'⏳ Guardando...':'✅ Mandar producción al stock'}
